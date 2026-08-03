@@ -10,6 +10,7 @@ import {
   JudgmentUiMapSchema,
   RelicsSchema,
   RewardsSchema,
+  RunStripSchema,
   type CaseDefinition,
 } from './schemas';
 import { validateCaseTier2AndTier3 } from './ContentSemanticValidator';
@@ -36,7 +37,8 @@ type ContentKind =
   | 'grades'
   | 'judgment-ui-map'
   | 'relics'
-  | 'rewards';
+  | 'rewards'
+  | 'run-strip';
 
 interface RegisteredSchema {
   readonly kind: ContentKind;
@@ -74,6 +76,7 @@ function schemaForPath(relativePath: string): RegisteredSchema | undefined {
     },
     'common/relics.json': { kind: 'relics', schema: RelicsSchema },
     'common/rewards.json': { kind: 'rewards', schema: RewardsSchema },
+    'common/run-strip.json': { kind: 'run-strip', schema: RunStripSchema },
   };
   const common = commonSchemas[path];
   if (common) return common;
@@ -150,6 +153,8 @@ function collectBundleDefinitions(files: readonly ValidatedFile[]): {
   readonly encounterIds: ReadonlySet<string>;
   readonly eventIds: ReadonlySet<string>;
   readonly choiceIds: ReadonlySet<string>;
+  readonly encounterCaseById: ReadonlyMap<string, string>;
+  readonly eventCaseById: ReadonlyMap<string, string>;
 } {
   const cardIds = new Set<string>();
   const enhancementIds = new Set<string>();
@@ -161,6 +166,8 @@ function collectBundleDefinitions(files: readonly ValidatedFile[]): {
   const eventIds = new Set<string>();
   const choiceIds = new Set<string>();
   const skillIds = new Set<string>();
+  const encounterCaseById = new Map<string, string>();
+  const eventCaseById = new Map<string, string>();
 
   for (const file of files) {
     if (file.kind === 'cards') addIds(cardIds, catalogueEntries(file.data, 'cards'), 'card_id');
@@ -176,12 +183,28 @@ function collectBundleDefinitions(files: readonly ValidatedFile[]): {
     }
     if (file.kind === 'case') {
       const root = asObject(file.data);
+      const caseDirectory = normalisePath(file.relativePath).match(
+        /^cases\/([a-z0-9_-]+)\/case\.json$/u,
+      )?.[1];
       const caseId = root?.case_id;
       if (typeof caseId === 'string') caseIds.add(caseId);
-      addIds(encounterIds, Array.isArray(root?.encounters) ? root.encounters : [], 'encounter_id');
+      const encounters = Array.isArray(root?.encounters) ? root.encounters : [];
+      addIds(encounterIds, encounters, 'encounter_id');
+      if (caseDirectory) {
+        encounters.forEach((encounter) => {
+          const id = asObject(encounter)?.encounter_id;
+          if (typeof id === 'string') encounterCaseById.set(id, caseDirectory);
+        });
+      }
       addIds(eventIds, Array.isArray(root?.events) ? root.events : [], 'event_id');
       const nonCombat = Array.isArray(root?.events_noncombat) ? root.events_noncombat : [];
       addIds(eventIds, nonCombat, 'event_id');
+      if (caseDirectory) {
+        nonCombat.forEach((event) => {
+          const id = asObject(event)?.event_id;
+          if (typeof id === 'string') eventCaseById.set(id, caseDirectory);
+        });
+      }
       for (const event of nonCombat) {
         addIds(choiceIds, catalogueEntries(event, 'choices'), 'choice_id');
       }
@@ -205,6 +228,8 @@ function collectBundleDefinitions(files: readonly ValidatedFile[]): {
     encounterIds,
     eventIds,
     choiceIds,
+    encounterCaseById,
+    eventCaseById,
   };
 }
 
@@ -339,6 +364,33 @@ function validateCommonReferences(
           }
         }
       }
+    }
+    if (file.kind === 'run-strip') {
+      catalogueEntries(root, 'nodes').forEach((entry, index) => {
+        const node = asObject(entry);
+        if (!node) return;
+        const ref = node.ref;
+        const caseDirectory = node.case_directory;
+        const referenceOwners = node.kind === 'EVENT'
+          ? definitions.eventCaseById
+          : definitions.encounterCaseById;
+        if (typeof ref !== 'string' || !referenceOwners.has(ref)) {
+          if (typeof ref === 'string') {
+            problems.push(referenceProblem(file.relativePath, `nodes.${index}.ref`, ref));
+          }
+          return;
+        }
+        if (
+          typeof caseDirectory === 'string' &&
+          referenceOwners.get(ref) !== caseDirectory
+        ) {
+          problems.push({
+            kind: 'tier1',
+            relativePath: file.relativePath,
+            message: `[CASE_DIRECTORY_MISMATCH] $.nodes.${index}.case_directory: ${ref} belongs to ${referenceOwners.get(ref) ?? 'unknown'}`,
+          });
+        }
+      });
     }
   }
   return problems;

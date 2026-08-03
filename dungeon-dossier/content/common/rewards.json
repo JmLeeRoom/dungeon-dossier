@@ -1,0 +1,127 @@
+{
+  "$schema": "../../schemas/rewards.schema.json",
+  "schema_version": "1.0",
+  "selection": {
+    "battle_choices": 3,
+    "boss_choices": 2
+  },
+  "rewards": [
+    {
+      "reward_id": "reward_dp_small",
+      "type": "RESOURCE",
+      "resource": "DP",
+      "amount": 10,
+      "rarity": "COMMON",
+      "weight": 8
+    },
+    {
+      "reward_id": "reward_stress_recovery",
+      "type": "RESOURCE",
+      "resource": "STRESS",
+      "amount": 15,
+      "rarity": "COMMON",
+      "weight": 6
+    },
+    {
+      "reward_id": "reward_trust",
+      "type": "RESOURCE",
+      "resource": "TRUST",
+      "amount": 1,
+      "rarity": "COMMON",
+      "weight": 4
+    },
+    {
+      "reward_id": "reward_card_precise",
+      "type": "CARD",
+      "reference_id": "card_contradict_precise",
+      "rarity": "UNCOMMON",
+      "weight": 4
+    },
+    {
+      "reward_id": "reward_blue_stamp",
+      "type": "ENHANCEMENT",
+      "reference_id": "enh_stamp_blue",
+      "rarity": "UNCOMMON",
+      "weight": 4
+    },
+    {
+      "reward_id": "reward_card_clarify_deep",
+      "type": "CARD",
+      "reference_id": "card_clarify_deep",
+      "rarity": "UNCOMMON",
+      "weight": 3
+    },
+    {
+      "reward_id": "reward_postit_time",
+      "type": "ENHANCEMENT",
+      "reference_id": "enh_postit_time",
+      "rarity": "UNCOMMON",
+      "weight": 3
+    },
+    {
+      "reward_id": "reward_clean_notebook",
+      "type": "RELIC",
+      "reference_id": "relic_clean_notebook",
+      "rarity": "RARE",
+      "weight": 2
+    },
+    {
+      "reward_id": "reward_sealed_badge",
+      "type": "RELIC",
+      "reference_id": "relic_sealed_badge",
+      "rarity": "RARE",
+      "weight": 2
+    },
+    {
+      "reward_id": "reward_red_stamp",
+      "type": "ENHANCEMENT",
+      "reference_id": "enh_stamp_red",
+      "rarity": "RARE",
+      "weight": 2
+    },
+    {
+      "reward_id": "reward_truth_lantern",
+      "type": "RELIC",
+      "reference_id": "relic_truth_lantern",
+      "rarity": "LEGENDARY",
+      "weight": 1,
+      "min_act": 4
+    },
+    {
+      "reward_id": "reward_dp_legendary",
+      "type": "RESOURCE",
+      "resource": "DP",
+      "amount": 50,
+      "rarity": "LEGENDARY",
+      "weight": 1
+    },
+    {
+      "reward_id": "reward_clip_legendary",
+      "type": "ENHANCEMENT",
+      "reference_id": "enh_clip_commit",
+      "rarity": "LEGENDARY",
+      "weight": 1
+    },
+    {
+      "reward_id": "reward_case_commit",
+      "type": "CARD",
+      "reference_id": "card_commit_clip",
+      "rarity": "CASE",
+      "weight": 1
+    },
+    {
+      "reward_id": "reward_case_forensic",
+      "type": "CARD",
+      "reference_id": "card_forensic",
+      "rarity": "CASE",
+      "weight": 1
+    },
+    {
+      "reward_id": "reward_case_notice",
+      "type": "CARD",
+      "reference_id": "card_special_notice",
+      "rarity": "CASE",
+      "weight": 1
+    }
+  ]
+}

@@ -13,4 +13,5 @@ export * from './primitives';
 export * from './proofRule';
 export * from './relics';
 export * from './rewards';
+export * from './runStrip';
 export * from './save';

@@ -3,7 +3,10 @@ import {
   SaveRepository,
   exportSaveJson,
   importSaveJson,
+  restoreRunState,
+  saveRunAtNodeBoundary,
 } from '../../src/app/save';
+import { createRunState, type RunState } from '../../src/engine/run';
 import {
   UnsupportedSaveVersionError,
   type SaveData,
@@ -77,6 +80,47 @@ describe('save schema usage path', () => {
     expect(repository.load()).toEqual(save);
     repository.clear();
     expect(repository.load()).toBeUndefined();
+  });
+
+  it('auto-saves and restores run-owned state only at a node boundary', () => {
+    const storage = memoryStorage();
+    const repository = new SaveRepository(storage, 'run-save');
+    const initial = createRunState({
+      runSeed: 77,
+      stress: 82,
+      dp: 20,
+      trust: 2,
+      deck: {
+        drawPile: ['card_query_who'],
+        hand: [],
+        discardPile: ['card_confirm_basic'],
+        exhaustPile: [],
+      },
+      flags: { 'F-02': true },
+    });
+    const state: RunState = {
+      ...initial,
+      nodeIndex: 2,
+      completedNodeIds: ['run_tutorial_01', 'run_tutorial_02'],
+      claimedRewardIds: ['reward_dp_small'],
+      gradeHistory: [{
+        nodeId: 'run_tutorial_01',
+        outcome: 'BEST_RESOLUTION',
+        grade: 'A',
+      }],
+      outcomeHistory: [{
+        nodeId: 'run_tutorial_01',
+        outcome: 'BEST_RESOLUTION',
+      }],
+    };
+
+    const saved = saveRunAtNodeBoundary(repository, state, {
+      caseId: 'case_tutorial',
+      contentVersion: '1.1',
+    });
+    expect(saved.encounter).toBeNull();
+    expect(saved.run?.node_index).toBe(2);
+    expect(restoreRunState(repository.load()!)).toEqual(state);
   });
 
   it('rejects definition fields instead of persisting them', () => {

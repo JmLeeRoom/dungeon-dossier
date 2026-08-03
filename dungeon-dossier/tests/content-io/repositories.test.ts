@@ -7,6 +7,7 @@ import {
   CaseRepository,
   ContentValidationError,
   FallbackRepository,
+  RunStripRepository,
   type FetchLike,
   type InvalidValidationReport,
 } from '../../src/content-io';
@@ -37,16 +38,18 @@ function fetchFixtures(entries: Readonly<Record<string, unknown>>): FetchLike {
 }
 
 describe('content repositories', () => {
-  it('loads case, card, balance, and fallback JSON through the fetch boundary', async () => {
+  it('loads case, card, balance, run-strip, and fallback JSON through the fetch boundary', async () => {
     const caseData = await fixture('cases/tutorial/case.json');
     const cards = await fixture('common/cards.json');
     const balance = await fixture('common/balance.json');
     const dialogue = await fixture('cases/tutorial/dialogue.json');
+    const runStrip = await fixture('common/run-strip.json');
     const fetcher = fetchFixtures({
       '/content/cases/tutorial/case.json': caseData,
       '/content/common/cards.json': cards,
       '/content/common/balance.json': balance,
       '/content/cases/tutorial/dialogue.json': dialogue,
+      '/content/common/run-strip.json': runStrip,
     });
 
     const loadedCase = await new CaseRepository({
@@ -57,12 +60,14 @@ describe('content repositories', () => {
     const balanceRepository = new BalanceRepository({ fetcher });
     const loadedBalance = await balanceRepository.reload();
     const loadedDialogue = await new FallbackRepository({ fetcher }).load('tutorial');
+    const loadedRunStrip = await new RunStripRepository({ fetcher }).load();
 
     expect(loadedCase?.case_id).toBe('case_tutorial');
     expect(loadedCards?.cards).toHaveLength(14);
     expect(loadedBalance?.dmg.contradict).toBe(18);
     expect(balanceRepository.current()).toBe(loadedBalance);
     expect(loadedDialogue?.statements.clm_tutorial_who?.fallback).toHaveLength(1);
+    expect(loadedRunStrip?.nodes).toHaveLength(15);
   });
 
   it('applies validated balance edits immediately without another fetch', async () => {

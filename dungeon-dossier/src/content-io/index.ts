@@ -5,5 +5,7 @@ export * from './ContentSemanticValidator';
 export * from './EncounterBalance';
 export * from './FallbackRepository';
 export * from './RuntimeJsonRepository';
+export * from './RunCatalogRepository';
+export * from './RunStripRepository';
 export * from './SchemaValidator';
 export * from './schemas';

@@ -320,6 +320,116 @@
       "items": {
         "$ref": "#/$defs/__schema0"
       }
+    },
+    "run": {
+      "type": "object",
+      "properties": {
+        "node_index": {
+          "$ref": "#/$defs/__schema1"
+        },
+        "reward_seed_stream": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "false_confessions": {
+          "$ref": "#/$defs/__schema1"
+        },
+        "completed_node_ids": {
+          "minItems": 0,
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/__schema0"
+          }
+        },
+        "pending_reward_ids": {
+          "minItems": 0,
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/__schema0"
+          }
+        },
+        "claimed_reward_ids": {
+          "minItems": 0,
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/__schema0"
+          }
+        },
+        "acquired_evidence_ids": {
+          "minItems": 0,
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/__schema0"
+          }
+        },
+        "grade_history": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "node_id": {
+                "$ref": "#/$defs/__schema0"
+              },
+              "outcome": {
+                "$ref": "#/$defs/__schema3"
+              },
+              "grade": {
+                "type": "string",
+                "enum": [
+                  "S",
+                  "A",
+                  "B",
+                  "C",
+                  "D",
+                  "F"
+                ]
+              }
+            },
+            "required": [
+              "node_id",
+              "outcome",
+              "grade"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "outcome_history": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "node_id": {
+                "$ref": "#/$defs/__schema0"
+              },
+              "outcome": {
+                "$ref": "#/$defs/__schema3"
+              }
+            },
+            "required": [
+              "node_id",
+              "outcome"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "terminal": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "node_index",
+        "reward_seed_stream",
+        "false_confessions",
+        "completed_node_ids",
+        "pending_reward_ids",
+        "claimed_reward_ids",
+        "acquired_evidence_ids",
+        "grade_history",
+        "outcome_history",
+        "terminal"
+      ],
+      "additionalProperties": false
     }
   },
   "required": [
@@ -352,6 +462,15 @@
     "__schema2": {
       "type": "number",
       "minimum": 0
+    },
+    "__schema3": {
+      "type": "string",
+      "enum": [
+        "BEST_RESOLUTION",
+        "PARTIAL_RESOLUTION",
+        "COERCED_CONFESSION",
+        "FAILED"
+      ]
     }
   },
   "$id": "./save.schema.json"

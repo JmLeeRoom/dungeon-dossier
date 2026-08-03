@@ -1,0 +1,76 @@
+{
+  "speaker_profiles": {
+    "ent_ep001_orc": {
+      "race": "ORC",
+      "personality": ["DISCIPLINED", "DEFENSIVE"],
+      "speech": "TERSE_MILITARY",
+      "forbidden_expressions": ["자백", "진범"]
+    }
+  },
+  "statements": {
+    "clm_ep001_orc_who": {
+      "fallback": ["서쪽 창고에서는 누구와도 함께 일하지 않았다."],
+      "spans": [{ "claim_id": "clm_ep001_orc_who", "start": 0, "end": 1 }]
+    },
+    "clm_ep001_orc_when": {
+      "fallback": ["밤 종 뒤에는 화물을 옮기지 않았다."],
+      "spans": [{ "claim_id": "clm_ep001_orc_when", "start": 0, "end": 1 }]
+    },
+    "clm_ep001_where": {
+      "fallback": ["야간 근무 동안 나는 동문 초소를 한 번도 비우지 않았다."],
+      "spans": [{ "claim_id": "clm_ep001_where", "start": 0, "end": 1 }]
+    },
+    "clm_ep001_what": {
+      "fallback": ["서쪽 창고에서 나른 건 속이 빈 나무 상자뿐이다."],
+      "spans": [{ "claim_id": "clm_ep001_what", "start": 0, "end": 1 }]
+    },
+    "clm_ep001_orc_how": {
+      "fallback": ["봉인 상자는 수레 없이 손으로만 옮겼다."],
+      "spans": [{ "claim_id": "clm_ep001_orc_how", "start": 0, "end": 1 }]
+    },
+    "clm_ep001_orc_why": {
+      "fallback": ["상자 이동을 지시받은 적이 없다."],
+      "spans": [{ "claim_id": "clm_ep001_orc_why", "start": 0, "end": 1 }]
+    }
+  },
+  "reactions": {
+    "R_DIRECT_CONTRADICTION": ["서쪽 관문 기록과 내 근무 시각이 맞지 않는군."],
+    "R_INDIRECT_SUSPICION": ["정황뿐이다. 동문을 비웠다는 증거는 아니다."],
+    "R_INSUFFICIENT_GROUNDS": ["그 기록만으로 상자 내용까지 증명할 수 없다."],
+    "R_TRUTH_ATTACKED": ["내 근무 보고를 의심하는 건가."],
+    "R_CONFIRM_LOCKED": ["그 진술은 이미 근무 기록으로 확정했다."],
+    "R_CONFIRM_PROVISIONAL": ["임시로 인정하겠다. 화물 내역은 더 확인해라."],
+    "R_CONFIRM_CONFLICT": ["그 판단은 초소 근무표와 충돌한다."],
+    "R_QUERY_SUCCESS": ["묻는 항목에 답하겠다. 시각부터 확인해라."],
+    "R_QUERY_BLOCKED": ["선행 기록이 없다. 지금은 답할 수 없다."],
+    "R_CLARIFY_SUCCESS": ["명확히 말한다. 나는 동문에 있었고 빈 상자만 옮겼다."],
+    "R_CLARIFY_NOOP": ["같은 보고를 반복했다. 내용은 변함없다."],
+    "R_ACTION_INVALID": ["그 조치는 현재 조사 절차에 맞지 않는다."],
+    "R_PROCEDURE_VIOLATION": ["순서를 지켜라. 근무 기록부터 확인해야 한다."],
+    "INCOMPATIBLE_TARGET": ["그 자료는 내 초소 근무와 관계없다."],
+    "TARGET_NOT_EXPOSED": ["공개되지 않은 화물 항목에는 답하지 않겠다."],
+    "MISSING_TARGET": ["어느 진술을 검토하는지 지목해라."],
+    "MISSING_EVIDENCE": ["제시된 통과 기록이 없다."],
+    "MISSING_PROOF_RULE": ["상자 내용과 그 기록을 잇는 근거가 없다."],
+    "RESERVED_INTENT": ["지금 허용된 조사 명령이 아니다."],
+    "SILENCE": ["추가 보고는 없다."],
+    "R_COMMIT_SUCCESS": ["그 진술은 근무 보고에 확정해 두겠다."],
+    "R_COMMIT_REFUSED": ["화물 내역이 없이는 확정하지 않겠다."],
+    "R_FORENSIC_REVEALED": ["상자 잔류물 분석에 보급품 흔적이 나왔군."],
+    "R_PRESSURE_APPLIED": ["압박은 견딜 수 있다. 질문을 계속해라."],
+    "R_PRESSURE_BACKFIRE": ["무리한 압박에는 더 답하지 않겠다."],
+    "R_RECOVER_APPLIED": ["호흡을 가다듬었다. 근무 동선을 다시 보고하겠다."],
+    "R_SPECIAL_APPLIED": ["특별 조회로 서쪽 관문 기록이 전부 드러났군."],
+    "R_IRRELEVANT_EVIDENCE": ["그 자료는 서쪽 창고 통과와 무관하다."]
+  },
+  "confession": {
+    "full": [
+      "나는 22시 20분에 동문을 떠나 서쪽 창고로 갔다.",
+      "보급품이 든 상자 네 개를 옮긴 경위를 보고하겠다."
+    ],
+    "coerced": [
+      "압박을 거둬라. 서쪽 창고에 갔다고 적어라.",
+      "더 묻지 마라. 상자에 보급품이 있었다고 하겠다."
+    ]
+  }
+}

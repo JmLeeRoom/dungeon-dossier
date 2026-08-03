@@ -1,0 +1,76 @@
+{
+  "speaker_profiles": {
+    "ent_tutorial_harpy": {
+      "race": "HARPY",
+      "personality": ["QUICK"],
+      "speech": "RAPID_FORMAL",
+      "forbidden_expressions": ["정답", "범인"]
+    }
+  },
+  "statements": {
+    "clm_tutorial_harpy_who": {
+      "fallback": ["보관함 근처에서는 아는 사람을 보지 못했습니다."],
+      "spans": [{ "claim_id": "clm_tutorial_harpy_who", "start": 0, "end": 1 }]
+    },
+    "clm_tutorial_harpy_when": {
+      "fallback": ["경보 전에는 서쪽 계단을 확인하고 있었습니다."],
+      "spans": [{ "claim_id": "clm_tutorial_harpy_when", "start": 0, "end": 1 }]
+    },
+    "clm_tutorial_where": {
+      "fallback": ["저는 그 시간 내내 서쪽 복도만 순찰했습니다."],
+      "spans": [{ "claim_id": "clm_tutorial_where", "start": 0, "end": 1 }]
+    },
+    "clm_tutorial_harpy_what": {
+      "fallback": ["순찰 중 발견한 것은 열린 보관함뿐이었습니다."],
+      "spans": [{ "claim_id": "clm_tutorial_harpy_what", "start": 0, "end": 1 }]
+    },
+    "clm_tutorial_how": {
+      "fallback": ["문은 제가 보았을 때부터 이미 열려 있었습니다."],
+      "spans": [{ "claim_id": "clm_tutorial_how", "start": 0, "end": 1 }]
+    },
+    "clm_tutorial_harpy_why": {
+      "fallback": ["동쪽 보관함에 갈 이유가 없었습니다."],
+      "spans": [{ "claim_id": "clm_tutorial_harpy_why", "start": 0, "end": 1 }]
+    }
+  },
+  "reactions": {
+    "R_DIRECT_CONTRADICTION": ["복도 사진의 시각은 제 순찰표와 다르군요."],
+    "R_INDIRECT_SUSPICION": ["그 흔적만으로 동쪽에 갔다고 보긴 어렵습니다."],
+    "R_INSUFFICIENT_GROUNDS": ["사진 한 장에는 순찰 전체가 담기지 않습니다."],
+    "R_TRUTH_ATTACKED": ["그 자료는 서쪽에 있었다는 설명을 뒷받침합니다."],
+    "R_IRRELEVANT_EVIDENCE": ["그 물건은 복도 동선과 연결되지 않습니다."],
+    "R_CONFIRM_LOCKED": ["서쪽 순찰 기록은 이제 확인된 셈이군요."],
+    "R_CONFIRM_PROVISIONAL": ["적어도 순찰 시작점은 맞다고 보시는군요."],
+    "R_CONFIRM_CONFLICT": ["사진과 순찰표의 시각부터 비교해 보시죠."],
+    "R_QUERY_SUCCESS": ["서쪽 복도에서는 창문과 계단을 확인했습니다."],
+    "R_QUERY_BLOCKED": ["그 동선은 앞선 순찰 기록부터 살펴야 합니다."],
+    "R_CLARIFY_SUCCESS": ["서쪽에만 있었다는 건 담당 시간 전체를 뜻합니다."],
+    "R_CLARIFY_NOOP": ["제 순찰 경로는 이미 분명히 말씀드렸습니다."],
+    "R_COMMIT_SUCCESS": ["좋습니다, 서쪽 순찰이었다고 명확히 기록하십시오."],
+    "R_COMMIT_REFUSED": ["그 문장으로 제 동선을 확정할 수는 없습니다."],
+    "R_FORENSIC_REVEALED": ["사진의 가려진 시각 정보까지 복원했군요."],
+    "R_PRESSURE_APPLIED": ["재촉하지 않아도 순서대로 답하겠습니다."],
+    "R_PRESSURE_BACKFIRE": ["그런 압박은 기억을 흐릴 뿐입니다."],
+    "R_RECOVER_APPLIED": ["호흡을 가다듬었으니 계속 진행하시죠."],
+    "R_SPECIAL_APPLIED": ["새 절차가 동선을 밝힌다면 협조하겠습니다."],
+    "R_ACTION_INVALID": ["그 방식으로는 제 동선을 검증할 수 없습니다."],
+    "R_PROCEDURE_VIOLATION": ["규정에 맞는 질문으로 다시 진행해 주십시오."],
+    "INCOMPATIBLE_TARGET": ["그 단서는 이 순찰 진술과 맞지 않습니다."],
+    "TARGET_NOT_EXPOSED": ["아직 제게 묻지 않은 동선을 지목하셨습니다."],
+    "MISSING_TARGET": ["어느 진술을 검토하는지 먼저 정해 주십시오."],
+    "MISSING_EVIDENCE": ["비교할 사진이나 순찰표가 필요합니다."],
+    "MISSING_PROOF_RULE": ["그 자료로 무엇을 확인할지 불분명합니다."],
+    "RESERVED_INTENT": ["현재 절차에서는 그 요청을 받을 수 없습니다."],
+    "SILENCE": ["그 부분에는 더 답하지 않겠습니다."]
+  },
+  "confession": {
+    "full": [
+      "서쪽 순찰을 벗어나 보관함으로 간 경로를 모두 밝히겠습니다.",
+      "문이 열린 시각과 제가 본 사람을 순서대로 말하겠습니다."
+    ],
+    "coerced": [
+      "이제 됐습니다. 적고 싶은 내용대로 적으십시오.",
+      "더는 같은 질문을 견딜 수 없습니다. 끝내 주십시오."
+    ]
+  }
+}

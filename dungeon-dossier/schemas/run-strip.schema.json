@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "$ref": "#/$defs/__schema0"
+    },
+    "schema_version": {
+      "$ref": "#/$defs/__schema2"
+    },
+    "nodes": {
+      "$ref": "#/$defs/__schema3"
+    }
+  },
+  "required": [
+    "schema_version",
+    "nodes"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "__schema0": {
+      "maxLength": 500,
+      "$ref": "#/$defs/__schema1"
+    },
+    "__schema1": {
+      "type": "string",
+      "minLength": 1
+    },
+    "__schema2": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+(?:\\.\\d+)?$"
+    },
+    "__schema3": {
+      "minItems": 15,
+      "maxItems": 15,
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/__schema4"
+      }
+    },
+    "__schema4": {
+      "type": "object",
+      "properties": {
+        "node_id": {
+          "$ref": "#/$defs/__schema5"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "ENCOUNTER",
+            "EVENT",
+            "BOSS"
+          ]
+        },
+        "ref": {
+          "$ref": "#/$defs/__schema5"
+        },
+        "case_directory": {
+          "$ref": "#/$defs/__schema1"
+        }
+      },
+      "required": [
+        "node_id",
+        "kind",
+        "ref",
+        "case_directory"
+      ],
+      "additionalProperties": false
+    },
+    "__schema5": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160
+    }
+  },
+  "$id": "./run-strip.schema.json"
+}

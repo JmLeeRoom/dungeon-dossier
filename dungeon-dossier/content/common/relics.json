@@ -1,0 +1,38 @@
+{
+  "$schema": "../../schemas/relics.schema.json",
+  "schema_version": "1.0",
+  "relics": [
+    {
+      "relic_id": "relic_clean_notebook",
+      "name_key": "relic.clean_notebook.name",
+      "description_key": "relic.clean_notebook.description",
+      "rarity": "COMMON",
+      "acquisition": "REWARD",
+      "activation": "ENCOUNTER_START",
+      "conditions": [{ "type": "ALWAYS" }],
+      "effects": [{ "type": "ADJUST_RESOURCE", "resource": "cp", "delta": 1 }]
+    },
+    {
+      "relic_id": "relic_sealed_badge",
+      "name_key": "relic.sealed_badge.name",
+      "description_key": "relic.sealed_badge.description",
+      "rarity": "RARE",
+      "acquisition": "REWARD",
+      "activation": "ON_RESOLUTION",
+      "conditions": [{ "type": "ALWAYS" }],
+      "effects": [{ "type": "ADJUST_RESOURCE", "resource": "coercion", "delta": -2 }],
+      "uses_per_encounter": 1
+    },
+    {
+      "relic_id": "relic_truth_lantern",
+      "name_key": "relic.truth_lantern.name",
+      "description_key": "relic.truth_lantern.description",
+      "rarity": "LEGENDARY",
+      "acquisition": "CASE_CLEAR",
+      "activation": "PASSIVE",
+      "conditions": [{ "type": "ALWAYS" }],
+      "effects": [{ "type": "OPEN_ROUTE", "target": "runtime-bonus-route" }],
+      "linked_flag_id": "F-13"
+    }
+  ]
+}

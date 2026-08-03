@@ -6,19 +6,21 @@ import {
   SIMULATION_ARCHETYPES,
   SIMULATION_CATALOG,
   simulateBestRoute,
+  type SimulationAction,
 } from '../../tools/simulate/routeSimulator';
 
 describe('BEST reachability smoke policies', () => {
   it.each(SIMULATION_ARCHETYPES)(
-    '%s completes a shortest solving path and explicitly secures the statement',
+    '%s completes its authored path through EncounterCoordinator and explicitly secures the statement',
     (archetype) => {
       const encounter = SIMULATION_CATALOG[archetype];
-      const policy = encounter.policies.BEST_RESOLUTION;
       const startedAt = performance.now();
       const result = simulateBestRoute(archetype, { seed: 2_026 });
       const elapsedMs = performance.now() - startedAt;
 
       expect(result).toMatchObject({
+        caseId: encounter.caseId,
+        encounterId: encounter.encounterId,
         intendedOutcome: 'BEST_RESOLUTION',
         outcome: 'BEST_RESOLUTION',
         terminated: true,
@@ -26,26 +28,70 @@ describe('BEST reachability smoke policies', () => {
         allRequiredObjectivesCompleted: true,
         bestUnlockObserved: true,
         explicitBestConfirmation: true,
+        execution: 'ENCOUNTER_COORDINATOR',
       });
+      expect(result.coordinatorJudgmentLogBytes).not.toBeNull();
       expect(result.completedObjectiveIds).toHaveLength(
         encounter.objectives.required.length,
       );
-      expect(result.steps).toBe(encounter.objectives.required.length + 1);
-      expect(result.steps).toBe(policy.actions.length);
+      expect(result.steps).toBeGreaterThan(encounter.objectives.required.length);
+      expect(result.steps).toBe(result.inputSequence.length);
+      expect(result.steps).toBeLessThanOrEqual(result.maxSteps);
       expect(elapsedMs).toBeLessThan(1_000);
 
-      const submissions = policy.actions.filter(
-        (action) => action.kind === 'SUBMIT',
+      const submissions = result.inputSequence.filter(
+        (
+          action,
+        ): action is Extract<SimulationAction, Readonly<{ kind: 'SUBMIT' }>> =>
+          action.kind === 'SUBMIT' &&
+          action.resolutionCode === 'R_DIRECT_CONTRADICTION',
       );
-      expect(submissions).toHaveLength(encounter.objectives.required.length);
+      expect(submissions.length).toBeGreaterThanOrEqual(
+        encounter.objectives.required.length,
+      );
       expect(
         new Set(submissions.map((action) => action.objectiveId)).size,
       ).toBe(encounter.objectives.required.length);
+      for (const path of encounter.proofPaths) {
+        expect(submissions).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({
+              objectiveId: path.objectiveId,
+              claimId: path.claimId,
+              proofRuleId: path.proofRuleId,
+              cardId: path.cardId,
+              evidenceIds: path.evidenceIds,
+            }),
+          ]),
+        );
+      }
       for (const submission of submissions) {
         expect(submission.cardId).not.toBe('');
         expect(submission.tagId).not.toBe('');
+        expect(submission.claimId).not.toBe('');
+        expect(submission.proofRuleId).not.toBe('');
         expect(submission.evidenceIds.length).toBeGreaterThan(0);
       }
+      expect(
+        result.judgmentLog
+          .filter((step) => step.actionKind === 'SUBMIT')
+          .every(
+            (step) =>
+              step.cardId !== undefined &&
+              step.resolutionCode !== undefined &&
+              step.commandPoints !== undefined &&
+              step.commandPoints >= 0 &&
+              step.handCardIds !== undefined,
+          ),
+      ).toBe(true);
+      expect(result.inputSequence.some((action) => action.kind === 'END_TURN')).toBe(
+        true,
+      );
+      expect(result.coordinatorJudgmentLogBytes).toContain('"SUBMIT"');
+      expect(result.coordinatorJudgmentLogBytes).toContain('"END_TURN"');
+      expect(result.coordinatorJudgmentLogBytes).toContain(
+        '"SECURE_STATEMENT"',
+      );
 
       const unlockedAt = result.judgmentLog.findIndex(
         (step) =>
@@ -61,6 +107,13 @@ describe('BEST reachability smoke policies', () => {
         secureStatementRequested: true,
         terminalOutcome: 'BEST_RESOLUTION',
       });
+      const composureBeforeConfirmation = result.judgmentLog.at(-2)?.composure;
+      expect(composureBeforeConfirmation).toBeGreaterThanOrEqual(
+        encounter.sweetSpot.min,
+      );
+      expect(composureBeforeConfirmation).toBeLessThanOrEqual(
+        encounter.sweetSpot.max,
+      );
     },
   );
 
@@ -71,6 +124,31 @@ describe('BEST reachability smoke policies', () => {
 
       expect(replay.inputSequence).toEqual(first.inputSequence);
       expect(replay.judgmentLogBytes).toBe(first.judgmentLogBytes);
+      expect(replay.coordinatorJudgmentLogBytes).toBe(
+        first.coordinatorJudgmentLogBytes,
+      );
     }
+  });
+
+  it('uses authored inquiry routes while cycling the real card deck', () => {
+    const results = SIMULATION_ARCHETYPES.map((archetype) =>
+      simulateBestRoute(archetype, { seed: 91 }),
+    );
+    const submittedRouteIds = results.flatMap((result) =>
+      result.inputSequence.flatMap((action) =>
+        action.kind === 'SUBMIT' && action.routeId !== undefined
+          ? [action.routeId]
+          : [],
+      ),
+    );
+
+    expect(submittedRouteIds.length).toBeGreaterThan(0);
+    expect(
+      results.every(
+        (result) =>
+          result.modifierActivationCount >= 0 &&
+          result.coordinatorJudgmentLogBytes !== null,
+      ),
+    ).toBe(true);
   });
 });

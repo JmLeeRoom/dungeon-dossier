@@ -1,0 +1,76 @@
+{
+  "speaker_profiles": {
+    "ent_ep001_goblin": {
+      "race": "GOBLIN",
+      "personality": ["NERVOUS", "CALCULATING"],
+      "speech": "FAST_BUREAUCRATIC",
+      "forbidden_expressions": ["범인", "정답"]
+    }
+  },
+  "statements": {
+    "clm_ep001_who": {
+      "fallback": ["장부를 고친 계정이 제 것처럼 보일 뿐, 저는 손대지 않았습니다."],
+      "spans": [{ "claim_id": "clm_ep001_who", "start": 0, "end": 1 }]
+    },
+    "clm_ep001_when": {
+      "fallback": ["밤 종이 울린 뒤에는 기록 보관실 근처에도 가지 않았어요."],
+      "spans": [{ "claim_id": "clm_ep001_when", "start": 0, "end": 1 }]
+    },
+    "clm_ep001_goblin_where": {
+      "fallback": ["밤 종 뒤에는 줄곧 숙소에 있었어요."],
+      "spans": [{ "claim_id": "clm_ep001_goblin_where", "start": 0, "end": 1 }]
+    },
+    "clm_ep001_goblin_what": {
+      "fallback": ["붉은 장부에서는 정상 출고 수량만 봤어요."],
+      "spans": [{ "claim_id": "clm_ep001_goblin_what", "start": 0, "end": 1 }]
+    },
+    "clm_ep001_goblin_how": {
+      "fallback": ["장부 계정에는 제 암호로 접속하지 않았어요."],
+      "spans": [{ "claim_id": "clm_ep001_goblin_how", "start": 0, "end": 1 }]
+    },
+    "clm_ep001_goblin_why": {
+      "fallback": ["출고 수량을 바꿀 이유가 없었어요."],
+      "spans": [{ "claim_id": "clm_ep001_goblin_why", "start": 0, "end": 1 }]
+    }
+  },
+  "reactions": {
+    "R_DIRECT_CONTRADICTION": ["접속 기록과 시각이 맞물린다고요? 잠깐만요."],
+    "R_INDIRECT_SUSPICION": ["그 정황만으로 제 계정의 움직임을 단정하긴 이릅니다."],
+    "R_INSUFFICIENT_GROUNDS": ["그 자료만으로는 장부 수정자를 가릴 수 없어요."],
+    "R_TRUTH_ATTACKED": ["제 설명을 통째로 의심하시는 겁니까?"],
+    "R_CONFIRM_LOCKED": ["그 대목은 이미 장부 기록과 맞춰 말씀드렸습니다."],
+    "R_CONFIRM_PROVISIONAL": ["일단 그렇게 적되, 접속 시각은 다시 확인해 주세요."],
+    "R_CONFIRM_CONFLICT": ["그 결론은 보관실 출입 시각과 어긋납니다."],
+    "R_QUERY_SUCCESS": ["질문하신 시각의 접속 내역부터 설명하겠습니다."],
+    "R_QUERY_BLOCKED": ["그 질문은 장부 열람 절차부터 갖춰야 답할 수 있어요."],
+    "R_CLARIFY_SUCCESS": ["정리하면, 종이 울린 뒤에는 보관실에 없었다는 말입니다."],
+    "R_CLARIFY_NOOP": ["이미 같은 내용으로 접속 경위를 말씀드렸어요."],
+    "R_ACTION_INVALID": ["그 방식으로는 장부 기록을 검토할 수 없습니다."],
+    "R_PROCEDURE_VIOLATION": ["기록 열람 순서를 지켜 주셔야 합니다."],
+    "INCOMPATIBLE_TARGET": ["그 자료는 제 계정 기록과 연결되지 않아요."],
+    "TARGET_NOT_EXPOSED": ["아직 공개되지 않은 장부 항목을 묻고 계시네요."],
+    "MISSING_TARGET": ["어느 장부 항목을 말씀하시는지 지정해 주세요."],
+    "MISSING_EVIDENCE": ["확인할 접속 기록이 제시되지 않았습니다."],
+    "MISSING_PROOF_RULE": ["그 자료를 장부 수정과 잇는 근거가 빠졌어요."],
+    "RESERVED_INTENT": ["그 요청은 지금 처리할 수 있는 조사 항목이 아닙니다."],
+    "SILENCE": ["기록을 더 살펴보기 전에는 덧붙일 말이 없습니다."],
+    "R_COMMIT_SUCCESS": ["그 진술은 장부 기록에 맞춰 확정하겠습니다."],
+    "R_COMMIT_REFUSED": ["접속 경위가 정리되기 전에는 확정할 수 없어요."],
+    "R_FORENSIC_REVEALED": ["단말 감식 결과에 제 계정 흔적이 더 드러났군요."],
+    "R_PRESSURE_APPLIED": ["재촉하셔도 장부 열람 순서는 지켜야 합니다."],
+    "R_PRESSURE_BACKFIRE": ["그런 압박이라면 기록 검토를 중단하겠습니다."],
+    "R_RECOVER_APPLIED": ["잠시 숨을 고르니 접속 시각을 다시 설명할 수 있겠어요."],
+    "R_SPECIAL_APPLIED": ["특별 조회로 장부 수정 이력이 한꺼번에 펼쳐졌네요."],
+    "R_IRRELEVANT_EVIDENCE": ["그 자료는 붉은 장부의 수정 시각과 무관합니다."]
+  },
+  "confession": {
+    "full": [
+      "제가 22시 8분에 보관실 단말로 출고 수량을 바꿨습니다.",
+      "제 계정을 써서 붉은 장부를 고친 경위를 모두 설명하겠습니다."
+    ],
+    "coerced": [
+      "압박을 멈춰 주세요. 장부는 제가 고쳤다고 적겠습니다.",
+      "더는 버티기 어렵습니다. 접속 기록대로 받아들이세요."
+    ]
+  }
+}

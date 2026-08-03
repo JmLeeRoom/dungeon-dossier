@@ -5,25 +5,101 @@
       "personality": ["TIMID"],
       "speech": "POLITE_TREMBLING",
       "forbidden_expressions": ["사실은", "거짓말"]
+    },
+    "ent_tutorial_harpy": {
+      "race": "HARPY",
+      "personality": ["QUICK"],
+      "speech": "RAPID_FORMAL",
+      "forbidden_expressions": ["정답", "범인"]
+    },
+    "ent_tutorial_minotaur": {
+      "race": "MINOTAUR",
+      "personality": ["STUBBORN"],
+      "speech": "SLOW_DIRECT",
+      "forbidden_expressions": ["자백", "진범"]
     }
   },
   "statements": {
     "clm_tutorial_who": {
       "fallback": ["오후 5시에는 저 혼자 탕비실을 청소했어요."],
-      "spans": [
-        {
-          "claim_id": "clm_tutorial_who",
-          "start": 0,
-          "end": 10
-        }
-      ]
+      "spans": [{ "claim_id": "clm_tutorial_who", "start": 0, "end": 1 }]
+    },
+    "clm_tutorial_when": {
+      "fallback": ["그 물건이 사라질 때에는 이미 퇴근했어요."],
+      "spans": [{ "claim_id": "clm_tutorial_when", "start": 0, "end": 1 }]
+    },
+    "clm_tutorial_where": {
+      "fallback": ["저는 계속 서쪽 복도에만 있었습니다."],
+      "spans": [{ "claim_id": "clm_tutorial_where", "start": 0, "end": 1 }]
+    },
+    "clm_tutorial_what": {
+      "fallback": ["제가 집은 것은 빈 종이컵뿐이오."],
+      "spans": [{ "claim_id": "clm_tutorial_what", "start": 0, "end": 1 }]
+    },
+    "clm_tutorial_how": {
+      "fallback": ["보관함 문은 원래 열려 있었어요."],
+      "spans": [{ "claim_id": "clm_tutorial_how", "start": 0, "end": 1 }]
+    },
+    "clm_tutorial_why": {
+      "fallback": ["나는 그 황금 엘릭서에 관심이 없소."],
+      "spans": [{ "claim_id": "clm_tutorial_why", "start": 0, "end": 1 }]
+    },
+    "clm_tutorial_slime_where": {
+      "fallback": ["저는 청소 시간 내내 탕비실 안에만 있었어요."],
+      "spans": [{ "claim_id": "clm_tutorial_slime_where", "start": 0, "end": 1 }]
+    },
+    "clm_tutorial_slime_what": {
+      "fallback": ["저는 빈 컵과 쟁반만 치웠어요."],
+      "spans": [{ "claim_id": "clm_tutorial_slime_what", "start": 0, "end": 1 }]
+    },
+    "clm_tutorial_slime_how": {
+      "fallback": ["저는 보관함 손잡이에 손대지 않았어요."],
+      "spans": [{ "claim_id": "clm_tutorial_slime_how", "start": 0, "end": 1 }]
+    },
+    "clm_tutorial_slime_why": {
+      "fallback": ["저는 마감 수당 외에는 바란 것이 없었어요."],
+      "spans": [{ "claim_id": "clm_tutorial_slime_why", "start": 0, "end": 1 }]
+    },
+    "clm_tutorial_harpy_who": {
+      "fallback": ["보관함 근처에서는 아는 사람을 보지 못했습니다."],
+      "spans": [{ "claim_id": "clm_tutorial_harpy_who", "start": 0, "end": 1 }]
+    },
+    "clm_tutorial_harpy_when": {
+      "fallback": ["경보 전에는 서쪽 계단을 확인하고 있었습니다."],
+      "spans": [{ "claim_id": "clm_tutorial_harpy_when", "start": 0, "end": 1 }]
+    },
+    "clm_tutorial_harpy_what": {
+      "fallback": ["순찰 중 발견한 것은 열린 보관함뿐이었습니다."],
+      "spans": [{ "claim_id": "clm_tutorial_harpy_what", "start": 0, "end": 1 }]
+    },
+    "clm_tutorial_harpy_why": {
+      "fallback": ["동쪽 보관함에 갈 이유가 없었습니다."],
+      "spans": [{ "claim_id": "clm_tutorial_harpy_why", "start": 0, "end": 1 }]
+    },
+    "clm_tutorial_minotaur_who": {
+      "fallback": ["보관함 앞에서 하피와 마주치지 않았소."],
+      "spans": [{ "claim_id": "clm_tutorial_minotaur_who", "start": 0, "end": 1 }]
+    },
+    "clm_tutorial_minotaur_when": {
+      "fallback": ["청소가 끝난 뒤에야 탕비실에 들어갔소."],
+      "spans": [{ "claim_id": "clm_tutorial_minotaur_when", "start": 0, "end": 1 }]
+    },
+    "clm_tutorial_minotaur_where": {
+      "fallback": ["종이컵은 탕비실 출입문 옆에서 주웠소."],
+      "spans": [{ "claim_id": "clm_tutorial_minotaur_where", "start": 0, "end": 1 }]
+    },
+    "clm_tutorial_minotaur_how": {
+      "fallback": ["보관함 문을 밀거나 열지 않았소."],
+      "spans": [{ "claim_id": "clm_tutorial_minotaur_how", "start": 0, "end": 1 }]
     }
   },
   "reactions": {
-    "reaction.tutorial.start": ["Let's review the shift roster first."]
+    "reaction.tutorial.slime": ["출입 기록이라면 다시 확인해 보세요."],
+    "reaction.tutorial.harpy": ["사진 한 장으로 순찰 전체를 알 수는 없어요."],
+    "reaction.tutorial.minotaur": ["그 목격자가 정말 가까이서 봤다는 거요?"]
   },
   "confession": {
-    "full": ["제가 기억하는 사실은 전부 말씀드렸습니다."],
-    "coerced": ["그만할게요. 제가 했다고 할게요."]
+    "full": ["황금 엘릭서를 옮긴 순서와 이유를 모두 말하겠습니다."],
+    "coerced": ["그만하시오. 원하는 대로 적으시오."]
   }
 }

@@ -1,0 +1,58 @@
+{
+  "$schema": "../../schemas/judgment-ui-map.schema.json",
+  "schema_version": "1.0",
+  "categories": {
+    "DIRECT_CONTRADICTION": { "label_key": "judgment.category.direct" },
+    "INDIRECT_SUSPICION": { "label_key": "judgment.category.indirect" },
+    "INSUFFICIENT_GROUNDS": { "label_key": "judgment.category.insufficient" },
+    "TRUTH_ATTACKED": { "label_key": "judgment.category.truth_attacked" }
+  },
+  "facets": {
+    "WHO": { "label_key": "facet.who" },
+    "WHEN": { "label_key": "facet.when" },
+    "WHERE": { "label_key": "facet.where" },
+    "WHAT": { "label_key": "facet.what" },
+    "HOW": { "label_key": "facet.how" },
+    "WHY": { "label_key": "facet.why" }
+  },
+  "proof_scopes": {
+    "IDENTITY": { "label_key": "scope.identity", "missing_feedback_key": "missing.identity" },
+    "TIME": { "label_key": "scope.time", "missing_feedback_key": "missing.time" },
+    "LOCATION": { "label_key": "scope.location", "missing_feedback_key": "missing.location" },
+    "PRESENCE": { "label_key": "scope.presence", "missing_feedback_key": "missing.presence" },
+    "OWNERSHIP": { "label_key": "scope.ownership", "missing_feedback_key": "missing.ownership" },
+    "ACTION": { "label_key": "scope.action", "missing_feedback_key": "missing.action" },
+    "SEQUENCE": { "label_key": "scope.sequence", "missing_feedback_key": "missing.sequence" },
+    "ROUTE": { "label_key": "scope.route", "missing_feedback_key": "missing.route" },
+    "INSTRUCTION": { "label_key": "scope.instruction", "missing_feedback_key": "missing.instruction" },
+    "MOTIVE": { "label_key": "scope.motive", "missing_feedback_key": "missing.motive" },
+    "INTEGRITY": { "label_key": "scope.integrity", "missing_feedback_key": "missing.integrity" }
+  },
+  "resolution_codes": {
+    "R_DIRECT_CONTRADICTION": {
+      "label_key": "judgment.direct.label",
+      "feedback_key": "judgment.direct.feedback",
+      "category": "DIRECT_CONTRADICTION"
+    },
+    "R_INDIRECT_SUSPICION": {
+      "label_key": "judgment.indirect.label",
+      "feedback_key": "judgment.indirect.feedback",
+      "category": "INDIRECT_SUSPICION"
+    },
+    "R_INSUFFICIENT_GROUNDS": {
+      "label_key": "judgment.insufficient.label",
+      "feedback_key": "judgment.insufficient.feedback",
+      "category": "INSUFFICIENT_GROUNDS"
+    },
+    "R_TRUTH_ATTACKED": {
+      "label_key": "judgment.truth_attacked.label",
+      "feedback_key": "judgment.truth_attacked.feedback",
+      "category": "TRUTH_ATTACKED"
+    },
+    "R_IRRELEVANT_EVIDENCE": {
+      "label_key": "judgment.irrelevant.label",
+      "feedback_key": "judgment.irrelevant.dedicated_feedback",
+      "category": "INSUFFICIENT_GROUNDS"
+    }
+  }
+}

@@ -1,0 +1,67 @@
+{
+  "$schema": "../../schemas/grades.schema.json",
+  "schema_version": "1.0",
+  "grades": [
+    {
+      "grade": "S",
+      "label_key": "grade.s",
+      "priority": 600,
+      "requirements": {
+        "required_claim_resolution_ratio_min": 1,
+        "optional_objective_ratio_min": 1,
+        "require_sweet_spot_finish": true,
+        "require_originals_preserved": true,
+        "coercion_max": 10,
+        "false_confessions_max": 0
+      }
+    },
+    {
+      "grade": "A",
+      "label_key": "grade.a",
+      "priority": 500,
+      "requirements": {
+        "required_claim_resolution_ratio_min": 1,
+        "require_sweet_spot_finish": true,
+        "coercion_max": 25,
+        "false_confessions_max": 0
+      }
+    },
+    {
+      "grade": "B",
+      "label_key": "grade.b",
+      "priority": 400,
+      "requirements": {
+        "required_claim_resolution_ratio_min": 0.8,
+        "coercion_max": 40,
+        "false_confessions_max": 0
+      }
+    },
+    {
+      "grade": "C",
+      "label_key": "grade.c",
+      "priority": 300,
+      "requirements": {
+        "required_claim_resolution_ratio_min": 0.6,
+        "coercion_max": 60,
+        "false_confessions_max": 1
+      }
+    },
+    {
+      "grade": "D",
+      "label_key": "grade.d",
+      "priority": 200,
+      "requirements": {
+        "required_claim_resolution_ratio_min": 0.3,
+        "false_confessions_max": 2
+      }
+    },
+    {
+      "grade": "F",
+      "label_key": "grade.f",
+      "priority": 100,
+      "requirements": {
+        "required_claim_resolution_ratio_min": 0
+      }
+    }
+  ]
+}

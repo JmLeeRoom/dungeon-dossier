@@ -33,6 +33,16 @@ export const CardChainStepSchema = z.strictObject({
   effects: z.array(EffectSchema),
 });
 
+export const CardModifierSchema = z
+  .strictObject({
+    stamp: z.enum(['BLUE', 'RED']).optional(),
+    postit: FacetSchema.optional(),
+    clip: z.boolean().optional(),
+  })
+  .refine((modifier) => Object.keys(modifier).length > 0, {
+    message: 'card_modifier must configure a stamp, postit, or clip',
+  });
+
 export const CardSchema = z
   .strictObject({
     card_id: ContentIdSchema,
@@ -45,6 +55,7 @@ export const CardSchema = z
     target: CardTargetSchema,
     modifiers: z.array(EffectSchema),
     special_effect_id: ContentIdSchema.optional(),
+    card_modifier: CardModifierSchema.optional(),
     chain: z.array(CardChainStepSchema).min(2).optional(),
     starting_copies: NonNegativeIntegerSchema,
     acquisition: NonEmptyStringSchema.optional(),

@@ -15,6 +15,8 @@ import {
   VersionSchema,
   uniqueContentIds,
 } from './primitives';
+import { CaseGradeSchema } from './grades';
+import { OutcomeGradeSchema } from './encounter';
 
 export const CURRENT_SAVE_VERSION = 1 as const;
 
@@ -64,6 +66,26 @@ export const SavedEncounterStateSchema = z.strictObject({
   shield_durability: z.record(ContentIdSchema, NonNegativeNumberSchema),
 });
 
+export const SavedRunStateSchema = z.strictObject({
+  node_index: NonNegativeIntegerSchema,
+  reward_seed_stream: z.number().int().min(0).max(0xffff_ffff),
+  false_confessions: NonNegativeIntegerSchema,
+  completed_node_ids: uniqueContentIds(),
+  pending_reward_ids: uniqueContentIds(),
+  claimed_reward_ids: uniqueContentIds(),
+  acquired_evidence_ids: uniqueContentIds(),
+  grade_history: z.array(z.strictObject({
+    node_id: ContentIdSchema,
+    outcome: OutcomeGradeSchema,
+    grade: CaseGradeSchema,
+  })),
+  outcome_history: z.array(z.strictObject({
+    node_id: ContentIdSchema,
+    outcome: OutcomeGradeSchema,
+  })),
+  terminal: z.boolean(),
+});
+
 export const SaveSchema = z.strictObject({
   $schema: JsonSchemaReferenceSchema.optional(),
   save_version: z.literal(CURRENT_SAVE_VERSION),
@@ -79,6 +101,8 @@ export const SaveSchema = z.strictObject({
   used_routes: uniqueContentIds(),
   acquired_relics: uniqueContentIds(),
   acquired_enhancements: uniqueContentIds(),
+  /** Optional for backward-compatible v1 saves created before the run layer. */
+  run: SavedRunStateSchema.optional(),
 });
 export type SaveData = z.infer<typeof SaveSchema>;
 

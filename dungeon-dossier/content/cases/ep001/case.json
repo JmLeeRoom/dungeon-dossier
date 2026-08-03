@@ -1,0 +1,1099 @@
+{
+  "$schema": "../../../schemas/case.schema.json",
+  "schema_version": "1.0",
+  "case_id": "case_ep001_red_ledger",
+  "metadata": {
+    "title": "붉은 장부와 사라진 보급품",
+    "act": 1,
+    "estimated_turns": 27,
+    "content_version": "1.0"
+  },
+  "entities": [
+    {
+      "entity_id": "ent_ep001_goblin",
+      "type": "PERSON",
+      "role": "SUSPECT",
+      "display_name_key": "entity.ep001.goblin.name",
+      "attributes": { "archetype": "GOBLIN" }
+    },
+    {
+      "entity_id": "ent_ep001_orc",
+      "type": "PERSON",
+      "role": "SUSPECT",
+      "display_name_key": "entity.ep001.orc.name",
+      "attributes": { "archetype": "ORC" }
+    },
+    {
+      "entity_id": "ent_ep001_succubus",
+      "type": "PERSON",
+      "role": "SUSPECT",
+      "display_name_key": "entity.ep001.succubus.name",
+      "attributes": { "archetype": "SUCCUBUS" }
+    },
+    {
+      "entity_id": "ent_ep001_archive",
+      "type": "LOCATION",
+      "role": "SCENE",
+      "display_name_key": "entity.ep001.archive.name",
+      "attributes": { "zone": "ADMIN" }
+    },
+    {
+      "entity_id": "ent_ep001_warehouse",
+      "type": "LOCATION",
+      "role": "SCENE",
+      "display_name_key": "entity.ep001.warehouse.name",
+      "attributes": { "zone": "WEST" }
+    },
+    {
+      "entity_id": "ent_ep001_red_ledger",
+      "type": "OBJECT",
+      "role": "INSTRUMENT",
+      "display_name_key": "entity.ep001.red_ledger.name",
+      "attributes": { "catalogue": "SUPPLY" }
+    },
+    {
+      "entity_id": "ent_ep001_seal",
+      "type": "OBJECT",
+      "role": "INSTRUMENT",
+      "display_name_key": "entity.ep001.seal.name",
+      "attributes": { "material": "CRIMSON_WAX" }
+    }
+  ],
+  "events": [
+    {
+      "event_id": "evt_ep001_ledger_edit",
+      "time": { "from": "22:08", "to": "22:14" },
+      "location_id": "ent_ep001_archive",
+      "participants": ["ent_ep001_goblin"],
+      "action": "ALTER_SUPPLY_LEDGER",
+      "objects": ["ent_ep001_red_ledger"]
+    },
+    {
+      "event_id": "evt_ep001_crate_transfer",
+      "time": { "from": "22:20", "to": "22:36" },
+      "location_id": "ent_ep001_warehouse",
+      "participants": ["ent_ep001_orc", "ent_ep001_succubus"],
+      "action": "MOVE_SEALED_SUPPLY_CRATES",
+      "instructed_by": "ent_ep001_succubus"
+    },
+    {
+      "event_id": "evt_ep001_seal_payment",
+      "time": { "from": "22:38", "to": "22:44" },
+      "location_id": "ent_ep001_warehouse",
+      "participants": ["ent_ep001_succubus"],
+      "action": "FORGE_SEAL_AND_RECORD_COMMISSION",
+      "objects": ["ent_ep001_seal"],
+      "caused_by": "evt_ep001_crate_transfer"
+    }
+  ],
+  "claims": [
+    {
+      "claim_id": "clm_ep001_who",
+      "speaker": "ent_ep001_goblin",
+      "subject_id": "ent_ep001_goblin",
+      "object_id": "ent_ep001_red_ledger",
+      "facet": "WHO",
+      "canonical_meaning": "붉은 장부의 출고 수량을 고친 사람은 자신이 아니다",
+      "predicate": "DENY_LEDGER_EDITOR",
+      "time_ref": { "from": "22:08", "to": "22:14" },
+      "initial": { "commitment": "COMMITTED", "presentation": "NORMAL" },
+      "resistance": 1,
+      "is_required": true,
+      "truth": {
+        "relation": "CONTRADICTED_BY_WORLD",
+        "contradicting_events": ["evt_ep001_ledger_edit"]
+      }
+    },
+    {
+      "claim_id": "clm_ep001_when",
+      "speaker": "ent_ep001_goblin",
+      "subject_id": "ent_ep001_goblin",
+      "facet": "WHEN",
+      "canonical_meaning": "밤 종이 울린 뒤에는 기록 보관실에 들어가지 않았다",
+      "predicate": "DENY_ARCHIVE_ACCESS_AFTER_BELL",
+      "time_ref": { "from": "22:00", "to": "22:20" },
+      "initial": { "commitment": "ASSERTED", "presentation": "NORMAL" },
+      "resistance": 1,
+      "truth": {
+        "relation": "CONTRADICTED_BY_WORLD",
+        "contradicting_events": ["evt_ep001_ledger_edit"]
+      }
+    },
+    {
+      "claim_id": "clm_ep001_where",
+      "speaker": "ent_ep001_orc",
+      "subject_id": "ent_ep001_orc",
+      "facet": "WHERE",
+      "canonical_meaning": "야간 근무 내내 동문 초소를 떠나지 않았다",
+      "predicate": "STAYED_AT_EAST_GATE",
+      "time_ref": { "from": "22:00", "to": "23:00" },
+      "initial": { "commitment": "COMMITTED", "presentation": "NORMAL" },
+      "resistance": 2,
+      "is_required": true,
+      "truth": {
+        "relation": "CONTRADICTED_BY_WORLD",
+        "contradicting_events": ["evt_ep001_crate_transfer"]
+      }
+    },
+    {
+      "claim_id": "clm_ep001_what",
+      "speaker": "ent_ep001_orc",
+      "subject_id": "ent_ep001_orc",
+      "facet": "WHAT",
+      "canonical_meaning": "서쪽 창고에서 옮긴 것은 빈 나무 상자뿐이었다",
+      "predicate": "MOVED_ONLY_EMPTY_CRATES",
+      "initial": { "commitment": "ASSERTED", "presentation": "NORMAL" },
+      "resistance": 1,
+      "truth": {
+        "relation": "CONTRADICTED_BY_WORLD",
+        "contradicting_events": ["evt_ep001_crate_transfer"]
+      }
+    },
+    {
+      "claim_id": "clm_ep001_how",
+      "speaker": "ent_ep001_succubus",
+      "object_id": "ent_ep001_seal",
+      "facet": "HOW",
+      "canonical_meaning": "반출 허가서의 진홍 인장은 원본 그대로였다",
+      "predicate": "SEAL_WAS_AUTHENTIC",
+      "initial": { "commitment": "COMMITTED", "presentation": "NORMAL" },
+      "resistance": 3,
+      "is_required": true,
+      "truth": {
+        "relation": "CONTRADICTED_BY_WORLD",
+        "contradicting_events": ["evt_ep001_seal_payment"]
+      }
+    },
+    {
+      "claim_id": "clm_ep001_why",
+      "speaker": "ent_ep001_succubus",
+      "subject_id": "ent_ep001_succubus",
+      "facet": "WHY",
+      "canonical_meaning": "보급품 반출로 자신이 얻은 대가는 하나도 없었다",
+      "predicate": "DENY_TRANSFER_PROFIT",
+      "initial": { "commitment": "ASSERTED", "presentation": "NORMAL" },
+      "resistance": 2,
+      "truth": {
+        "relation": "CONTRADICTED_BY_WORLD",
+        "contradicting_events": ["evt_ep001_seal_payment"]
+      }
+    },
+    {
+      "claim_id": "clm_ep001_goblin_where",
+      "speaker": "ent_ep001_goblin",
+      "subject_id": "ent_ep001_goblin",
+      "object_id": "ent_ep001_archive",
+      "facet": "WHERE",
+      "canonical_meaning": "밤 종이 울린 뒤에는 줄곧 숙소에 있었다",
+      "predicate": "GOBLIN_STAYED_IN_QUARTERS",
+      "initial": { "commitment": "ASSERTED", "presentation": "NORMAL" },
+      "resistance": 0,
+      "is_required": false,
+      "truth": {
+        "relation": "CONTRADICTED_BY_WORLD",
+        "contradicting_events": ["evt_ep001_ledger_edit"]
+      }
+    },
+    {
+      "claim_id": "clm_ep001_goblin_what",
+      "speaker": "ent_ep001_goblin",
+      "subject_id": "ent_ep001_goblin",
+      "object_id": "ent_ep001_red_ledger",
+      "facet": "WHAT",
+      "canonical_meaning": "붉은 장부에서 본 것은 정상 출고 수량뿐이었다",
+      "predicate": "GOBLIN_SAW_ONLY_NORMAL_LEDGER_COUNTS",
+      "initial": { "commitment": "ASSERTED", "presentation": "NORMAL" },
+      "resistance": 1,
+      "is_required": false,
+      "truth": {
+        "relation": "CONTRADICTED_BY_WORLD",
+        "contradicting_events": ["evt_ep001_ledger_edit"]
+      }
+    },
+    {
+      "claim_id": "clm_ep001_goblin_how",
+      "speaker": "ent_ep001_goblin",
+      "subject_id": "ent_ep001_goblin",
+      "facet": "HOW",
+      "canonical_meaning": "장부 계정에는 자신의 암호로 접속하지 않았다",
+      "predicate": "GOBLIN_DENY_ACCOUNT_LOGIN",
+      "initial": { "commitment": "ASSERTED", "presentation": "NORMAL" },
+      "resistance": 2,
+      "is_required": false,
+      "truth": {
+        "relation": "CONTRADICTED_BY_WORLD",
+        "contradicting_events": ["evt_ep001_ledger_edit"]
+      }
+    },
+    {
+      "claim_id": "clm_ep001_goblin_why",
+      "speaker": "ent_ep001_goblin",
+      "subject_id": "ent_ep001_goblin",
+      "facet": "WHY",
+      "canonical_meaning": "출고 수량을 바꿀 이유가 없었다",
+      "predicate": "GOBLIN_DENY_LEDGER_MOTIVE",
+      "initial": { "commitment": "ASSERTED", "presentation": "NORMAL" },
+      "resistance": 3,
+      "is_required": false,
+      "truth": { "relation": "UNVERIFIABLE", "contradicting_events": [] }
+    },
+    {
+      "claim_id": "clm_ep001_orc_who",
+      "speaker": "ent_ep001_orc",
+      "subject_id": "ent_ep001_orc",
+      "facet": "WHO",
+      "canonical_meaning": "서쪽 창고에서는 누구와도 함께 일하지 않았다",
+      "predicate": "ORC_DENY_WAREHOUSE_PARTNER",
+      "initial": { "commitment": "ASSERTED", "presentation": "NORMAL" },
+      "resistance": 0,
+      "is_required": false,
+      "truth": {
+        "relation": "CONTRADICTED_BY_WORLD",
+        "contradicting_events": ["evt_ep001_crate_transfer"]
+      }
+    },
+    {
+      "claim_id": "clm_ep001_orc_when",
+      "speaker": "ent_ep001_orc",
+      "subject_id": "ent_ep001_orc",
+      "facet": "WHEN",
+      "canonical_meaning": "밤 종이 울린 뒤에는 화물을 옮기지 않았다",
+      "predicate": "ORC_DENY_TRANSFER_AFTER_BELL",
+      "initial": { "commitment": "ASSERTED", "presentation": "NORMAL" },
+      "resistance": 1,
+      "is_required": false,
+      "truth": {
+        "relation": "CONTRADICTED_BY_WORLD",
+        "contradicting_events": ["evt_ep001_crate_transfer"]
+      }
+    },
+    {
+      "claim_id": "clm_ep001_orc_how",
+      "speaker": "ent_ep001_orc",
+      "subject_id": "ent_ep001_orc",
+      "facet": "HOW",
+      "canonical_meaning": "봉인 상자는 수레 없이 손으로만 옮겼다",
+      "predicate": "ORC_MOVED_CRATES_BY_HAND",
+      "initial": { "commitment": "ASSERTED", "presentation": "NORMAL" },
+      "resistance": 2,
+      "is_required": false,
+      "truth": { "relation": "UNVERIFIABLE", "contradicting_events": [] }
+    },
+    {
+      "claim_id": "clm_ep001_orc_why",
+      "speaker": "ent_ep001_orc",
+      "subject_id": "ent_ep001_orc",
+      "facet": "WHY",
+      "canonical_meaning": "상자 이동을 지시받은 적이 없었다",
+      "predicate": "ORC_DENY_TRANSFER_ORDER",
+      "initial": { "commitment": "ASSERTED", "presentation": "NORMAL" },
+      "resistance": 3,
+      "is_required": false,
+      "truth": {
+        "relation": "CONTRADICTED_BY_WORLD",
+        "contradicting_events": ["evt_ep001_crate_transfer"]
+      }
+    },
+    {
+      "claim_id": "clm_ep001_succubus_who",
+      "speaker": "ent_ep001_succubus",
+      "subject_id": "ent_ep001_succubus",
+      "facet": "WHO",
+      "canonical_meaning": "창고에서 오크에게 상자 이동을 지시하지 않았다",
+      "predicate": "SUCCUBUS_DENY_ORDERING_ORC",
+      "initial": { "commitment": "ASSERTED", "presentation": "NORMAL" },
+      "resistance": 0,
+      "is_required": false,
+      "truth": {
+        "relation": "CONTRADICTED_BY_WORLD",
+        "contradicting_events": ["evt_ep001_crate_transfer"]
+      }
+    },
+    {
+      "claim_id": "clm_ep001_succubus_when",
+      "speaker": "ent_ep001_succubus",
+      "subject_id": "ent_ep001_succubus",
+      "facet": "WHEN",
+      "canonical_meaning": "상자 이동이 시작되기 전에 창고를 떠났다",
+      "predicate": "SUCCUBUS_LEFT_BEFORE_TRANSFER",
+      "initial": { "commitment": "ASSERTED", "presentation": "NORMAL" },
+      "resistance": 1,
+      "is_required": false,
+      "truth": {
+        "relation": "CONTRADICTED_BY_WORLD",
+        "contradicting_events": ["evt_ep001_crate_transfer"]
+      }
+    },
+    {
+      "claim_id": "clm_ep001_succubus_where",
+      "speaker": "ent_ep001_succubus",
+      "subject_id": "ent_ep001_succubus",
+      "facet": "WHERE",
+      "canonical_meaning": "밤에는 접견실에만 머물렀다",
+      "predicate": "SUCCUBUS_STAYED_IN_RECEPTION_ROOM",
+      "initial": { "commitment": "ASSERTED", "presentation": "NORMAL" },
+      "resistance": 2,
+      "is_required": false,
+      "truth": {
+        "relation": "CONTRADICTED_BY_WORLD",
+        "contradicting_events": ["evt_ep001_seal_payment"]
+      }
+    },
+    {
+      "claim_id": "clm_ep001_succubus_what",
+      "speaker": "ent_ep001_succubus",
+      "subject_id": "ent_ep001_succubus",
+      "facet": "WHAT",
+      "canonical_meaning": "기록한 것은 정상 수수료뿐이었다",
+      "predicate": "SUCCUBUS_RECORDED_ONLY_NORMAL_FEE",
+      "initial": { "commitment": "ASSERTED", "presentation": "NORMAL" },
+      "resistance": 3,
+      "is_required": false,
+      "truth": {
+        "relation": "CONTRADICTED_BY_WORLD",
+        "contradicting_events": ["evt_ep001_seal_payment"]
+      }
+    }
+  ],
+  "inquiry_routes": [
+    {
+      "route_id": "route_ep001_audit",
+      "target_slot": "clm_ep001_when",
+      "slot_label_key": "route.ep001.audit",
+      "facet": "WHEN",
+      "allowed_intents": ["QUERY", "CLARIFY"],
+      "preconditions": [],
+      "reveals": ["clm_ep001_when"],
+      "unlocks_routes": [],
+      "creates_commitment": true,
+      "commitment_level": "ASSERTED",
+      "coercion_risk": 0,
+      "composure_delta": -1,
+      "single_use": true
+    },
+    {
+      "route_id": "route_ep001_commission",
+      "target_slot": "clm_ep001_succubus_when",
+      "slot_label_key": "route.ep001.succubus.when",
+      "facet": "WHEN",
+      "allowed_intents": ["QUERY", "CLARIFY"],
+      "preconditions": [],
+      "reveals": ["clm_ep001_succubus_when"],
+      "unlocks_routes": [],
+      "creates_commitment": true,
+      "commitment_level": "ASSERTED",
+      "coercion_risk": 1,
+      "composure_delta": -2,
+      "single_use": true
+    },
+    {
+      "route_id": "route_ep001_goblin_how",
+      "target_slot": "clm_ep001_who",
+      "slot_label_key": "route.ep001.goblin.who",
+      "facet": "WHO",
+      "allowed_intents": ["QUERY", "CLARIFY"],
+      "preconditions": [],
+      "reveals": ["clm_ep001_who"],
+      "unlocks_routes": [],
+      "creates_commitment": true,
+      "commitment_level": "ASSERTED",
+      "coercion_risk": 0,
+      "composure_delta": -1,
+      "single_use": true
+    },
+    {
+      "route_id": "route_ep001_orc_where",
+      "target_slot": "clm_ep001_orc_who",
+      "slot_label_key": "route.ep001.orc.who",
+      "facet": "WHO",
+      "allowed_intents": ["QUERY", "CLARIFY"],
+      "preconditions": [],
+      "reveals": ["clm_ep001_orc_who"],
+      "unlocks_routes": [],
+      "creates_commitment": true,
+      "commitment_level": "COMMITTED",
+      "coercion_risk": 0,
+      "composure_delta": -1,
+      "single_use": true
+    },
+    {
+      "route_id": "route_ep001_orc_why",
+      "target_slot": "clm_ep001_orc_when",
+      "slot_label_key": "route.ep001.orc.when",
+      "facet": "WHEN",
+      "allowed_intents": ["QUERY", "CLARIFY"],
+      "preconditions": [],
+      "reveals": ["clm_ep001_orc_when"],
+      "unlocks_routes": [],
+      "creates_commitment": true,
+      "commitment_level": "ASSERTED",
+      "coercion_risk": 1,
+      "composure_delta": -2,
+      "single_use": true
+    },
+    {
+      "route_id": "route_ep001_succubus_how",
+      "target_slot": "clm_ep001_succubus_who",
+      "slot_label_key": "route.ep001.succubus.who",
+      "facet": "WHO",
+      "allowed_intents": ["QUERY", "CLARIFY"],
+      "preconditions": [],
+      "reveals": ["clm_ep001_succubus_who"],
+      "unlocks_routes": [],
+      "creates_commitment": true,
+      "commitment_level": "COMMITTED",
+      "coercion_risk": 0,
+      "composure_delta": -1,
+      "single_use": true
+    }
+  ],
+  "evidence": [
+    {
+      "evidence_id": "ev_ep001_audit_trail",
+      "type": "LEDGER_AUDIT_TRAIL",
+      "title_key": "evidence.ep001.audit_trail.title",
+      "acquire": { "node": "node_ep001_goblin_start", "method": "STARTING" },
+      "source_category": "DIGITAL",
+      "independence": {
+        "source_id": "source_ep001_ledger_server",
+        "group": "DIGITAL",
+        "derived_from": null
+      },
+      "grade": { "initial": "A", "upgrades": [] },
+      "integrity": { "initial": "INTACT" },
+      "observations": [
+          {
+            "observation_id": "observation_ep001_audit_trail",
+            "object_id": "ent_ep001_red_ledger",
+          "predicate": "ACCOUNT_EDITED_LEDGER",
+          "summary_key": "evidence.ep001.audit_trail.summary",
+          "scopes": ["IDENTITY", "ACTION"],
+          "detail": { "terminal": "ARCHIVE_3" },
+          "time": { "from": "22:08", "to": "22:14" },
+          "confidence": 1,
+          "contradicts_claim_ids": ["clm_ep001_who"]
+        }
+      ],
+      "not_proven_keys": ["evidence.ep001.audit_trail.not_motive"]
+    },
+    {
+      "evidence_id": "ev_ep001_bell_access_log",
+      "type": "ARCHIVE_ACCESS_LOG",
+      "title_key": "evidence.ep001.bell_access_log.title",
+      "acquire": { "node": "node_ep001_goblin_start", "method": "STARTING" },
+      "source_category": "DIGITAL",
+      "independence": {
+        "source_id": "source_ep001_archive_lock",
+        "group": "DIGITAL",
+        "derived_from": null
+      },
+      "grade": { "initial": "A", "upgrades": [] },
+      "integrity": { "initial": "INTACT" },
+      "observations": [
+        {
+          "observation_id": "observation_ep001_bell_access",
+          "subject_id": "ent_ep001_goblin",
+          "location_id": "ent_ep001_archive",
+          "predicate": "ENTERED_AFTER_NIGHT_BELL",
+          "summary_key": "evidence.ep001.bell_access_log.summary",
+          "scopes": ["TIME", "SEQUENCE"],
+          "detail": { "bell": "NIGHT_BELL" },
+          "time": { "from": "22:07", "to": "22:15" },
+          "confidence": 1,
+          "contradicts_claim_ids": ["clm_ep001_when"]
+        }
+      ],
+      "not_proven_keys": ["evidence.ep001.bell_access_log.not_editor"]
+    },
+    {
+      "evidence_id": "ev_ep001_west_gate_log",
+      "type": "WAREHOUSE_GATE_LOG",
+      "title_key": "evidence.ep001.west_gate_log.title",
+      "acquire": { "node": "node_ep001_orc_start", "method": "STARTING" },
+      "source_category": "DIGITAL",
+      "independence": {
+        "source_id": "source_ep001_west_gate",
+        "group": "DIGITAL",
+        "derived_from": null
+      },
+      "grade": { "initial": "A", "upgrades": [] },
+      "integrity": { "initial": "INTACT" },
+      "observations": [
+        {
+          "observation_id": "observation_ep001_west_gate",
+          "subject_id": "ent_ep001_orc",
+          "location_id": "ent_ep001_warehouse",
+          "predicate": "ENTERED_WEST_WAREHOUSE",
+          "summary_key": "evidence.ep001.west_gate_log.summary",
+          "scopes": ["LOCATION", "PRESENCE"],
+          "detail": { "gate": "WEST_SERVICE" },
+          "time": { "from": "22:19", "to": "22:37" },
+          "confidence": 1,
+          "contradicts_claim_ids": ["clm_ep001_where"]
+        }
+      ],
+      "not_proven_keys": ["evidence.ep001.west_gate_log.not_cargo"]
+    },
+    {
+      "evidence_id": "ev_ep001_cargo_manifest",
+      "type": "CARGO_MANIFEST",
+      "title_key": "evidence.ep001.cargo_manifest.title",
+      "acquire": { "node": "node_ep001_orc_start", "method": "STARTING" },
+      "source_category": "DOCUMENT",
+      "independence": {
+        "source_id": "source_ep001_quartermaster",
+        "group": "DOCUMENT",
+        "derived_from": null
+      },
+      "grade": { "initial": "A", "upgrades": [] },
+      "integrity": { "initial": "INTACT" },
+      "observations": [
+        {
+          "observation_id": "observation_ep001_cargo_manifest",
+          "subject_id": "ent_ep001_orc",
+          "predicate": "MOVED_FILLED_SUPPLY_CRATES",
+          "summary_key": "evidence.ep001.cargo_manifest.summary",
+          "scopes": ["ACTION", "OWNERSHIP"],
+          "detail": { "crate_count": 4 },
+          "confidence": 1,
+          "contradicts_claim_ids": ["clm_ep001_what"]
+        }
+      ],
+      "not_proven_keys": ["evidence.ep001.cargo_manifest.not_destination"]
+    },
+    {
+      "evidence_id": "ev_ep001_seal_residue",
+      "type": "SEAL_RESIDUE_ANALYSIS",
+      "title_key": "evidence.ep001.seal_residue.title",
+      "acquire": { "node": "node_ep001_succubus_start", "method": "STARTING" },
+      "source_category": "PHYSICAL",
+      "independence": {
+        "source_id": "source_ep001_forensic_lab",
+        "group": "PHYSICAL",
+        "derived_from": null
+      },
+      "grade": { "initial": "A", "upgrades": [] },
+      "integrity": { "initial": "INTACT" },
+      "observations": [
+        {
+          "observation_id": "observation_ep001_seal_residue",
+          "object_id": "ent_ep001_seal",
+          "predicate": "SEAL_WAS_RECAST",
+          "summary_key": "evidence.ep001.seal_residue.summary",
+          "scopes": ["INTEGRITY", "ACTION"],
+          "detail": { "wax_batch": "UNREGISTERED" },
+          "confidence": 1,
+          "contradicts_claim_ids": ["clm_ep001_how"]
+        }
+      ],
+      "not_proven_keys": ["evidence.ep001.seal_residue.not_profit"]
+    },
+    {
+      "evidence_id": "ev_ep001_commission_note",
+      "type": "COMMISSION_NOTE",
+      "title_key": "evidence.ep001.commission_note.title",
+      "acquire": { "node": "node_ep001_succubus_start", "method": "STARTING" },
+      "source_category": "FINANCIAL",
+      "independence": {
+        "source_id": "source_ep001_broker_account",
+        "group": "FINANCIAL",
+        "derived_from": null
+      },
+      "grade": { "initial": "A", "upgrades": [] },
+      "integrity": { "initial": "INTACT" },
+      "observations": [
+        {
+          "observation_id": "observation_ep001_commission_note",
+          "subject_id": "ent_ep001_succubus",
+          "predicate": "RECEIVED_TRANSFER_COMMISSION",
+          "summary_key": "evidence.ep001.commission_note.summary",
+          "scopes": ["MOTIVE", "OWNERSHIP"],
+          "detail": { "payment": "SILVER_MARKS" },
+          "confidence": 1,
+          "contradicts_claim_ids": ["clm_ep001_why"]
+        }
+      ],
+      "not_proven_keys": ["evidence.ep001.commission_note.not_forgery_method"]
+    }
+  ],
+  "proof_rules": [
+    {
+      "rule_id": "rule_ep001_who",
+      "target_claim_id": "clm_ep001_who",
+      "direction": "CONTRADICT",
+      "requirements": {
+        "required_scopes": ["IDENTITY", "ACTION"],
+        "minimum_confidence": 0.8,
+        "minimum_independent_sources": 1,
+        "require_integrity": true
+      },
+      "guaranteed_evidence_sets": [["ev_ep001_audit_trail"]]
+    },
+    {
+      "rule_id": "rule_ep001_when",
+      "target_claim_id": "clm_ep001_when",
+      "direction": "CONTRADICT",
+      "requirements": {
+        "required_scopes": ["TIME", "SEQUENCE"],
+        "minimum_confidence": 0.8,
+        "minimum_independent_sources": 1,
+        "require_integrity": true
+      },
+      "guaranteed_evidence_sets": [["ev_ep001_bell_access_log"]]
+    },
+    {
+      "rule_id": "rule_ep001_where",
+      "target_claim_id": "clm_ep001_where",
+      "direction": "CONTRADICT",
+      "requirements": {
+        "required_scopes": ["LOCATION", "PRESENCE"],
+        "minimum_confidence": 0.8,
+        "minimum_independent_sources": 1,
+        "require_integrity": true
+      },
+      "guaranteed_evidence_sets": [["ev_ep001_west_gate_log"]]
+    },
+    {
+      "rule_id": "rule_ep001_what",
+      "target_claim_id": "clm_ep001_what",
+      "direction": "CONTRADICT",
+      "requirements": {
+        "required_scopes": ["ACTION", "OWNERSHIP"],
+        "minimum_confidence": 0.8,
+        "minimum_independent_sources": 1,
+        "require_integrity": true
+      },
+      "guaranteed_evidence_sets": [["ev_ep001_cargo_manifest"]]
+    },
+    {
+      "rule_id": "rule_ep001_how",
+      "target_claim_id": "clm_ep001_how",
+      "direction": "CONTRADICT",
+      "requirements": {
+        "required_scopes": ["INTEGRITY", "ACTION"],
+        "minimum_confidence": 0.8,
+        "minimum_independent_sources": 1,
+        "require_integrity": true
+      },
+      "guaranteed_evidence_sets": [["ev_ep001_seal_residue"]]
+    },
+    {
+      "rule_id": "rule_ep001_why",
+      "target_claim_id": "clm_ep001_why",
+      "direction": "CONTRADICT",
+      "requirements": {
+        "required_scopes": ["MOTIVE", "OWNERSHIP"],
+        "minimum_confidence": 0.8,
+        "minimum_independent_sources": 1,
+        "require_integrity": true
+      },
+      "guaranteed_evidence_sets": [["ev_ep001_commission_note"]]
+    }
+  ],
+  "encounters": [
+    {
+      "encounter_id": "enc_ep001_goblin",
+      "target_entity": "ent_ep001_goblin",
+      "resources": {
+        "composure_max": 90,
+        "cp_per_turn": 3,
+        "cp_max": 3,
+        "coercion_limit": 100,
+        "shields_per_round": 1
+      },
+      "rounds": [
+        {
+          "round_id": "round_ep001_goblin_01",
+          "statement_claims": [
+            "clm_ep001_who",
+            "clm_ep001_when",
+            "clm_ep001_goblin_where",
+            "clm_ep001_goblin_what",
+            "clm_ep001_goblin_how",
+            "clm_ep001_goblin_why"
+          ],
+          "shields": [{ "claim_id": "clm_ep001_who", "durability": 1 }]
+        }
+      ],
+      "flow_nodes": [
+        {
+          "node_id": "node_ep001_goblin_start",
+          "enter_conditions": [{ "type": "ALWAYS" }],
+          "reveal_claim_ids": [
+            "clm_ep001_who",
+            "clm_ep001_when",
+            "clm_ep001_goblin_where",
+            "clm_ep001_goblin_what",
+            "clm_ep001_goblin_how",
+            "clm_ep001_goblin_why"
+          ],
+          "revise_claim_ids": [],
+          "open_route_ids": ["route_ep001_audit", "route_ep001_goblin_how"],
+          "activate_modifiers": [],
+          "deactivate_modifiers": [],
+          "reaction_key": "reaction.ep001.goblin.start",
+          "resource_delta": {},
+          "is_terminal": true
+        }
+      ],
+      "modifiers": [],
+      "objectives": {
+        "required": [
+          {
+            "objective_id": "objective_ep001_goblin_who",
+            "type": "REFUTE_CLAIM",
+            "claim_id": "clm_ep001_who"
+          }
+        ],
+        "optional": [
+          {
+            "objective_id": "objective_ep001_goblin_when",
+            "type": "REFUTE_CLAIM",
+            "claim_id": "clm_ep001_when"
+          }
+        ],
+        "state_conditions": {
+          "composure_min": 1,
+          "composure_max": 27,
+          "coercion_max": 40
+        }
+      },
+      "outcomes": [
+        {
+          "outcome_id": "outcome_ep001_goblin_best",
+          "grade": "BEST_RESOLUTION",
+          "priority": 10,
+          "conditions": [{ "type": "ALL_REQUIRED_OBJECTIVES" }],
+          "rewards": { "dp": 20 }
+        },
+        {
+          "outcome_id": "outcome_ep001_goblin_partial",
+          "grade": "PARTIAL_RESOLUTION",
+          "priority": 5,
+          "conditions": [{ "type": "SOME_REQUIRED_OBJECTIVES" }]
+        }
+      ]
+    },
+    {
+      "encounter_id": "enc_ep001_orc",
+      "target_entity": "ent_ep001_orc",
+      "resources": {
+        "composure_max": 100,
+        "cp_per_turn": 3,
+        "cp_max": 3,
+        "coercion_limit": 100,
+        "shields_per_round": 1
+      },
+      "rounds": [
+        {
+          "round_id": "round_ep001_orc_01",
+          "statement_claims": [
+            "clm_ep001_orc_who",
+            "clm_ep001_orc_when",
+            "clm_ep001_where",
+            "clm_ep001_what",
+            "clm_ep001_orc_how",
+            "clm_ep001_orc_why"
+          ],
+          "shields": [{ "claim_id": "clm_ep001_where", "durability": 2 }]
+        }
+      ],
+      "flow_nodes": [
+        {
+          "node_id": "node_ep001_orc_start",
+          "enter_conditions": [{ "type": "ALWAYS" }],
+          "reveal_claim_ids": [
+            "clm_ep001_orc_who",
+            "clm_ep001_orc_when",
+            "clm_ep001_where",
+            "clm_ep001_what",
+            "clm_ep001_orc_how",
+            "clm_ep001_orc_why"
+          ],
+          "revise_claim_ids": [],
+          "open_route_ids": ["route_ep001_orc_where", "route_ep001_orc_why"],
+          "activate_modifiers": [],
+          "deactivate_modifiers": [],
+          "reaction_key": "reaction.ep001.orc.start",
+          "resource_delta": {},
+          "is_terminal": true
+        }
+      ],
+      "modifiers": [],
+      "objectives": {
+        "required": [
+          {
+            "objective_id": "objective_ep001_orc_where",
+            "type": "REFUTE_CLAIM",
+            "claim_id": "clm_ep001_where"
+          }
+        ],
+        "optional": [
+          {
+            "objective_id": "objective_ep001_orc_what",
+            "type": "REFUTE_CLAIM",
+            "claim_id": "clm_ep001_what"
+          }
+        ],
+        "state_conditions": {
+          "composure_min": 1,
+          "composure_max": 30,
+          "coercion_max": 40
+        }
+      },
+      "outcomes": [
+        {
+          "outcome_id": "outcome_ep001_orc_best",
+          "grade": "BEST_RESOLUTION",
+          "priority": 10,
+          "conditions": [{ "type": "ALL_REQUIRED_OBJECTIVES" }],
+          "rewards": { "dp": 20 }
+        },
+        {
+          "outcome_id": "outcome_ep001_orc_partial",
+          "grade": "PARTIAL_RESOLUTION",
+          "priority": 5,
+          "conditions": [{ "type": "SOME_REQUIRED_OBJECTIVES" }]
+        }
+      ]
+    },
+    {
+      "encounter_id": "enc_ep001_succubus",
+      "target_entity": "ent_ep001_succubus",
+      "resources": {
+        "composure_max": 140,
+        "cp_per_turn": 3,
+        "cp_max": 3,
+        "coercion_limit": 100,
+        "shields_per_round": 2
+      },
+      "rounds": [
+        {
+          "round_id": "round_ep001_succubus_01",
+          "statement_claims": [
+            "clm_ep001_succubus_who",
+            "clm_ep001_succubus_when",
+            "clm_ep001_succubus_where",
+            "clm_ep001_succubus_what",
+            "clm_ep001_how",
+            "clm_ep001_why"
+          ],
+          "shields": [
+            { "claim_id": "clm_ep001_how", "durability": 2 },
+            { "claim_id": "clm_ep001_why", "durability": 1 }
+          ]
+        }
+      ],
+      "flow_nodes": [
+        {
+          "node_id": "node_ep001_succubus_start",
+          "enter_conditions": [{ "type": "ALWAYS" }],
+          "reveal_claim_ids": [
+            "clm_ep001_succubus_who",
+            "clm_ep001_succubus_when",
+            "clm_ep001_succubus_where",
+            "clm_ep001_succubus_what",
+            "clm_ep001_how",
+            "clm_ep001_why"
+          ],
+          "revise_claim_ids": [],
+          "open_route_ids": ["route_ep001_succubus_how", "route_ep001_commission"],
+          "activate_modifiers": [],
+          "deactivate_modifiers": [],
+          "reaction_key": "reaction.ep001.succubus.start",
+          "resource_delta": {},
+          "is_terminal": true
+        }
+      ],
+      "modifiers": [],
+      "objectives": {
+        "required": [
+          {
+            "objective_id": "objective_ep001_succubus_how",
+            "type": "REFUTE_CLAIM",
+            "claim_id": "clm_ep001_how"
+          }
+        ],
+        "optional": [
+          {
+            "objective_id": "objective_ep001_succubus_why",
+            "type": "REFUTE_CLAIM",
+            "claim_id": "clm_ep001_why"
+          }
+        ],
+        "state_conditions": {
+          "composure_min": 1,
+          "composure_max": 42,
+          "coercion_max": 40
+        }
+      },
+      "outcomes": [
+        {
+          "outcome_id": "outcome_ep001_succubus_best",
+          "grade": "BEST_RESOLUTION",
+          "priority": 10,
+          "conditions": [{ "type": "ALL_REQUIRED_OBJECTIVES" }],
+          "rewards": { "dp": 30 }
+        },
+        {
+          "outcome_id": "outcome_ep001_succubus_partial",
+          "grade": "PARTIAL_RESOLUTION",
+          "priority": 5,
+          "conditions": [{ "type": "SOME_REQUIRED_OBJECTIVES" }]
+        }
+      ]
+    }
+  ],
+  "events_noncombat": [
+    {
+      "event_id": "event_ep001_links",
+      "node": "node_ep001_links",
+      "title_key": "event.ep001.links.title",
+      "pattern": "B",
+      "items": [
+        { "item_id": "item_ep001_ledger_edit", "label_key": "event.ep001.links.ledger_edit" },
+        { "item_id": "item_ep001_crate_transfer", "label_key": "event.ep001.links.crate_transfer" }
+      ],
+      "slots": [
+        { "slot_id": "slot_ep001_before_bell", "label_key": "event.ep001.links.before_bell" },
+        { "slot_id": "slot_ep001_after_bell", "label_key": "event.ep001.links.after_bell" }
+      ],
+      "answer_mapping": {
+        "item_ep001_ledger_edit": "slot_ep001_before_bell",
+        "item_ep001_crate_transfer": "slot_ep001_after_bell"
+      },
+      "partial_scoring": { "points_per_correct": 1, "success_ratio": 1, "partial_ratio": 0.5 }
+    },
+    {
+      "event_id": "event_ep001_warehouse",
+      "node": "node_ep001_warehouse",
+      "title_key": "event.ep001.warehouse.title",
+      "pattern": "C",
+      "spots": [
+        {
+          "spot_id": "spot_ep001_west_gate",
+          "label_key": "event.ep001.warehouse.west_gate",
+          "effects": [{ "type": "GRANT_EVIDENCE", "target": "ev_ep001_west_gate_log" }]
+        },
+        {
+          "spot_id": "spot_ep001_loading_bay",
+          "label_key": "event.ep001.warehouse.loading_bay",
+          "effects": [{ "type": "GRANT_EVIDENCE", "target": "ev_ep001_cargo_manifest" }]
+        },
+        {
+          "spot_id": "spot_ep001_seal_table",
+          "label_key": "event.ep001.warehouse.seal_table",
+          "effects": [{ "type": "GRANT_EVIDENCE", "target": "ev_ep001_seal_residue" }]
+        }
+      ],
+      "attempt_limit": 2,
+      "per_attempt_costs": { "stress": 2 }
+    }
+  ],
+  "flag_hooks": [],
+  "dialogue": {
+    "speaker_profiles": {
+      "ent_ep001_goblin": {
+        "race": "GOBLIN",
+        "personality": ["NERVOUS", "CALCULATING"],
+        "speech": "FAST_BUREAUCRATIC",
+        "forbidden_expressions": ["범인", "정답"]
+      },
+      "ent_ep001_orc": {
+        "race": "ORC",
+        "personality": ["DISCIPLINED", "DEFENSIVE"],
+        "speech": "TERSE_MILITARY",
+        "forbidden_expressions": ["자백", "진범"]
+      },
+      "ent_ep001_succubus": {
+        "race": "SUCCUBUS",
+        "personality": ["ELEGANT", "EVASIVE"],
+        "speech": "FORMAL_PERSUASIVE",
+        "forbidden_expressions": ["거짓말", "사실은"]
+      }
+    },
+    "statements": {
+      "clm_ep001_who": {
+        "fallback": ["장부를 고친 계정이 제 것처럼 보일 뿐, 제가 손댄 건 아닙니다."],
+        "spans": [{ "claim_id": "clm_ep001_who", "start": 0, "end": 1 }]
+      },
+      "clm_ep001_when": {
+        "fallback": ["밤 종이 울린 다음에는 기록 보관실 근처에도 가지 않았어요."],
+        "spans": [{ "claim_id": "clm_ep001_when", "start": 0, "end": 1 }]
+      },
+      "clm_ep001_where": {
+        "fallback": ["야간 근무 동안 나는 동문 초소를 한 번도 비우지 않았다."],
+        "spans": [{ "claim_id": "clm_ep001_where", "start": 0, "end": 1 }]
+      },
+      "clm_ep001_what": {
+        "fallback": ["서쪽 창고에서 나른 건 속이 빈 나무 상자뿐이다."],
+        "spans": [{ "claim_id": "clm_ep001_what", "start": 0, "end": 1 }]
+      },
+      "clm_ep001_how": {
+        "fallback": ["반출 허가서의 진홍 인장은 처음 찍힌 모습 그대로예요."],
+        "spans": [{ "claim_id": "clm_ep001_how", "start": 0, "end": 1 }]
+      },
+      "clm_ep001_why": {
+        "fallback": ["그 반출 건으로 제게 돌아온 몫은 조금도 없답니다."],
+        "spans": [{ "claim_id": "clm_ep001_why", "start": 0, "end": 1 }]
+      },
+      "clm_ep001_goblin_where": {
+        "fallback": ["밤 종 뒤에는 줄곧 숙소에 있었어요."],
+        "spans": [{ "claim_id": "clm_ep001_goblin_where", "start": 0, "end": 1 }]
+      },
+      "clm_ep001_goblin_what": {
+        "fallback": ["붉은 장부에서는 정상 출고 수량만 봤어요."],
+        "spans": [{ "claim_id": "clm_ep001_goblin_what", "start": 0, "end": 1 }]
+      },
+      "clm_ep001_goblin_how": {
+        "fallback": ["장부 계정에는 제 암호로 접속하지 않았어요."],
+        "spans": [{ "claim_id": "clm_ep001_goblin_how", "start": 0, "end": 1 }]
+      },
+      "clm_ep001_goblin_why": {
+        "fallback": ["출고 수량을 바꿀 이유가 없었어요."],
+        "spans": [{ "claim_id": "clm_ep001_goblin_why", "start": 0, "end": 1 }]
+      },
+      "clm_ep001_orc_who": {
+        "fallback": ["서쪽 창고에서는 누구와도 함께 일하지 않았다."],
+        "spans": [{ "claim_id": "clm_ep001_orc_who", "start": 0, "end": 1 }]
+      },
+      "clm_ep001_orc_when": {
+        "fallback": ["밤 종 뒤에는 화물을 옮기지 않았다."],
+        "spans": [{ "claim_id": "clm_ep001_orc_when", "start": 0, "end": 1 }]
+      },
+      "clm_ep001_orc_how": {
+        "fallback": ["봉인 상자는 수레 없이 손으로만 옮겼다."],
+        "spans": [{ "claim_id": "clm_ep001_orc_how", "start": 0, "end": 1 }]
+      },
+      "clm_ep001_orc_why": {
+        "fallback": ["상자 이동을 지시받은 적이 없다."],
+        "spans": [{ "claim_id": "clm_ep001_orc_why", "start": 0, "end": 1 }]
+      },
+      "clm_ep001_succubus_who": {
+        "fallback": ["창고에서 오크에게 이동을 지시하지 않았어요."],
+        "spans": [{ "claim_id": "clm_ep001_succubus_who", "start": 0, "end": 1 }]
+      },
+      "clm_ep001_succubus_when": {
+        "fallback": ["상자 이동이 시작되기 전에 창고를 떠났어요."],
+        "spans": [{ "claim_id": "clm_ep001_succubus_when", "start": 0, "end": 1 }]
+      },
+      "clm_ep001_succubus_where": {
+        "fallback": ["밤에는 접견실에만 머물렀어요."],
+        "spans": [{ "claim_id": "clm_ep001_succubus_where", "start": 0, "end": 1 }]
+      },
+      "clm_ep001_succubus_what": {
+        "fallback": ["기록한 것은 정상 수수료뿐이었어요."],
+        "spans": [{ "claim_id": "clm_ep001_succubus_what", "start": 0, "end": 1 }]
+      }
+    },
+    "reactions": {
+      "reaction.ep001.goblin.start": ["접속 흔적만으로 누가 자리에 앉았는지 단정할 수는 없잖아요."],
+      "reaction.ep001.orc.start": ["통과 기록이 있어도 내가 짐을 옮겼다는 뜻은 아니다."],
+      "reaction.ep001.succubus.start": ["밀랍 성분이 다르다는 이유만으로 인장 전체를 의심하시나요?"]
+    },
+    "confession": {
+      "full": ["장부 수정과 창고 반출, 위조 인장의 연결을 순서대로 설명하겠습니다."],
+      "coerced": ["그만하세요. 적고 싶은 대로 기록하세요."]
+    }
+  }
+}

@@ -1,0 +1,76 @@
+{
+  "speaker_profiles": {
+    "ent_ep004_fallen_hero": {
+      "race": "FALLEN_HERO",
+      "personality": ["COMMANDING", "DISILLUSIONED"],
+      "speech": "FORMAL_HEROIC",
+      "forbidden_expressions": ["거짓말", "사실은"]
+    }
+  },
+  "statements": {
+    "clm_ep004_fallen_hero_who": {
+      "fallback": ["VIP 우회 승인은 다른 검표관이 내렸네."],
+      "spans": [{ "claim_id": "clm_ep004_fallen_hero_who", "start": 0, "end": 1 }]
+    },
+    "clm_ep004_fallen_hero_when": {
+      "fallback": ["VIP가 도착한 뒤에야 승인 기록을 작성했네."],
+      "spans": [{ "claim_id": "clm_ep004_fallen_hero_when", "start": 0, "end": 1 }]
+    },
+    "clm_ep004_fallen_hero_where": {
+      "fallback": ["승인 시간에는 VIP 승강장에 가지 않았네."],
+      "spans": [{ "claim_id": "clm_ep004_fallen_hero_where", "start": 0, "end": 1 }]
+    },
+    "clm_ep004_fallen_hero_what": {
+      "fallback": ["VIP에게서 받은 것은 승차권 원본뿐이었네."],
+      "spans": [{ "claim_id": "clm_ep004_fallen_hero_what", "start": 0, "end": 1 }]
+    },
+    "clm_ep004_how": {
+      "fallback": ["승인은 정식 검표 절차만 거쳐 처리되었네."],
+      "spans": [{ "claim_id": "clm_ep004_how", "start": 0, "end": 1 }]
+    },
+    "clm_ep004_why": {
+      "fallback": ["나는 노선이 바뀌어도 얻을 이익이 전혀 없네."],
+      "spans": [{ "claim_id": "clm_ep004_why", "start": 0, "end": 1 }]
+    }
+  },
+  "reactions": {
+    "R_DIRECT_CONTRADICTION": ["우회권 흔적이 내 검표 기록과 맞서고 있군."],
+    "R_INDIRECT_SUSPICION": ["표 한 장으로 거래의 대가까지 입증되지는 않네."],
+    "R_INSUFFICIENT_GROUNDS": ["그 기록에는 승인 과정 전체가 담기지 않았네."],
+    "R_TRUTH_ATTACKED": ["그 자료는 정식 검표를 거쳤다는 설명과 맞네."],
+    "R_IRRELEVANT_EVIDENCE": ["그 단서는 VIP 승인이나 노선 변경과 무관하네."],
+    "R_CONFIRM_LOCKED": ["검표 절차는 이제 확인된 것으로 보이는군."],
+    "R_CONFIRM_PROVISIONAL": ["적어도 승차권 대조는 인정하는군."],
+    "R_CONFIRM_CONFLICT": ["우회권과 검표표의 발급 시각부터 살펴보게."],
+    "R_QUERY_SUCCESS": ["VIP 승객은 수동 검표대에서 확인했네."],
+    "R_QUERY_BLOCKED": ["그 승인은 앞선 검표 기록 없이는 설명하기 어렵네."],
+    "R_CLARIFY_SUCCESS": ["정식 절차란 승차권과 신분패를 함께 보는 것이네."],
+    "R_CLARIFY_NOOP": ["승인 절차는 이미 빠짐없이 설명했네."],
+    "R_COMMIT_SUCCESS": ["좋네, 정식 검표였다고 명확히 기록하게."],
+    "R_COMMIT_REFUSED": ["불완전한 기록에 명예를 걸 수는 없네."],
+    "R_FORENSIC_REVEALED": ["우회권의 감춰진 발급 흔적까지 찾았군."],
+    "R_PRESSURE_APPLIED": ["재촉하지 말게. 절차대로 답하겠네."],
+    "R_PRESSURE_BACKFIRE": ["그런 압박은 협조할 뜻마저 꺾는군."],
+    "R_RECOVER_APPLIED": ["잠시 마음을 다잡았으니 계속하게."],
+    "R_SPECIAL_APPLIED": ["새 심사 방식이 공정하다면 따르겠네."],
+    "R_ACTION_INVALID": ["그 방식으로는 승인 기록을 검토할 수 없네."],
+    "R_PROCEDURE_VIOLATION": ["명예를 짓밟는 방식에는 응하지 않겠네."],
+    "INCOMPATIBLE_TARGET": ["그 자료는 이 승인 진술에 맞지 않네."],
+    "TARGET_NOT_EXPOSED": ["아직 논의하지 않은 거래를 먼저 겨누는군."],
+    "MISSING_TARGET": ["어느 승인 대목을 묻는지 분명히 하게."],
+    "MISSING_EVIDENCE": ["대조할 승차권이나 검표표를 제시하게."],
+    "MISSING_PROOF_RULE": ["그 흔적이 무엇을 증명하는지 불명확하네."],
+    "RESERVED_INTENT": ["현재 절차에서는 그 요구를 받을 수 없네."],
+    "SILENCE": ["그 질문에는 더 답하지 않겠네."]
+  },
+  "confession": {
+    "full": [
+      "VIP 우회권을 승인하고 노선을 바꾼 거래를 모두 밝히겠네.",
+      "수동 검표를 이용해 우회 통로를 연 과정을 설명하겠네."
+    ],
+    "coerced": [
+      "이제 그만하게. 원하는 결론을 기록하게.",
+      "더는 이 압박을 견디지 못하겠네. 끝내 주게."
+    ]
+  }
+}

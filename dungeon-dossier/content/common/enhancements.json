@@ -1,0 +1,45 @@
+{
+  "$schema": "../../schemas/enhancements.schema.json",
+  "schema_version": "1.0",
+  "enhancements": [
+    {
+      "enhancement_id": "enh_stamp_blue",
+      "name_key": "enhancement.stamp_blue.name",
+      "description_key": "enhancement.stamp_blue.description",
+      "type": "STAMP",
+      "color": "BLUE",
+      "compatible_intents": ["CONFIRM", "CONTRADICT"],
+      "effects": [{ "type": "ADJUST_RESOURCE", "resource": "coercion", "delta": -1 }],
+      "acquisition": "REWARD"
+    },
+    {
+      "enhancement_id": "enh_stamp_red",
+      "name_key": "enhancement.stamp_red.name",
+      "description_key": "enhancement.stamp_red.description",
+      "type": "STAMP",
+      "color": "RED",
+      "compatible_card_ids": ["card_contradict_basic", "card_contradict_precise"],
+      "effects": [{ "type": "ADJUST_RESOURCE", "resource": "composure", "delta": -2 }],
+      "acquisition": "REWARD"
+    },
+    {
+      "enhancement_id": "enh_postit_time",
+      "name_key": "enhancement.postit_time.name",
+      "description_key": "enhancement.postit_time.description",
+      "type": "POST_IT",
+      "facet": "WHEN",
+      "compatible_intents": ["QUERY", "CLARIFY"],
+      "effects": [{ "type": "REVEAL_CLAIMS", "targets": ["runtime-selected-claim"] }],
+      "acquisition": "REWARD"
+    },
+    {
+      "enhancement_id": "enh_clip_commit",
+      "name_key": "enhancement.clip_commit.name",
+      "description_key": "enhancement.clip_commit.description",
+      "type": "CLIP",
+      "compatible_card_ids": ["card_commit_clip"],
+      "effects": [{ "type": "SET_CLAIM_STATE", "value": "COMMITTED" }],
+      "acquisition": "REWARD"
+    }
+  ]
+}

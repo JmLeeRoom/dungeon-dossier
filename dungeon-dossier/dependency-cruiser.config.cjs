@@ -79,7 +79,7 @@ module.exports = {
     topologyRule(
       "encounter-follows-canonical-engine-flow",
       "^src/engine/encounter(?:/|$)",
-      "^src/engine/(?:domain|knowledge|resolution|cards|rng|encounter)(?:/|$)",
+      "^src/engine/(?:domain|knowledge|resolution|cards|rng|log|encounter)(?:/|$)",
       "Encounter orchestration may use the four lower engine modules and the deterministic RNG leaf.",
     ),
     topologyRule(

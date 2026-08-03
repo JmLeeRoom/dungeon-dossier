@@ -48,13 +48,19 @@ describe('content validation T2/T3', () => {
     expect(messages(noRule)).toContain('REQUIRED_CLAIM_WITHOUT_PROOF');
 
     const unreachableEvidence = cloneCase();
-    const evidence = unreachableEvidence.evidence[0];
-    expect(evidence).toBeDefined();
-    if (evidence === undefined) return;
-    (evidence as { acquire: { node: string; method: string } }).acquire = {
-      node: 'unreachable-acquisition-node',
-      method: 'INQUIRY',
-    };
+    const evidenceIds = unreachableEvidence.proof_rules[0]?.guaranteed_evidence_sets?.[0] ?? [];
+    expect(evidenceIds.length).toBeGreaterThan(0);
+    for (const evidenceId of evidenceIds) {
+      const evidence = unreachableEvidence.evidence.find(
+        (candidate) => candidate.evidence_id === evidenceId,
+      );
+      expect(evidence).toBeDefined();
+      if (evidence === undefined) continue;
+      (evidence as { acquire: { node: string; method: string } }).acquire = {
+        node: 'unreachable-acquisition-node',
+        method: 'INQUIRY',
+      };
+    }
     const report = messages(unreachableEvidence);
     expect(report).toContain('UNOBTAINABLE_EVIDENCE');
     expect(report).toContain('NO_SOLVABLE_PATH');
@@ -110,7 +116,7 @@ describe('content validation T2/T3', () => {
     expect(statement).toBeDefined();
     if (rule === undefined || node === undefined || statement === undefined) return;
 
-    (rule.requirements.required_scopes as string[]).splice(0, 1, 'TIME');
+    (rule.requirements.required_scopes as string[]).splice(0, 1, 'MOTIVE');
     (node.enter_conditions as unknown[]).push({ type: 'FLAG_EQUALS', flag_id: 'F-01', value: true });
     (invalid.dialogue as unknown as Record<string, unknown>).truth_relation = 'PRIVATE';
     const firstSpan = statement.spans[0];

@@ -1,0 +1,76 @@
+{
+  "speaker_profiles": {
+    "ent_ep001_succubus": {
+      "race": "SUCCUBUS",
+      "personality": ["ELEGANT", "EVASIVE"],
+      "speech": "FORMAL_PERSUASIVE",
+      "forbidden_expressions": ["거짓말", "사실은"]
+    }
+  },
+  "statements": {
+    "clm_ep001_succubus_who": {
+      "fallback": ["창고에서 오크에게 이동을 지시하지 않았어요."],
+      "spans": [{ "claim_id": "clm_ep001_succubus_who", "start": 0, "end": 1 }]
+    },
+    "clm_ep001_succubus_when": {
+      "fallback": ["상자 이동이 시작되기 전에 창고를 떠났어요."],
+      "spans": [{ "claim_id": "clm_ep001_succubus_when", "start": 0, "end": 1 }]
+    },
+    "clm_ep001_succubus_where": {
+      "fallback": ["밤에는 접견실에만 머물렀어요."],
+      "spans": [{ "claim_id": "clm_ep001_succubus_where", "start": 0, "end": 1 }]
+    },
+    "clm_ep001_succubus_what": {
+      "fallback": ["기록한 것은 정상 수수료뿐이었어요."],
+      "spans": [{ "claim_id": "clm_ep001_succubus_what", "start": 0, "end": 1 }]
+    },
+    "clm_ep001_how": {
+      "fallback": ["반출 허가서의 진홍 인장은 처음 찍힌 모습 그대로예요."],
+      "spans": [{ "claim_id": "clm_ep001_how", "start": 0, "end": 1 }]
+    },
+    "clm_ep001_why": {
+      "fallback": ["그 반출 건으로 제게 돌아온 몫은 조금도 없답니다."],
+      "spans": [{ "claim_id": "clm_ep001_why", "start": 0, "end": 1 }]
+    }
+  },
+  "reactions": {
+    "R_DIRECT_CONTRADICTION": ["인장 잔여물과 수수료 기록이 함께 맞물리는군요."],
+    "R_INDIRECT_SUSPICION": ["그 정황만으로 제 관여를 단정하시기엔 성급하군요."],
+    "R_INSUFFICIENT_GROUNDS": ["그 자료만으로 진홍 인장의 출처를 가릴 수는 없어요."],
+    "R_TRUTH_ATTACKED": ["제 설명 전체를 의심하시다니 유감이네요."],
+    "R_CONFIRM_LOCKED": ["그 대목은 이미 허가서 원본으로 확인해 드렸어요."],
+    "R_CONFIRM_PROVISIONAL": ["우선 그렇게 받아들이시죠. 세부 기록은 더 보셔야 해요."],
+    "R_CONFIRM_CONFLICT": ["그 결론은 허가서의 인장 상태와 어긋나는군요."],
+    "R_QUERY_SUCCESS": ["질문하신 반출 경위부터 차례로 말씀드리죠."],
+    "R_QUERY_BLOCKED": ["그 질문은 선행 절차가 갖춰진 뒤에 답해 드리겠어요."],
+    "R_CLARIFY_SUCCESS": ["분명히 하죠. 인장은 원본이고 제 몫은 없었어요."],
+    "R_CLARIFY_NOOP": ["같은 설명을 이미 충분히 드렸답니다."],
+    "R_ACTION_INVALID": ["그 방식으로는 허가서 기록을 다룰 수 없어요."],
+    "R_PROCEDURE_VIOLATION": ["정해진 검토 순서를 지켜 주시겠어요?"],
+    "INCOMPATIBLE_TARGET": ["그 자료는 제 인장이나 수수료 기록과 닿지 않아요."],
+    "TARGET_NOT_EXPOSED": ["아직 제시되지 않은 거래 항목을 묻고 계시는군요."],
+    "MISSING_TARGET": ["어느 진술을 지목하시는지 먼저 알려 주세요."],
+    "MISSING_EVIDENCE": ["검토할 인장 분석 자료가 보이지 않네요."],
+    "MISSING_PROOF_RULE": ["그 기록을 제 수수료와 잇는 근거가 빠졌어요."],
+    "RESERVED_INTENT": ["그 요청은 지금 다룰 수 있는 조사 항목이 아니군요."],
+    "SILENCE": ["더 확인하실 자료가 없다면 잠시 침묵하겠어요."],
+    "R_COMMIT_SUCCESS": ["그 진술은 허가서 검토 결과로 확정해 두시죠."],
+    "R_COMMIT_REFUSED": ["인장 원본을 보기 전에는 확정해 드릴 수 없어요."],
+    "R_FORENSIC_REVEALED": ["밀랍 감식이 재주조 흔적까지 밝혀냈군요."],
+    "R_PRESSURE_APPLIED": ["그렇게 몰아붙이셔도 제 설명은 달라지지 않아요."],
+    "R_PRESSURE_BACKFIRE": ["무례한 압박에는 더 답해 드리지 않겠어요."],
+    "R_RECOVER_APPLIED": ["잠시 진정했으니 반출 경위를 다시 말씀드리죠."],
+    "R_SPECIAL_APPLIED": ["특별 조회가 은화 수수료 기록까지 찾아냈군요."],
+    "R_IRRELEVANT_EVIDENCE": ["그 자료는 진홍 인장과 반출 대가에 무관해요."]
+  },
+  "confession": {
+    "full": [
+      "제가 인장을 다시 찍고 은화 수수료를 받은 경위를 말씀드리죠.",
+      "보급품 반출을 지시하고 허가서 봉인을 바꾼 것은 저예요."
+    ],
+    "coerced": [
+      "이 정도면 원하시는 대로 적으셔도 되겠군요.",
+      "압박은 충분해요. 인장과 수수료를 제 몫으로 기록하세요."
+    ]
+  }
+}

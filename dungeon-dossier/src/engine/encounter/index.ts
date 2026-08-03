@@ -1,4 +1,5 @@
 export * from './EncounterStateMachine';
+export * from './EncounterCoordinator';
 export * from './FlowRunner';
 export * from './ModifierSystem';
 export * from './ObjectiveEvaluator';

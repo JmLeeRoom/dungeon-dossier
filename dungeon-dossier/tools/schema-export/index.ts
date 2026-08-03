@@ -13,6 +13,7 @@ import {
   JudgmentUiMapSchema,
   RelicsSchema,
   RewardsSchema,
+  RunStripSchema,
   SaveSchema,
 } from '../../src/content-io/schemas';
 
@@ -26,6 +27,7 @@ export const JSON_SCHEMA_EXPORTS = [
   ['rewards.schema.json', RewardsSchema],
   ['grades.schema.json', GradesSchema],
   ['judgment-ui-map.schema.json', JudgmentUiMapSchema],
+  ['run-strip.schema.json', RunStripSchema],
   ['save.schema.json', SaveSchema],
 ] as const;
 

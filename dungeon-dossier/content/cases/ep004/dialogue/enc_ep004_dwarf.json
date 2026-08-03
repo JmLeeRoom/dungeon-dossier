@@ -1,0 +1,76 @@
+{
+  "speaker_profiles": {
+    "ent_ep004_dwarf": {
+      "race": "DWARF",
+      "personality": ["METICULOUS", "PRICKLY"],
+      "speech": "TECHNICAL_GRUFF",
+      "forbidden_expressions": ["범인", "정답"]
+    }
+  },
+  "statements": {
+    "clm_ep004_who": {
+      "fallback": ["나는 용맥 기관의 안전 잠금을 해제하지 않았소."],
+      "spans": [{ "claim_id": "clm_ep004_who", "start": 0, "end": 1 }]
+    },
+    "clm_ep004_when": {
+      "fallback": ["경보 전에는 나는 이미 기계실 근무를 마쳤소."],
+      "spans": [{ "claim_id": "clm_ep004_when", "start": 0, "end": 1 }]
+    },
+    "clm_ep004_dwarf_where": {
+      "fallback": ["압력 경보 뒤에는 객실에 머물렀소."],
+      "spans": [{ "claim_id": "clm_ep004_dwarf_where", "start": 0, "end": 1 }]
+    },
+    "clm_ep004_dwarf_what": {
+      "fallback": ["그날 점검한 것은 압력계뿐이었소."],
+      "spans": [{ "claim_id": "clm_ep004_dwarf_what", "start": 0, "end": 1 }]
+    },
+    "clm_ep004_dwarf_how": {
+      "fallback": ["안전 잠금 키를 사용하지 않았소."],
+      "spans": [{ "claim_id": "clm_ep004_dwarf_how", "start": 0, "end": 1 }]
+    },
+    "clm_ep004_dwarf_why": {
+      "fallback": ["기관 설정을 바꿀 이유가 없었소."],
+      "spans": [{ "claim_id": "clm_ep004_dwarf_why", "start": 0, "end": 1 }]
+    }
+  },
+  "reactions": {
+    "R_DIRECT_CONTRADICTION": ["열시계 기록이 내 퇴실 시각과 어긋나는군."],
+    "R_INDIRECT_SUSPICION": ["공구 자국만으로 잠금을 푼 손을 특정할 순 없소."],
+    "R_INSUFFICIENT_GROUNDS": ["그 기록에는 제어반 조작자가 표시되지 않소."],
+    "R_TRUTH_ATTACKED": ["그 자료는 내 교대 기록과 일치하오."],
+    "R_IRRELEVANT_EVIDENCE": ["그 단서는 안전 잠금 계통과 무관하오."],
+    "R_CONFIRM_LOCKED": ["내 퇴실 시각은 이제 검증된 셈이군."],
+    "R_CONFIRM_PROVISIONAL": ["교대 기록만큼은 인정하는 모양이오."],
+    "R_CONFIRM_CONFLICT": ["열시계와 교대표의 오차부터 계산하시오."],
+    "R_QUERY_SUCCESS": ["잠금 제어반은 후임에게 정상 인계했소."],
+    "R_QUERY_BLOCKED": ["그 회로는 정비 일지부터 확인해야 설명할 수 있소."],
+    "R_CLARIFY_SUCCESS": ["근무 종료는 공구 반납 시각을 뜻하오."],
+    "R_CLARIFY_NOOP": ["인계 절차는 이미 충분히 설명했소."],
+    "R_COMMIT_SUCCESS": ["좋소, 정비 종료 시각을 그 문장대로 확정하시오."],
+    "R_COMMIT_REFUSED": ["측정값 없이 내 진술을 고정할 수는 없소."],
+    "R_FORENSIC_REVEALED": ["공구 자국의 미세 홈까지 분석했군."],
+    "R_PRESSURE_APPLIED": ["재촉은 그만두시오. 계산 순서대로 답하겠소."],
+    "R_PRESSURE_BACKFIRE": ["그런 압박은 점검을 망칠 뿐이오."],
+    "R_RECOVER_APPLIED": ["잠시 쉬었으니 수치를 다시 설명하겠소."],
+    "R_SPECIAL_APPLIED": ["새 측정법이 정확하다면 결과를 보겠소."],
+    "R_ACTION_INVALID": ["그 방식으로는 제어 기록을 판독할 수 없소."],
+    "R_PROCEDURE_VIOLATION": ["정비 규정 밖의 압박에는 응하지 않겠소."],
+    "INCOMPATIBLE_TARGET": ["그 자료는 안전 잠금 진술과 맞지 않소."],
+    "TARGET_NOT_EXPOSED": ["아직 공개하지 않은 회로를 지목했군."],
+    "MISSING_TARGET": ["어느 작업 기록을 묻는지 특정하시오."],
+    "MISSING_EVIDENCE": ["대조할 정비 기록을 먼저 제시하시오."],
+    "MISSING_PROOF_RULE": ["그 흔적이 어느 조작을 뜻하는지 불분명하오."],
+    "RESERVED_INTENT": ["현재 점검 절차로는 그 요청을 받을 수 없소."],
+    "SILENCE": ["그 기술 정보에는 답하지 않겠소."]
+  },
+  "confession": {
+    "full": [
+      "안전 잠금을 우회한 순서와 사용한 공구를 모두 밝히겠소.",
+      "열시계를 조작하고 기계실을 드나든 경위를 설명하겠소."
+    ],
+    "coerced": [
+      "그만 밀어붙이시오. 원하는 기록을 남기시오.",
+      "더는 견디기 어렵소. 이 절차를 끝내시오."
+    ]
+  }
+}

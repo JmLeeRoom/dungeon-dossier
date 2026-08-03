@@ -5,8 +5,8 @@
   "metadata": {
     "title": "황금 엘릭서 믹스커피 절도",
     "act": 0,
-    "estimated_turns": 8,
-    "content_version": "1.0"
+    "estimated_turns": 18,
+    "content_version": "1.1"
   },
   "entities": [
     {
@@ -14,6 +14,27 @@
       "type": "PERSON",
       "role": "SUSPECT",
       "display_name_key": "entity.tutorial.slime.name",
+      "attributes": { "archetype": "SLIME" }
+    },
+    {
+      "entity_id": "ent_tutorial_harpy",
+      "type": "PERSON",
+      "role": "WITNESS",
+      "display_name_key": "entity.tutorial.harpy.name",
+      "attributes": { "archetype": "HARPY" }
+    },
+    {
+      "entity_id": "ent_tutorial_minotaur",
+      "type": "PERSON",
+      "role": "SUSPECT",
+      "display_name_key": "entity.tutorial.minotaur.name",
+      "attributes": { "archetype": "MINOTAUR" }
+    },
+    {
+      "entity_id": "ent_tutorial_breakroom",
+      "type": "LOCATION",
+      "role": "SCENE",
+      "display_name_key": "entity.tutorial.breakroom.name",
       "attributes": {}
     }
   ],
@@ -21,8 +42,16 @@
     {
       "event_id": "evt_tutorial_cleanup",
       "time": { "from": "17:00", "to": "17:30" },
+      "location_id": "ent_tutorial_breakroom",
       "participants": ["ent_tutorial_slime"],
       "action": "CLEAN_BREAK_ROOM"
+    },
+    {
+      "event_id": "evt_tutorial_checkout",
+      "time": { "from": "17:12", "to": "17:14" },
+      "location_id": "ent_tutorial_breakroom",
+      "participants": ["ent_tutorial_harpy", "ent_tutorial_minotaur"],
+      "action": "REMOVE_GOLDEN_COFFEE"
     }
   ],
   "claims": [
@@ -33,46 +62,348 @@
       "canonical_meaning": "사건 시간대 탕비실에는 자신 혼자 있었다",
       "predicate": "PRESENT_ALONE",
       "time_ref": { "from": "17:00", "to": "17:30" },
-      "initial": {
-        "commitment": "ASSERTED",
-        "presentation": "NORMAL"
-      },
+      "initial": { "commitment": "ASSERTED", "presentation": "NORMAL" },
+      "resistance": 1,
+      "truth": { "relation": "CONSISTENT_WITH_WORLD", "contradicting_events": [] }
+    },
+    {
+      "claim_id": "clm_tutorial_when",
+      "speaker": "ent_tutorial_slime",
+      "facet": "WHEN",
+      "canonical_meaning": "믹스커피가 사라진 때에는 이미 퇴근한 뒤였다",
+      "predicate": "LEFT_BEFORE_THEFT",
+      "time_ref": { "from": "16:30", "to": "16:40" },
+      "initial": { "commitment": "ASSERTED", "presentation": "NORMAL" },
+      "resistance": 1,
+      "is_required": true,
       "truth": {
-        "relation": "CONSISTENT_WITH_WORLD",
-        "contradicting_events": []
+        "relation": "CONTRADICTED_BY_WORLD",
+        "contradicting_events": ["evt_tutorial_cleanup"]
+      }
+    },
+    {
+      "claim_id": "clm_tutorial_where",
+      "speaker": "ent_tutorial_harpy",
+      "facet": "WHERE",
+      "canonical_meaning": "그 시간에는 서쪽 복도에서만 순찰했다",
+      "predicate": "PATROLLED_WEST_ONLY",
+      "object_id": "ent_tutorial_breakroom",
+      "initial": { "commitment": "ASSERTED", "presentation": "NORMAL" },
+      "resistance": 2,
+      "is_required": true,
+      "truth": {
+        "relation": "CONTRADICTED_BY_WORLD",
+        "contradicting_events": ["evt_tutorial_checkout"]
+      }
+    },
+    {
+      "claim_id": "clm_tutorial_what",
+      "speaker": "ent_tutorial_minotaur",
+      "facet": "WHAT",
+      "canonical_meaning": "가져간 것은 빈 종이컵뿐이었다",
+      "predicate": "TOOK_ONLY_EMPTY_CUP",
+      "initial": { "commitment": "COMMITTED", "presentation": "NORMAL" },
+      "resistance": 2,
+      "is_required": true,
+      "truth": {
+        "relation": "CONTRADICTED_BY_WORLD",
+        "contradicting_events": ["evt_tutorial_checkout"]
+      }
+    },
+    {
+      "claim_id": "clm_tutorial_how",
+      "speaker": "ent_tutorial_harpy",
+      "facet": "HOW",
+      "canonical_meaning": "보관함 문은 처음부터 열려 있었다",
+      "predicate": "CABINET_ALREADY_OPEN",
+      "initial": { "commitment": "ASSERTED", "presentation": "DISTORTED" },
+      "resistance": 2,
+      "truth": { "relation": "PARTIALLY_TRUE", "contradicting_events": [] }
+    },
+    {
+      "claim_id": "clm_tutorial_why",
+      "speaker": "ent_tutorial_minotaur",
+      "facet": "WHY",
+      "canonical_meaning": "황금 엘릭서에는 아무 관심도 없었다",
+      "predicate": "NO_MOTIVE",
+      "initial": { "commitment": "ASSERTED", "presentation": "NORMAL" },
+      "resistance": 2,
+      "truth": { "relation": "UNVERIFIABLE", "contradicting_events": [] }
+    },
+    {
+      "claim_id": "clm_tutorial_slime_where",
+      "speaker": "ent_tutorial_slime",
+      "subject_id": "ent_tutorial_slime",
+      "object_id": "ent_tutorial_breakroom",
+      "facet": "WHERE",
+      "canonical_meaning": "청소 시간 내내 탕비실 안에만 있었다",
+      "predicate": "SLIME_STAYED_IN_BREAKROOM",
+      "initial": { "commitment": "ASSERTED", "presentation": "NORMAL" },
+      "resistance": 0,
+      "is_required": false,
+      "truth": { "relation": "CONSISTENT_WITH_WORLD", "contradicting_events": [] }
+    },
+    {
+      "claim_id": "clm_tutorial_slime_what",
+      "speaker": "ent_tutorial_slime",
+      "subject_id": "ent_tutorial_slime",
+      "facet": "WHAT",
+      "canonical_meaning": "치운 것은 빈 컵과 쟁반뿐이었다",
+      "predicate": "SLIME_CLEANED_ONLY_CUPS_AND_TRAYS",
+      "initial": { "commitment": "ASSERTED", "presentation": "NORMAL" },
+      "resistance": 1,
+      "is_required": false,
+      "truth": { "relation": "PARTIALLY_TRUE", "contradicting_events": [] }
+    },
+    {
+      "claim_id": "clm_tutorial_slime_how",
+      "speaker": "ent_tutorial_slime",
+      "subject_id": "ent_tutorial_slime",
+      "facet": "HOW",
+      "canonical_meaning": "보관함 손잡이에는 손대지 않았다",
+      "predicate": "SLIME_DENY_CABINET_CONTACT",
+      "initial": { "commitment": "ASSERTED", "presentation": "NORMAL" },
+      "resistance": 2,
+      "is_required": false,
+      "truth": { "relation": "UNVERIFIABLE", "contradicting_events": [] }
+    },
+    {
+      "claim_id": "clm_tutorial_slime_why",
+      "speaker": "ent_tutorial_slime",
+      "subject_id": "ent_tutorial_slime",
+      "facet": "WHY",
+      "canonical_meaning": "마감 수당 외에는 바란 것이 없었다",
+      "predicate": "SLIME_DENY_OTHER_MOTIVE",
+      "initial": { "commitment": "ASSERTED", "presentation": "NORMAL" },
+      "resistance": 3,
+      "is_required": false,
+      "truth": { "relation": "UNVERIFIABLE", "contradicting_events": [] }
+    },
+    {
+      "claim_id": "clm_tutorial_harpy_who",
+      "speaker": "ent_tutorial_harpy",
+      "subject_id": "ent_tutorial_harpy",
+      "facet": "WHO",
+      "canonical_meaning": "보관함 근처에서 아는 사람을 보지 못했다",
+      "predicate": "HARPY_SAW_NO_ONE_AT_CABINET",
+      "initial": { "commitment": "ASSERTED", "presentation": "NORMAL" },
+      "resistance": 0,
+      "is_required": false,
+      "truth": {
+        "relation": "CONTRADICTED_BY_WORLD",
+        "contradicting_events": ["evt_tutorial_checkout"]
+      }
+    },
+    {
+      "claim_id": "clm_tutorial_harpy_when",
+      "speaker": "ent_tutorial_harpy",
+      "subject_id": "ent_tutorial_harpy",
+      "facet": "WHEN",
+      "canonical_meaning": "경보 전에는 서쪽 계단을 확인하고 있었다",
+      "predicate": "HARPY_CHECKED_WEST_STAIRS_BEFORE_ALARM",
+      "initial": { "commitment": "ASSERTED", "presentation": "NORMAL" },
+      "resistance": 1,
+      "is_required": false,
+      "truth": {
+        "relation": "CONTRADICTED_BY_WORLD",
+        "contradicting_events": ["evt_tutorial_checkout"]
+      }
+    },
+    {
+      "claim_id": "clm_tutorial_harpy_what",
+      "speaker": "ent_tutorial_harpy",
+      "subject_id": "ent_tutorial_harpy",
+      "facet": "WHAT",
+      "canonical_meaning": "순찰 중 발견한 것은 열린 보관함뿐이었다",
+      "predicate": "HARPY_FOUND_ONLY_OPEN_CABINET",
+      "initial": { "commitment": "ASSERTED", "presentation": "NORMAL" },
+      "resistance": 2,
+      "is_required": false,
+      "truth": { "relation": "PARTIALLY_TRUE", "contradicting_events": [] }
+    },
+    {
+      "claim_id": "clm_tutorial_harpy_why",
+      "speaker": "ent_tutorial_harpy",
+      "subject_id": "ent_tutorial_harpy",
+      "facet": "WHY",
+      "canonical_meaning": "동쪽 보관함에 갈 이유가 없었다",
+      "predicate": "HARPY_DENY_EAST_CABINET_MOTIVE",
+      "initial": { "commitment": "ASSERTED", "presentation": "NORMAL" },
+      "resistance": 3,
+      "is_required": false,
+      "truth": { "relation": "UNVERIFIABLE", "contradicting_events": [] }
+    },
+    {
+      "claim_id": "clm_tutorial_minotaur_who",
+      "speaker": "ent_tutorial_minotaur",
+      "subject_id": "ent_tutorial_minotaur",
+      "facet": "WHO",
+      "canonical_meaning": "보관함 앞에서 하피와 마주치지 않았다",
+      "predicate": "MINOTAUR_DENY_MEETING_HARPY",
+      "initial": { "commitment": "ASSERTED", "presentation": "NORMAL" },
+      "resistance": 0,
+      "is_required": false,
+      "truth": {
+        "relation": "CONTRADICTED_BY_WORLD",
+        "contradicting_events": ["evt_tutorial_checkout"]
+      }
+    },
+    {
+      "claim_id": "clm_tutorial_minotaur_when",
+      "speaker": "ent_tutorial_minotaur",
+      "subject_id": "ent_tutorial_minotaur",
+      "facet": "WHEN",
+      "canonical_meaning": "청소가 끝난 뒤에야 탕비실에 들어갔다",
+      "predicate": "MINOTAUR_ENTERED_AFTER_CLEANUP",
+      "initial": { "commitment": "ASSERTED", "presentation": "NORMAL" },
+      "resistance": 1,
+      "is_required": false,
+      "truth": {
+        "relation": "CONTRADICTED_BY_WORLD",
+        "contradicting_events": ["evt_tutorial_checkout"]
+      }
+    },
+    {
+      "claim_id": "clm_tutorial_minotaur_where",
+      "speaker": "ent_tutorial_minotaur",
+      "subject_id": "ent_tutorial_minotaur",
+      "facet": "WHERE",
+      "canonical_meaning": "종이컵은 탕비실 출입문 옆에서 주웠다",
+      "predicate": "MINOTAUR_FOUND_CUP_BY_DOOR",
+      "initial": { "commitment": "ASSERTED", "presentation": "NORMAL" },
+      "resistance": 2,
+      "is_required": false,
+      "truth": { "relation": "UNVERIFIABLE", "contradicting_events": [] }
+    },
+    {
+      "claim_id": "clm_tutorial_minotaur_how",
+      "speaker": "ent_tutorial_minotaur",
+      "subject_id": "ent_tutorial_minotaur",
+      "facet": "HOW",
+      "canonical_meaning": "보관함 문을 밀거나 열지 않았다",
+      "predicate": "MINOTAUR_DENY_OPENING_CABINET",
+      "initial": { "commitment": "ASSERTED", "presentation": "NORMAL" },
+      "resistance": 3,
+      "is_required": false,
+      "truth": {
+        "relation": "CONTRADICTED_BY_WORLD",
+        "contradicting_events": ["evt_tutorial_checkout"]
       }
     }
   ],
-  "inquiry_routes": [],
+  "inquiry_routes": [
+    {
+      "route_id": "route_tutorial_when",
+      "target_slot": "clm_tutorial_when",
+      "slot_label_key": "route.tutorial.when",
+      "facet": "WHEN",
+      "allowed_intents": ["QUERY"],
+      "preconditions": [],
+      "reveals": ["clm_tutorial_when"],
+      "unlocks_routes": [],
+      "creates_commitment": true,
+      "commitment_level": "ASSERTED",
+      "coercion_risk": 0,
+      "composure_delta": 0,
+      "single_use": true
+    },
+    {
+      "route_id": "route_tutorial_how",
+      "target_slot": "clm_tutorial_harpy_when",
+      "slot_label_key": "route.tutorial.harpy.when",
+      "facet": "WHEN",
+      "allowed_intents": ["QUERY", "CLARIFY"],
+      "preconditions": [],
+      "reveals": ["clm_tutorial_harpy_when"],
+      "unlocks_routes": [],
+      "creates_commitment": true,
+      "commitment_level": "ASSERTED",
+      "coercion_risk": 1,
+      "composure_delta": -2,
+      "single_use": true
+    },
+    {
+      "route_id": "route_tutorial_slime_how",
+      "target_slot": "clm_tutorial_who",
+      "slot_label_key": "route.tutorial.slime.who",
+      "facet": "WHO",
+      "allowed_intents": ["QUERY", "CLARIFY"],
+      "preconditions": [],
+      "reveals": ["clm_tutorial_who"],
+      "unlocks_routes": [],
+      "creates_commitment": true,
+      "commitment_level": "ASSERTED",
+      "coercion_risk": 0,
+      "composure_delta": -1,
+      "single_use": true
+    },
+    {
+      "route_id": "route_tutorial_harpy_where",
+      "target_slot": "clm_tutorial_harpy_who",
+      "slot_label_key": "route.tutorial.harpy.who",
+      "facet": "WHO",
+      "allowed_intents": ["QUERY", "CLARIFY"],
+      "preconditions": [],
+      "reveals": ["clm_tutorial_harpy_who"],
+      "unlocks_routes": [],
+      "creates_commitment": true,
+      "commitment_level": "ASSERTED",
+      "coercion_risk": 0,
+      "composure_delta": -1,
+      "single_use": true
+    },
+    {
+      "route_id": "route_tutorial_minotaur_what",
+      "target_slot": "clm_tutorial_minotaur_who",
+      "slot_label_key": "route.tutorial.minotaur.who",
+      "facet": "WHO",
+      "allowed_intents": ["QUERY", "CLARIFY"],
+      "preconditions": [],
+      "reveals": ["clm_tutorial_minotaur_who"],
+      "unlocks_routes": [],
+      "creates_commitment": true,
+      "commitment_level": "COMMITTED",
+      "coercion_risk": 0,
+      "composure_delta": -1,
+      "single_use": true
+    },
+    {
+      "route_id": "route_tutorial_minotaur_how",
+      "target_slot": "clm_tutorial_minotaur_when",
+      "slot_label_key": "route.tutorial.minotaur.when",
+      "facet": "WHEN",
+      "allowed_intents": ["QUERY", "CLARIFY"],
+      "preconditions": [],
+      "reveals": ["clm_tutorial_minotaur_when"],
+      "unlocks_routes": [],
+      "creates_commitment": true,
+      "commitment_level": "ASSERTED",
+      "coercion_risk": 1,
+      "composure_delta": -2,
+      "single_use": true
+    }
+  ],
   "evidence": [
     {
       "evidence_id": "ev_tutorial_roster",
       "type": "SHIFT_ROSTER",
       "title_key": "evidence.tutorial.roster.title",
-      "acquire": {
-        "node": "node_tutorial_start",
-        "method": "STARTING"
-      },
+      "acquire": { "node": "node_tutorial_start", "method": "STARTING" },
       "source_category": "DIGITAL",
       "independence": {
         "source_id": "source_tutorial_registry",
         "group": "DIGITAL",
         "derived_from": null
       },
-      "grade": {
-        "initial": "A",
-        "upgrades": []
-      },
-      "integrity": {
-        "initial": "INTACT"
-      },
+      "grade": { "initial": "A", "upgrades": [] },
+      "integrity": { "initial": "INTACT" },
       "observations": [
         {
           "observation_id": "observation_tutorial_roster",
           "subject_id": "ent_tutorial_slime",
           "predicate": "PRESENT_DURING_SHIFT",
           "summary_key": "evidence.tutorial.roster.summary",
-          "scopes": ["PRESENCE"],
+          "scopes": ["PRESENCE", "TIME"],
           "detail": {},
           "time": { "from": "17:00", "to": "17:30" },
           "confidence": 1,
@@ -80,20 +411,184 @@
         }
       ],
       "not_proven_keys": ["evidence.tutorial.roster.not_proven"]
+    },
+    {
+      "evidence_id": "ev_tutorial_receipt",
+      "type": "VENDING_RECEIPT",
+      "title_key": "evidence.tutorial.receipt.title",
+      "acquire": { "node": "node_tutorial_start", "method": "STARTING" },
+      "source_category": "FINANCIAL",
+      "independence": {
+        "source_id": "source_tutorial_vending",
+        "group": "FINANCIAL",
+        "derived_from": null
+      },
+      "grade": { "initial": "B", "upgrades": [] },
+      "observations": [
+        {
+          "observation_id": "observation_tutorial_receipt",
+          "predicate": "PURCHASE_NEAR_BREAKROOM",
+          "summary_key": "evidence.tutorial.receipt.summary",
+          "scopes": ["LOCATION"],
+          "detail": {},
+          "confidence": 0.95
+        }
+      ],
+      "not_proven_keys": ["evidence.tutorial.receipt.not_time_proof"]
+    },
+    {
+      "evidence_id": "ev_tutorial_gate_log",
+      "type": "ACCESS_LOG",
+      "title_key": "evidence.tutorial.gate_log.title",
+      "acquire": { "node": "node_tutorial_start", "method": "STARTING" },
+      "source_category": "DIGITAL",
+      "independence": {
+        "source_id": "source_tutorial_gate",
+        "group": "DIGITAL",
+        "derived_from": null
+      },
+      "grade": { "initial": "A", "upgrades": [] },
+      "integrity": { "initial": "INTACT" },
+      "observations": [
+        {
+          "observation_id": "observation_tutorial_gate_log",
+          "subject_id": "ent_tutorial_slime",
+          "predicate": "EXITED_AFTER_CLEANUP",
+          "summary_key": "evidence.tutorial.gate_log.summary",
+          "scopes": ["TIME", "LOCATION"],
+          "detail": {},
+          "time": { "from": "17:31", "to": "17:32" },
+          "confidence": 1,
+          "contradicts_claim_ids": ["clm_tutorial_when"]
+        }
+      ],
+      "not_proven_keys": ["evidence.tutorial.gate_log.not_action"]
+    },
+    {
+      "evidence_id": "ev_tutorial_corridor_photo",
+      "type": "SECURITY_PHOTO",
+      "title_key": "evidence.tutorial.corridor_photo.title",
+      "acquire": { "node": "node_tutorial_harpy", "method": "STARTING" },
+      "source_category": "DIGITAL",
+      "independence": {
+        "source_id": "source_tutorial_camera",
+        "group": "DIGITAL",
+        "derived_from": null
+      },
+      "grade": { "initial": "A", "upgrades": [] },
+      "integrity": { "initial": "INTACT" },
+      "observations": [
+          {
+            "observation_id": "observation_tutorial_corridor_photo",
+            "subject_id": "ent_tutorial_harpy",
+            "predicate": "ENTERED_BREAKROOM",
+          "summary_key": "evidence.tutorial.corridor_photo.summary",
+          "scopes": ["LOCATION", "PRESENCE"],
+          "detail": {},
+          "confidence": 1,
+          "contradicts_claim_ids": ["clm_tutorial_where"]
+        }
+      ],
+      "not_proven_keys": ["evidence.tutorial.corridor_photo.not_motive"]
+    },
+    {
+      "evidence_id": "ev_tutorial_witness_note",
+      "type": "WITNESS_NOTE",
+      "title_key": "evidence.tutorial.witness_note.title",
+      "acquire": { "node": "node_tutorial_minotaur", "method": "STARTING" },
+      "source_category": "TESTIMONY",
+      "independence": {
+        "source_id": "source_tutorial_witness",
+        "group": "TESTIMONY",
+        "derived_from": null
+      },
+      "grade": {
+        "initial": "B",
+        "upgrades": [{ "to": "A", "cost": { "dp": 1 }, "via": "F-05" }]
+      },
+      "integrity": { "initial": "INTACT" },
+      "observations": [
+        {
+          "observation_id": "observation_tutorial_witness_note",
+          "subject_id": "ent_tutorial_minotaur",
+          "predicate": "CARRIED_GOLDEN_PACKET",
+          "summary_key": "evidence.tutorial.witness_note.summary",
+          "scopes": ["ACTION", "OWNERSHIP"],
+          "detail": {},
+          "confidence": 1,
+          "contradicts_claim_ids": ["clm_tutorial_what"]
+        }
+      ],
+      "not_proven_keys": ["evidence.tutorial.witness_note.not_intent"]
+    },
+    {
+      "evidence_id": "ev_tutorial_locker_inventory",
+      "type": "LOCKER_INVENTORY",
+      "title_key": "evidence.tutorial.locker_inventory.title",
+      "acquire": { "node": "node_tutorial_minotaur", "method": "STARTING" },
+      "source_category": "DOCUMENT",
+      "independence": {
+        "source_id": "source_tutorial_locker_registry",
+        "group": "DOCUMENT",
+        "derived_from": null
+      },
+      "grade": { "initial": "A", "upgrades": [] },
+      "integrity": { "initial": "INTACT" },
+      "observations": [
+        {
+          "observation_id": "observation_tutorial_locker_inventory",
+          "predicate": "GOLDEN_PACKET_LOGGED_IN_MINOTAUR_LOCKER",
+          "summary_key": "evidence.tutorial.locker_inventory.summary",
+          "scopes": ["ACTION", "OWNERSHIP"],
+          "detail": {},
+          "confidence": 0.9,
+          "contradicts_claim_ids": ["clm_tutorial_what"]
+        }
+      ],
+      "not_proven_keys": ["evidence.tutorial.locker_inventory.not_intent"]
     }
   ],
   "proof_rules": [
     {
-      "rule_id": "rule_tutorial_who",
-      "target_claim_id": "clm_tutorial_who",
-      "direction": "SUPPORT",
+      "rule_id": "rule_tutorial_when",
+      "target_claim_id": "clm_tutorial_when",
+      "direction": "CONTRADICT",
       "requirements": {
-        "required_scopes": ["PRESENCE"],
+        "required_scopes": ["TIME", "LOCATION"],
         "minimum_confidence": 0.8,
         "minimum_independent_sources": 1,
         "require_integrity": true
       },
-      "guaranteed_evidence_sets": [["ev_tutorial_roster"]]
+      "guaranteed_evidence_sets": [["ev_tutorial_gate_log"]],
+      "known_insufficient_sets": [["ev_tutorial_receipt"]],
+      "partial_credit": { "scopes_covered_ratio": 0.5, "result": "SUSPECTED" }
+    },
+    {
+      "rule_id": "rule_tutorial_where",
+      "target_claim_id": "clm_tutorial_where",
+      "direction": "CONTRADICT",
+      "requirements": {
+        "required_scopes": ["LOCATION", "PRESENCE"],
+        "minimum_confidence": 0.8,
+        "minimum_independent_sources": 1,
+        "require_integrity": true
+      },
+      "guaranteed_evidence_sets": [["ev_tutorial_corridor_photo"]]
+    },
+    {
+      "rule_id": "rule_tutorial_what",
+      "target_claim_id": "clm_tutorial_what",
+      "direction": "CONTRADICT",
+      "requirements": {
+        "required_scopes": ["ACTION", "OWNERSHIP"],
+        "minimum_confidence": 0.8,
+        "minimum_independent_sources": 1,
+        "require_integrity": true
+      },
+      "guaranteed_evidence_sets": [[
+        "ev_tutorial_witness_note",
+        "ev_tutorial_locker_inventory"
+      ]]
     }
   ],
   "encounters": [
@@ -105,25 +600,39 @@
         "cp_per_turn": 3,
         "cp_max": 3,
         "coercion_limit": 100,
-        "shields_per_round": 0
+        "shields_per_round": 1
       },
       "rounds": [
         {
-          "round_id": "round_tutorial_01",
-          "statement_claims": ["clm_tutorial_who"],
-          "shields": []
+          "round_id": "round_tutorial_slime_01",
+          "statement_claims": [
+            "clm_tutorial_who",
+            "clm_tutorial_when",
+            "clm_tutorial_slime_where",
+            "clm_tutorial_slime_what",
+            "clm_tutorial_slime_how",
+            "clm_tutorial_slime_why"
+          ],
+          "shields": [{ "claim_id": "clm_tutorial_who", "durability": 2 }]
         }
       ],
       "flow_nodes": [
         {
           "node_id": "node_tutorial_start",
           "enter_conditions": [{ "type": "ALWAYS" }],
-          "reveal_claim_ids": [],
+          "reveal_claim_ids": [
+            "clm_tutorial_who",
+            "clm_tutorial_when",
+            "clm_tutorial_slime_where",
+            "clm_tutorial_slime_what",
+            "clm_tutorial_slime_how",
+            "clm_tutorial_slime_why"
+          ],
           "revise_claim_ids": [],
-          "open_route_ids": [],
+          "open_route_ids": ["route_tutorial_when", "route_tutorial_slime_how"],
           "activate_modifiers": [],
           "deactivate_modifiers": [],
-          "reaction_key": "reaction.tutorial.start",
+          "reaction_key": "reaction.tutorial.slime",
           "resource_delta": {},
           "is_terminal": false
         }
@@ -132,28 +641,236 @@
       "objectives": {
         "required": [
           {
-            "objective_id": "objective_tutorial_resolve",
-            "type": "RESOLVE_CLAIM",
+            "objective_id": "objective_tutorial_when",
+            "type": "REFUTE_CLAIM",
+            "claim_id": "clm_tutorial_when"
+          }
+        ],
+        "optional": [
+          {
+            "objective_id": "objective_tutorial_confirm_who",
+            "type": "CONFIRM_CLAIM",
             "claim_id": "clm_tutorial_who"
           }
         ],
-        "optional": [],
-        "state_conditions": {
-          "composure_min": 1,
-          "composure_max": 30
-        }
+        "state_conditions": { "composure_min": 1, "composure_max": 30, "coercion_max": 40 }
       },
       "outcomes": [
         {
-          "outcome_id": "outcome_tutorial_best",
+          "outcome_id": "outcome_tutorial_slime_best",
           "grade": "BEST_RESOLUTION",
-          "priority": 1,
-          "conditions": [{ "type": "ALL_REQUIRED_OBJECTIVES" }]
+          "priority": 10,
+          "conditions": [{ "type": "ALL_REQUIRED_OBJECTIVES" }],
+          "rewards": { "dp": 20, "flags": { "F-02": true } }
+        },
+        {
+          "outcome_id": "outcome_tutorial_slime_partial",
+          "grade": "PARTIAL_RESOLUTION",
+          "priority": 5,
+          "conditions": [{ "type": "SOME_REQUIRED_OBJECTIVES" }]
+        }
+      ]
+    },
+    {
+      "encounter_id": "enc_tutorial_harpy",
+      "target_entity": "ent_tutorial_harpy",
+      "resources": {
+        "composure_max": 70,
+        "cp_per_turn": 3,
+        "cp_max": 3,
+        "coercion_limit": 100,
+        "shields_per_round": 1
+      },
+      "rounds": [
+        {
+          "round_id": "round_tutorial_harpy_01",
+          "statement_claims": [
+            "clm_tutorial_harpy_who",
+            "clm_tutorial_harpy_when",
+            "clm_tutorial_where",
+            "clm_tutorial_harpy_what",
+            "clm_tutorial_how",
+            "clm_tutorial_harpy_why"
+          ],
+          "shields": [{ "claim_id": "clm_tutorial_where", "durability": 1 }]
+        }
+      ],
+      "flow_nodes": [
+        {
+          "node_id": "node_tutorial_harpy",
+          "enter_conditions": [{ "type": "ALWAYS" }],
+          "reveal_claim_ids": [
+            "clm_tutorial_harpy_who",
+            "clm_tutorial_harpy_when",
+            "clm_tutorial_where",
+            "clm_tutorial_harpy_what",
+            "clm_tutorial_how",
+            "clm_tutorial_harpy_why"
+          ],
+          "revise_claim_ids": [],
+          "open_route_ids": ["route_tutorial_harpy_where", "route_tutorial_how"],
+          "activate_modifiers": [],
+          "deactivate_modifiers": [],
+          "reaction_key": "reaction.tutorial.harpy",
+          "resource_delta": {},
+          "is_terminal": false
+        }
+      ],
+      "modifiers": [],
+      "objectives": {
+        "required": [
+          {
+            "objective_id": "objective_tutorial_where",
+            "type": "REFUTE_CLAIM",
+            "claim_id": "clm_tutorial_where"
+          }
+        ],
+        "optional": [],
+        "state_conditions": { "composure_min": 1, "composure_max": 30, "coercion_max": 40 }
+      },
+      "outcomes": [
+        {
+          "outcome_id": "outcome_tutorial_harpy_best",
+          "grade": "BEST_RESOLUTION",
+          "priority": 10,
+          "conditions": [{ "type": "ALL_REQUIRED_OBJECTIVES" }],
+          "rewards": { "dp": 20 }
+        }
+      ]
+    },
+    {
+      "encounter_id": "enc_tutorial_minotaur",
+      "target_entity": "ent_tutorial_minotaur",
+      "resources": {
+        "composure_max": 120,
+        "cp_per_turn": 3,
+        "cp_max": 3,
+        "coercion_limit": 100,
+        "shields_per_round": 1
+      },
+      "rounds": [
+        {
+          "round_id": "round_tutorial_minotaur_01",
+          "statement_claims": [
+            "clm_tutorial_minotaur_who",
+            "clm_tutorial_minotaur_when",
+            "clm_tutorial_minotaur_where",
+            "clm_tutorial_what",
+            "clm_tutorial_minotaur_how",
+            "clm_tutorial_why"
+          ],
+          "shields": [{ "claim_id": "clm_tutorial_what", "durability": 1 }]
+        }
+      ],
+      "flow_nodes": [
+        {
+          "node_id": "node_tutorial_minotaur",
+          "enter_conditions": [{ "type": "ALWAYS" }],
+          "reveal_claim_ids": [
+            "clm_tutorial_minotaur_who",
+            "clm_tutorial_minotaur_when",
+            "clm_tutorial_minotaur_where",
+            "clm_tutorial_what",
+            "clm_tutorial_minotaur_how",
+            "clm_tutorial_why"
+          ],
+          "revise_claim_ids": [],
+          "open_route_ids": [
+            "route_tutorial_minotaur_what",
+            "route_tutorial_minotaur_how"
+          ],
+          "activate_modifiers": [],
+          "deactivate_modifiers": [],
+          "reaction_key": "reaction.tutorial.minotaur",
+          "resource_delta": {},
+          "is_terminal": true
+        }
+      ],
+      "modifiers": [],
+      "objectives": {
+        "required": [
+          {
+            "objective_id": "objective_tutorial_what",
+            "type": "REFUTE_CLAIM",
+            "claim_id": "clm_tutorial_what"
+          }
+        ],
+        "optional": [],
+        "state_conditions": { "composure_min": 1, "composure_max": 30, "coercion_max": 40 }
+      },
+      "outcomes": [
+        {
+          "outcome_id": "outcome_tutorial_minotaur_best",
+          "grade": "BEST_RESOLUTION",
+          "priority": 10,
+          "conditions": [{ "type": "ALL_REQUIRED_OBJECTIVES" }],
+          "rewards": { "dp": 30 }
         }
       ]
     }
   ],
-  "events_noncombat": [],
+  "events_noncombat": [
+    {
+      "event_id": "event_tutorial_choice",
+      "node": "node_tutorial_choice",
+      "title_key": "event.tutorial.choice.title",
+      "pattern": "A",
+      "choices": [
+        {
+          "choice_id": "choice_tutorial_search",
+          "label_key": "event.tutorial.choice.search",
+          "costs": { "stress": 5 },
+          "gains": [{ "type": "GRANT_EVIDENCE", "target": "ev_tutorial_receipt" }],
+          "sets_flags": { "F-07": true }
+        },
+        {
+          "choice_id": "choice_tutorial_rest",
+          "label_key": "event.tutorial.choice.rest",
+          "gains": [{ "type": "ADJUST_RESOURCE", "resource": "stress", "delta": 10 }],
+          "sets_flags": { "F-07": false }
+        }
+      ]
+    },
+    {
+      "event_id": "event_tutorial_placement",
+      "node": "node_tutorial_placement",
+      "title_key": "event.tutorial.placement.title",
+      "pattern": "B",
+      "items": [
+        { "item_id": "item_tutorial_cleanup", "label_key": "event.tutorial.item.cleanup" },
+        { "item_id": "item_tutorial_checkout", "label_key": "event.tutorial.item.checkout" }
+      ],
+      "slots": [
+        { "slot_id": "slot_tutorial_first", "label_key": "event.tutorial.slot.first" },
+        { "slot_id": "slot_tutorial_second", "label_key": "event.tutorial.slot.second" }
+      ],
+      "answer_mapping": {
+        "item_tutorial_cleanup": "slot_tutorial_first",
+        "item_tutorial_checkout": "slot_tutorial_second"
+      },
+      "partial_scoring": { "points_per_correct": 1, "success_ratio": 1, "partial_ratio": 0.5 }
+    },
+    {
+      "event_id": "event_tutorial_investigation",
+      "node": "node_tutorial_investigation",
+      "title_key": "event.tutorial.investigation.title",
+      "pattern": "C",
+      "spots": [
+        {
+          "spot_id": "spot_tutorial_cabinet",
+          "label_key": "event.tutorial.spot.cabinet",
+          "effects": [{ "type": "GRANT_EVIDENCE", "target": "ev_tutorial_gate_log" }]
+        },
+        {
+          "spot_id": "spot_tutorial_bin",
+          "label_key": "event.tutorial.spot.bin",
+          "effects": [{ "type": "GRANT_EVIDENCE", "target": "ev_tutorial_receipt" }]
+        }
+      ],
+      "attempt_limit": 2,
+      "per_attempt_costs": { "stress": 2 }
+    }
+  ],
   "flag_hooks": [],
   "dialogue": {
     "speaker_profiles": {
@@ -162,26 +879,102 @@
         "personality": ["TIMID"],
         "speech": "POLITE_TREMBLING",
         "forbidden_expressions": ["사실은", "거짓말"]
+      },
+      "ent_tutorial_harpy": {
+        "race": "HARPY",
+        "personality": ["QUICK"],
+        "speech": "RAPID_FORMAL",
+        "forbidden_expressions": ["정답", "범인"]
+      },
+      "ent_tutorial_minotaur": {
+        "race": "MINOTAUR",
+        "personality": ["STUBBORN"],
+        "speech": "SLOW_DIRECT",
+        "forbidden_expressions": ["자백", "진범"]
       }
     },
     "statements": {
       "clm_tutorial_who": {
         "fallback": ["오후 5시에는 저 혼자 탕비실을 청소했어요."],
-        "spans": [
-          {
-            "claim_id": "clm_tutorial_who",
-            "start": 0,
-            "end": 10
-          }
-        ]
+        "spans": [{ "claim_id": "clm_tutorial_who", "start": 0, "end": 1 }]
+      },
+      "clm_tutorial_when": {
+        "fallback": ["그 물건이 사라질 때에는 이미 퇴근했어요."],
+        "spans": [{ "claim_id": "clm_tutorial_when", "start": 0, "end": 1 }]
+      },
+      "clm_tutorial_where": {
+        "fallback": ["저는 계속 서쪽 복도에만 있었습니다."],
+        "spans": [{ "claim_id": "clm_tutorial_where", "start": 0, "end": 1 }]
+      },
+      "clm_tutorial_what": {
+        "fallback": ["제가 집은 것은 빈 종이컵뿐이오."],
+        "spans": [{ "claim_id": "clm_tutorial_what", "start": 0, "end": 1 }]
+      },
+      "clm_tutorial_how": {
+        "fallback": ["보관함 문은 원래 열려 있었어요."],
+        "spans": [{ "claim_id": "clm_tutorial_how", "start": 0, "end": 1 }]
+      },
+      "clm_tutorial_why": {
+        "fallback": ["나는 그 황금 엘릭서에 관심이 없소."],
+        "spans": [{ "claim_id": "clm_tutorial_why", "start": 0, "end": 1 }]
+      },
+      "clm_tutorial_slime_where": {
+        "fallback": ["저는 청소 시간 내내 탕비실 안에만 있었어요."],
+        "spans": [{ "claim_id": "clm_tutorial_slime_where", "start": 0, "end": 1 }]
+      },
+      "clm_tutorial_slime_what": {
+        "fallback": ["저는 빈 컵과 쟁반만 치웠어요."],
+        "spans": [{ "claim_id": "clm_tutorial_slime_what", "start": 0, "end": 1 }]
+      },
+      "clm_tutorial_slime_how": {
+        "fallback": ["저는 보관함 손잡이에 손대지 않았어요."],
+        "spans": [{ "claim_id": "clm_tutorial_slime_how", "start": 0, "end": 1 }]
+      },
+      "clm_tutorial_slime_why": {
+        "fallback": ["저는 마감 수당 외에는 바란 것이 없었어요."],
+        "spans": [{ "claim_id": "clm_tutorial_slime_why", "start": 0, "end": 1 }]
+      },
+      "clm_tutorial_harpy_who": {
+        "fallback": ["보관함 근처에서는 아는 사람을 보지 못했습니다."],
+        "spans": [{ "claim_id": "clm_tutorial_harpy_who", "start": 0, "end": 1 }]
+      },
+      "clm_tutorial_harpy_when": {
+        "fallback": ["경보 전에는 서쪽 계단을 확인하고 있었습니다."],
+        "spans": [{ "claim_id": "clm_tutorial_harpy_when", "start": 0, "end": 1 }]
+      },
+      "clm_tutorial_harpy_what": {
+        "fallback": ["순찰 중 발견한 것은 열린 보관함뿐이었습니다."],
+        "spans": [{ "claim_id": "clm_tutorial_harpy_what", "start": 0, "end": 1 }]
+      },
+      "clm_tutorial_harpy_why": {
+        "fallback": ["동쪽 보관함에 갈 이유가 없었습니다."],
+        "spans": [{ "claim_id": "clm_tutorial_harpy_why", "start": 0, "end": 1 }]
+      },
+      "clm_tutorial_minotaur_who": {
+        "fallback": ["보관함 앞에서 하피와 마주치지 않았소."],
+        "spans": [{ "claim_id": "clm_tutorial_minotaur_who", "start": 0, "end": 1 }]
+      },
+      "clm_tutorial_minotaur_when": {
+        "fallback": ["청소가 끝난 뒤에야 탕비실에 들어갔소."],
+        "spans": [{ "claim_id": "clm_tutorial_minotaur_when", "start": 0, "end": 1 }]
+      },
+      "clm_tutorial_minotaur_where": {
+        "fallback": ["종이컵은 탕비실 출입문 옆에서 주웠소."],
+        "spans": [{ "claim_id": "clm_tutorial_minotaur_where", "start": 0, "end": 1 }]
+      },
+      "clm_tutorial_minotaur_how": {
+        "fallback": ["보관함 문을 밀거나 열지 않았소."],
+        "spans": [{ "claim_id": "clm_tutorial_minotaur_how", "start": 0, "end": 1 }]
       }
     },
     "reactions": {
-      "reaction.tutorial.start": ["Let's review the shift roster first."]
+      "reaction.tutorial.slime": ["출입 기록이라면 다시 확인해 보세요."],
+      "reaction.tutorial.harpy": ["사진 한 장으로 순찰 전체를 알 수는 없어요."],
+      "reaction.tutorial.minotaur": ["그 목격자가 정말 가까이서 봤다는 거요?"]
     },
     "confession": {
-      "full": ["제가 기억하는 사실은 전부 말씀드렸습니다."],
-      "coerced": ["그만할게요. 제가 했다고 할게요."]
+      "full": ["황금 엘릭서를 옮긴 순서와 이유를 모두 말하겠습니다."],
+      "coerced": ["그만하시오. 원하는 대로 적으시오."]
     }
   }
 }
