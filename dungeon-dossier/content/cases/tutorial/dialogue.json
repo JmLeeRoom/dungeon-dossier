@@ -1,0 +1,29 @@
+{
+  "speaker_profiles": {
+    "ent_tutorial_slime": {
+      "race": "SLIME",
+      "personality": ["TIMID"],
+      "speech": "POLITE_TREMBLING",
+      "forbidden_expressions": ["사실은", "거짓말"]
+    }
+  },
+  "statements": {
+    "clm_tutorial_who": {
+      "fallback": ["오후 5시에는 저 혼자 탕비실을 청소했어요."],
+      "spans": [
+        {
+          "claim_id": "clm_tutorial_who",
+          "start": 0,
+          "end": 10
+        }
+      ]
+    }
+  },
+  "reactions": {
+    "reaction.tutorial.start": ["Let's review the shift roster first."]
+  },
+  "confession": {
+    "full": ["제가 기억하는 사실은 전부 말씀드렸습니다."],
+    "coerced": ["그만할게요. 제가 했다고 할게요."]
+  }
+}

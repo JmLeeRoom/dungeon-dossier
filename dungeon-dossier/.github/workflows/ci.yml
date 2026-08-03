@@ -1,0 +1,88 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: "17 18 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Verify Phase 5 gates
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 20.19
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.19.0
+
+      - name: Enable pinned pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@11.18.0 --activate
+          pnpm --version
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: 1 / 6 - Lint, type-check, and dependency boundaries
+        run: pnpm lint && pnpm typecheck && pnpm arch
+
+      - name: 2 / 6 - Run unit and contract gates
+        run: pnpm test:gates
+
+      - name: 3 / 6 - Validate content T1 through T3
+        run: pnpm content:validate
+
+      - name: 4 / 6 - Run BEST, flags, and deterministic smoke simulation
+        run: pnpm simulate:smoke
+
+      - name: 5 / 6 - Check asset palettes
+        run: pnpm palette:check
+
+      - name: 6 / 6 - Build P0 fallback bundle
+        run: pnpm build
+        env:
+          VITE_AI: "off"
+
+  nightly-matrix:
+    name: Nightly 27-cell simulation
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 20.19
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.19.0
+
+      - name: Enable pinned pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@11.18.0 --activate
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate content before simulation
+        run: pnpm content:validate
+
+      - name: Run full 9 x 3 route matrix
+        run: pnpm simulate:full

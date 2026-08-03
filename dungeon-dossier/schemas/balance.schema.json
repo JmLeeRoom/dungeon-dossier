@@ -1,0 +1,383 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "$ref": "#/$defs/__schema0"
+    },
+    "schema_version": {
+      "$ref": "#/$defs/__schema1"
+    },
+    "draw": {
+      "$ref": "#/$defs/__schema2"
+    },
+    "stress": {
+      "$ref": "#/$defs/__schema5"
+    },
+    "dp": {
+      "$ref": "#/$defs/__schema6"
+    },
+    "dmg": {
+      "$ref": "#/$defs/__schema8"
+    },
+    "shield": {
+      "$ref": "#/$defs/__schema9"
+    },
+    "composureDmg": {
+      "$ref": "#/$defs/__schema10"
+    },
+    "coercion": {
+      "$ref": "#/$defs/__schema11"
+    },
+    "committedMultiplier": {
+      "$ref": "#/$defs/__schema12"
+    },
+    "independence": {
+      "$ref": "#/$defs/__schema13"
+    },
+    "partner": {
+      "$ref": "#/$defs/__schema14"
+    },
+    "trust": {
+      "$ref": "#/$defs/__schema16"
+    },
+    "composure": {
+      "$ref": "#/$defs/__schema17"
+    },
+    "overrides": {
+      "$ref": "#/$defs/__schema18"
+    },
+    "sweetSpot": {
+      "$ref": "#/$defs/__schema24"
+    }
+  },
+  "required": [
+    "schema_version",
+    "draw",
+    "stress",
+    "dp",
+    "dmg",
+    "shield",
+    "composureDmg",
+    "coercion",
+    "committedMultiplier",
+    "independence",
+    "partner",
+    "trust",
+    "composure",
+    "overrides",
+    "sweetSpot"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "__schema0": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500
+    },
+    "__schema1": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+(?:\\.\\d+)?$"
+    },
+    "__schema2": {
+      "type": "object",
+      "properties": {
+        "initial": {
+          "$ref": "#/$defs/__schema3"
+        },
+        "perTurn": {
+          "$ref": "#/$defs/__schema3"
+        },
+        "handLimit": {
+          "$ref": "#/$defs/__schema4"
+        },
+        "reshuffleOnEmpty": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "initial",
+        "perTurn",
+        "handLimit",
+        "reshuffleOnEmpty"
+      ],
+      "additionalProperties": false
+    },
+    "__schema3": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "__schema4": {
+      "type": "integer",
+      "exclusiveMinimum": 0,
+      "maximum": 9007199254740991
+    },
+    "__schema5": {
+      "type": "object",
+      "properties": {
+        "max": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      },
+      "required": [
+        "max"
+      ],
+      "additionalProperties": false
+    },
+    "__schema6": {
+      "type": "object",
+      "properties": {
+        "initial": {
+          "$ref": "#/$defs/__schema7"
+        },
+        "rewardBattle": {
+          "$ref": "#/$defs/__schema7"
+        }
+      },
+      "required": [
+        "initial",
+        "rewardBattle"
+      ],
+      "additionalProperties": false
+    },
+    "__schema7": {
+      "type": "number",
+      "minimum": 0
+    },
+    "__schema8": {
+      "type": "object",
+      "properties": {
+        "contradict": {
+          "$ref": "#/$defs/__schema7"
+        },
+        "pressure": {
+          "$ref": "#/$defs/__schema7"
+        },
+        "requery": {
+          "$ref": "#/$defs/__schema7"
+        },
+        "chainPursuit": {
+          "$ref": "#/$defs/__schema7"
+        }
+      },
+      "required": [
+        "contradict",
+        "pressure",
+        "requery",
+        "chainPursuit"
+      ],
+      "additionalProperties": false
+    },
+    "__schema9": {
+      "type": "object",
+      "properties": {
+        "durabilityDefault": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      },
+      "required": [
+        "durabilityDefault"
+      ],
+      "additionalProperties": false
+    },
+    "__schema10": {
+      "type": "object",
+      "properties": {
+        "indirect": {
+          "$ref": "#/$defs/__schema7"
+        }
+      },
+      "required": [
+        "indirect"
+      ],
+      "additionalProperties": false
+    },
+    "__schema11": {
+      "type": "object",
+      "properties": {
+        "insufficient": {
+          "$ref": "#/$defs/__schema7"
+        },
+        "truthAttack": {
+          "$ref": "#/$defs/__schema7"
+        },
+        "irrelevant": {
+          "$ref": "#/$defs/__schema7"
+        },
+        "redStampFactor": {
+          "$ref": "#/$defs/__schema7"
+        },
+        "goblinReflectFactor": {
+          "$ref": "#/$defs/__schema7"
+        },
+        "breathReduce": {
+          "$ref": "#/$defs/__schema7"
+        },
+        "finalConfirmReduce": {
+          "$ref": "#/$defs/__schema7"
+        }
+      },
+      "required": [
+        "insufficient",
+        "truthAttack",
+        "irrelevant",
+        "redStampFactor",
+        "goblinReflectFactor",
+        "breathReduce",
+        "finalConfirmReduce"
+      ],
+      "additionalProperties": false
+    },
+    "__schema12": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "__schema13": {
+      "type": "object",
+      "properties": {
+        "partialWeight": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      },
+      "required": [
+        "partialWeight"
+      ],
+      "additionalProperties": false
+    },
+    "__schema14": {
+      "type": "object",
+      "properties": {
+        "cooldowns": {
+          "type": "object",
+          "propertyNames": {
+            "$ref": "#/$defs/__schema15"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/__schema3"
+          }
+        }
+      },
+      "required": [
+        "cooldowns"
+      ],
+      "additionalProperties": false
+    },
+    "__schema15": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160
+    },
+    "__schema16": {
+      "type": "object",
+      "properties": {
+        "max": {
+          "$ref": "#/$defs/__schema4"
+        },
+        "thresholds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/__schema3"
+          }
+        }
+      },
+      "required": [
+        "max",
+        "thresholds"
+      ],
+      "additionalProperties": false
+    },
+    "__schema17": {
+      "type": "object",
+      "properties": {
+        "regen": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/__schema7"
+          }
+        }
+      },
+      "required": [
+        "regen"
+      ],
+      "additionalProperties": false
+    },
+    "__schema18": {
+      "type": "object",
+      "properties": {
+        "byEncounter": {
+          "type": "object",
+          "propertyNames": {
+            "$ref": "#/$defs/__schema15"
+          },
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "composureMax": {
+                "$ref": "#/$defs/__schema19"
+              },
+              "cpPerTurn": {
+                "$ref": "#/$defs/__schema20"
+              },
+              "cpMax": {
+                "$ref": "#/$defs/__schema21"
+              },
+              "coercionLimit": {
+                "$ref": "#/$defs/__schema22"
+              },
+              "shieldsPerRound": {
+                "$ref": "#/$defs/__schema23"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "byEncounter"
+      ],
+      "additionalProperties": false
+    },
+    "__schema19": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "__schema20": {
+      "$ref": "#/$defs/__schema3"
+    },
+    "__schema21": {
+      "$ref": "#/$defs/__schema4"
+    },
+    "__schema22": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "__schema23": {
+      "$ref": "#/$defs/__schema3"
+    },
+    "__schema24": {
+      "type": "object",
+      "properties": {
+        "min": {
+          "$ref": "#/$defs/__schema7"
+        },
+        "max": {
+          "$ref": "#/$defs/__schema7"
+        }
+      },
+      "required": [
+        "min",
+        "max"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "$id": "./balance.schema.json"
+}

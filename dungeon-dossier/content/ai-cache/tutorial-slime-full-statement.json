@@ -1,0 +1,26 @@
+{
+  "schema_version": "1",
+  "entries": [
+    {
+      "kind": "statement",
+      "content_hash": "fnv1a64-4dd36d5c4466e044",
+      "prompt_version": "phase4-v1",
+      "model_id": "cache-preverified",
+      "response": {
+        "request_id": "cache-tutorial-slime-full-v1",
+        "full_text": "오후 5시에는 저 혼자 탕비실을 청소했어요.",
+        "tokens": [
+          {
+            "token_id": "tutorial-slime-who",
+            "claim_ids": ["clm_tutorial_who"],
+            "text": "오후 5시에는 저 ",
+            "span_start": 0,
+            "span_end": 10
+          }
+        ],
+        "model_id": "cache-preverified",
+        "seed": 0
+      }
+    }
+  ]
+}

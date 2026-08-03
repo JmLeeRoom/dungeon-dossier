@@ -1,0 +1,292 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "maxLength": 500,
+      "$ref": "#/$defs/__schema0"
+    },
+    "schema_version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+(?:\\.\\d+)?$"
+    },
+    "categories": {
+      "type": "object",
+      "propertyNames": {
+        "$ref": "#/$defs/__schema1"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "label_key": {
+            "$ref": "#/$defs/__schema2"
+          }
+        },
+        "required": [
+          "label_key"
+        ],
+        "additionalProperties": false
+      },
+      "required": [
+        "DIRECT_CONTRADICTION",
+        "INDIRECT_SUSPICION",
+        "INSUFFICIENT_GROUNDS",
+        "TRUTH_ATTACKED"
+      ]
+    },
+    "facets": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "enum": [
+          "WHO",
+          "WHEN",
+          "WHERE",
+          "WHAT",
+          "HOW",
+          "WHY"
+        ]
+      },
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "label_key": {
+            "$ref": "#/$defs/__schema2"
+          }
+        },
+        "required": [
+          "label_key"
+        ],
+        "additionalProperties": false
+      },
+      "required": [
+        "WHO",
+        "WHEN",
+        "WHERE",
+        "WHAT",
+        "HOW",
+        "WHY"
+      ]
+    },
+    "proof_scopes": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "enum": [
+          "IDENTITY",
+          "TIME",
+          "LOCATION",
+          "PRESENCE",
+          "OWNERSHIP",
+          "ACTION",
+          "SEQUENCE",
+          "ROUTE",
+          "INSTRUCTION",
+          "MOTIVE",
+          "INTEGRITY"
+        ]
+      },
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "label_key": {
+            "$ref": "#/$defs/__schema2"
+          },
+          "missing_feedback_key": {
+            "$ref": "#/$defs/__schema2"
+          }
+        },
+        "required": [
+          "label_key",
+          "missing_feedback_key"
+        ],
+        "additionalProperties": false
+      },
+      "required": [
+        "IDENTITY",
+        "TIME",
+        "LOCATION",
+        "PRESENCE",
+        "OWNERSHIP",
+        "ACTION",
+        "SEQUENCE",
+        "ROUTE",
+        "INSTRUCTION",
+        "MOTIVE",
+        "INTEGRITY"
+      ]
+    },
+    "resolution_codes": {
+      "type": "object",
+      "properties": {
+        "R_DIRECT_CONTRADICTION": {
+          "$ref": "#/$defs/__schema3"
+        },
+        "R_INDIRECT_SUSPICION": {
+          "$ref": "#/$defs/__schema3"
+        },
+        "R_INSUFFICIENT_GROUNDS": {
+          "$ref": "#/$defs/__schema3"
+        },
+        "R_TRUTH_ATTACKED": {
+          "$ref": "#/$defs/__schema3"
+        },
+        "R_IRRELEVANT_EVIDENCE": {
+          "$ref": "#/$defs/__schema3"
+        },
+        "R_CONFIRM_LOCKED": {
+          "$ref": "#/$defs/__schema4"
+        },
+        "R_CONFIRM_PROVISIONAL": {
+          "$ref": "#/$defs/__schema5"
+        },
+        "R_CONFIRM_CONFLICT": {
+          "$ref": "#/$defs/__schema6"
+        },
+        "R_QUERY_SUCCESS": {
+          "$ref": "#/$defs/__schema7"
+        },
+        "R_QUERY_BLOCKED": {
+          "$ref": "#/$defs/__schema8"
+        },
+        "R_CLARIFY_SUCCESS": {
+          "$ref": "#/$defs/__schema9"
+        },
+        "R_CLARIFY_NOOP": {
+          "$ref": "#/$defs/__schema10"
+        },
+        "R_COMMIT_SUCCESS": {
+          "$ref": "#/$defs/__schema11"
+        },
+        "R_COMMIT_REFUSED": {
+          "$ref": "#/$defs/__schema12"
+        },
+        "R_FORENSIC_REVEALED": {
+          "$ref": "#/$defs/__schema13"
+        },
+        "R_PRESSURE_APPLIED": {
+          "$ref": "#/$defs/__schema14"
+        },
+        "R_PRESSURE_BACKFIRE": {
+          "$ref": "#/$defs/__schema15"
+        },
+        "R_RECOVER_APPLIED": {
+          "$ref": "#/$defs/__schema16"
+        },
+        "R_SPECIAL_APPLIED": {
+          "$ref": "#/$defs/__schema17"
+        },
+        "R_ACTION_INVALID": {
+          "$ref": "#/$defs/__schema18"
+        },
+        "R_PROCEDURE_VIOLATION": {
+          "$ref": "#/$defs/__schema19"
+        }
+      },
+      "required": [
+        "R_DIRECT_CONTRADICTION",
+        "R_INDIRECT_SUSPICION",
+        "R_INSUFFICIENT_GROUNDS",
+        "R_TRUTH_ATTACKED",
+        "R_IRRELEVANT_EVIDENCE"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "schema_version",
+    "categories",
+    "facets",
+    "proof_scopes",
+    "resolution_codes"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "__schema0": {
+      "type": "string",
+      "minLength": 1
+    },
+    "__schema1": {
+      "type": "string",
+      "enum": [
+        "DIRECT_CONTRADICTION",
+        "INDIRECT_SUSPICION",
+        "INSUFFICIENT_GROUNDS",
+        "TRUTH_ATTACKED"
+      ]
+    },
+    "__schema2": {
+      "maxLength": 240,
+      "$ref": "#/$defs/__schema0"
+    },
+    "__schema3": {
+      "type": "object",
+      "properties": {
+        "label_key": {
+          "$ref": "#/$defs/__schema2"
+        },
+        "feedback_key": {
+          "$ref": "#/$defs/__schema2"
+        },
+        "category": {
+          "$ref": "#/$defs/__schema1"
+        }
+      },
+      "required": [
+        "label_key",
+        "feedback_key",
+        "category"
+      ],
+      "additionalProperties": false
+    },
+    "__schema4": {
+      "$ref": "#/$defs/__schema3"
+    },
+    "__schema5": {
+      "$ref": "#/$defs/__schema3"
+    },
+    "__schema6": {
+      "$ref": "#/$defs/__schema3"
+    },
+    "__schema7": {
+      "$ref": "#/$defs/__schema3"
+    },
+    "__schema8": {
+      "$ref": "#/$defs/__schema3"
+    },
+    "__schema9": {
+      "$ref": "#/$defs/__schema3"
+    },
+    "__schema10": {
+      "$ref": "#/$defs/__schema3"
+    },
+    "__schema11": {
+      "$ref": "#/$defs/__schema3"
+    },
+    "__schema12": {
+      "$ref": "#/$defs/__schema3"
+    },
+    "__schema13": {
+      "$ref": "#/$defs/__schema3"
+    },
+    "__schema14": {
+      "$ref": "#/$defs/__schema3"
+    },
+    "__schema15": {
+      "$ref": "#/$defs/__schema3"
+    },
+    "__schema16": {
+      "$ref": "#/$defs/__schema3"
+    },
+    "__schema17": {
+      "$ref": "#/$defs/__schema3"
+    },
+    "__schema18": {
+      "$ref": "#/$defs/__schema3"
+    },
+    "__schema19": {
+      "$ref": "#/$defs/__schema3"
+    }
+  },
+  "$id": "./judgment-ui-map.schema.json"
+}

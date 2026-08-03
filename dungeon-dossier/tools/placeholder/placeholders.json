@@ -1,0 +1,75 @@
+{
+  "outputDirectory": "../../assets",
+  "assets": [
+    {
+      "directory": "ui",
+      "category": "placeholder",
+      "name": "missing",
+      "state": "fallback",
+      "width": 64,
+      "height": 64,
+      "label": "MISSING",
+      "theme": "neutral"
+    },
+    {
+      "directory": "bg",
+      "category": "배경",
+      "name": "심문실",
+      "state": "시안",
+      "width": 640,
+      "height": 400,
+      "label": "ROOM CYAN",
+      "theme": "cyan"
+    },
+    {
+      "directory": "bg",
+      "category": "배경",
+      "name": "심문실",
+      "state": "세피아",
+      "width": 640,
+      "height": 400,
+      "label": "ROOM SEPIA",
+      "theme": "sepia"
+    },
+    {
+      "directory": "bg",
+      "category": "배경",
+      "name": "심문실",
+      "state": "마젠타",
+      "width": 640,
+      "height": 400,
+      "label": "ROOM MAGENTA",
+      "theme": "magenta"
+    },
+    {
+      "directory": "portraits",
+      "category": "portrait",
+      "name": "물컹이",
+      "state": "base",
+      "width": 196,
+      "height": 216,
+      "label": "MULKKUNGI",
+      "theme": "cyan"
+    },
+    {
+      "directory": "portraits",
+      "category": "portrait",
+      "name": "하피",
+      "state": "base",
+      "width": 196,
+      "height": 216,
+      "label": "HARPY",
+      "theme": "sepia"
+    },
+    {
+      "directory": "portraits",
+      "category": "portrait",
+      "name": "미노타우로스",
+      "state": "base",
+      "width": 196,
+      "height": 216,
+      "label": "MINOTAUR",
+      "theme": "magenta"
+    }
+  ]
+}

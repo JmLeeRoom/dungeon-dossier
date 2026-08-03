@@ -1,0 +1,129 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "$ref": "#/$defs/__schema0"
+    },
+    "schema_version": {
+      "$ref": "#/$defs/__schema2"
+    },
+    "grades": {
+      "$ref": "#/$defs/__schema3"
+    }
+  },
+  "required": [
+    "schema_version",
+    "grades"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "__schema0": {
+      "maxLength": 500,
+      "$ref": "#/$defs/__schema1"
+    },
+    "__schema1": {
+      "type": "string",
+      "minLength": 1
+    },
+    "__schema2": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+(?:\\.\\d+)?$"
+    },
+    "__schema3": {
+      "minItems": 6,
+      "maxItems": 6,
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/__schema4"
+      }
+    },
+    "__schema4": {
+      "type": "object",
+      "properties": {
+        "grade": {
+          "type": "string",
+          "enum": [
+            "S",
+            "A",
+            "B",
+            "C",
+            "D",
+            "F"
+          ]
+        },
+        "label_key": {
+          "maxLength": 240,
+          "$ref": "#/$defs/__schema1"
+        },
+        "priority": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        "requirements": {
+          "type": "object",
+          "properties": {
+            "required_claim_resolution_ratio_min": {
+              "$ref": "#/$defs/__schema5"
+            },
+            "optional_objective_ratio_min": {
+              "$ref": "#/$defs/__schema8"
+            },
+            "require_sweet_spot_finish": {
+              "$ref": "#/$defs/__schema9"
+            },
+            "require_originals_preserved": {
+              "$ref": "#/$defs/__schema10"
+            },
+            "coercion_max": {
+              "$ref": "#/$defs/__schema11"
+            },
+            "false_confessions_max": {
+              "$ref": "#/$defs/__schema12"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "grade",
+        "label_key",
+        "priority",
+        "requirements"
+      ],
+      "additionalProperties": false
+    },
+    "__schema5": {
+      "$ref": "#/$defs/__schema6"
+    },
+    "__schema6": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "$ref": "#/$defs/__schema7"
+    },
+    "__schema7": {
+      "type": "number"
+    },
+    "__schema8": {
+      "$ref": "#/$defs/__schema6"
+    },
+    "__schema9": {
+      "type": "boolean"
+    },
+    "__schema10": {
+      "type": "boolean"
+    },
+    "__schema11": {
+      "minimum": 0,
+      "$ref": "#/$defs/__schema7"
+    },
+    "__schema12": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    }
+  },
+  "$id": "./grades.schema.json"
+}

@@ -1,0 +1,36 @@
+{
+  "$schema": "../../schemas/balance.schema.json",
+  "schema_version": "1.0",
+  "draw": {
+    "initial": 5,
+    "perTurn": 1,
+    "handLimit": 7,
+    "reshuffleOnEmpty": true
+  },
+  "stress": { "max": 100 },
+  "dp": { "initial": 0, "rewardBattle": 20 },
+  "dmg": {
+    "contradict": 18,
+    "pressure": 8,
+    "requery": 4,
+    "chainPursuit": 12
+  },
+  "shield": { "durabilityDefault": 1 },
+  "composureDmg": { "indirect": 4 },
+  "coercion": {
+    "insufficient": 2,
+    "truthAttack": 15,
+    "irrelevant": 5,
+    "redStampFactor": 1.5,
+    "goblinReflectFactor": 2,
+    "breathReduce": 4,
+    "finalConfirmReduce": 3
+  },
+  "committedMultiplier": 1.4,
+  "independence": { "partialWeight": 0.5 },
+  "partner": { "cooldowns": {} },
+  "trust": { "max": 3, "thresholds": [1, 2] },
+  "composure": { "regen": {} },
+  "overrides": { "byEncounter": {} },
+  "sweetSpot": { "min": 1, "max": 30 }
+}

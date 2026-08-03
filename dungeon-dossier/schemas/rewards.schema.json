@@ -1,0 +1,418 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "$ref": "#/$defs/__schema0"
+    },
+    "schema_version": {
+      "$ref": "#/$defs/__schema2"
+    },
+    "selection": {
+      "$ref": "#/$defs/__schema3"
+    },
+    "rewards": {
+      "$ref": "#/$defs/__schema5"
+    }
+  },
+  "required": [
+    "schema_version",
+    "selection",
+    "rewards"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "__schema0": {
+      "maxLength": 500,
+      "$ref": "#/$defs/__schema1"
+    },
+    "__schema1": {
+      "type": "string",
+      "minLength": 1
+    },
+    "__schema2": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+(?:\\.\\d+)?$"
+    },
+    "__schema3": {
+      "type": "object",
+      "properties": {
+        "battle_choices": {
+          "$ref": "#/$defs/__schema4"
+        },
+        "boss_choices": {
+          "$ref": "#/$defs/__schema4"
+        }
+      },
+      "required": [
+        "battle_choices",
+        "boss_choices"
+      ],
+      "additionalProperties": false
+    },
+    "__schema4": {
+      "type": "integer",
+      "exclusiveMinimum": 0,
+      "maximum": 9007199254740991
+    },
+    "__schema5": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "reward_id": {
+            "$ref": "#/$defs/__schema6"
+          },
+          "type": {
+            "$ref": "#/$defs/__schema7"
+          },
+          "reference_id": {
+            "$ref": "#/$defs/__schema8"
+          },
+          "resource": {
+            "$ref": "#/$defs/__schema9"
+          },
+          "amount": {
+            "$ref": "#/$defs/__schema10"
+          },
+          "rarity": {
+            "$ref": "#/$defs/__schema12"
+          },
+          "weight": {
+            "$ref": "#/$defs/__schema13"
+          },
+          "min_act": {
+            "$ref": "#/$defs/__schema14"
+          },
+          "max_act": {
+            "$ref": "#/$defs/__schema16"
+          },
+          "episode_ids": {
+            "$ref": "#/$defs/__schema17"
+          },
+          "conditions": {
+            "$ref": "#/$defs/__schema18"
+          }
+        },
+        "required": [
+          "reward_id",
+          "type",
+          "rarity",
+          "weight"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "__schema6": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160
+    },
+    "__schema7": {
+      "type": "string",
+      "enum": [
+        "CARD",
+        "ENHANCEMENT",
+        "RELIC",
+        "RESOURCE"
+      ]
+    },
+    "__schema8": {
+      "$ref": "#/$defs/__schema6"
+    },
+    "__schema9": {
+      "type": "string",
+      "enum": [
+        "DP",
+        "STRESS",
+        "TRUST"
+      ]
+    },
+    "__schema10": {
+      "minimum": 0,
+      "$ref": "#/$defs/__schema11"
+    },
+    "__schema11": {
+      "type": "number"
+    },
+    "__schema12": {
+      "type": "string",
+      "enum": [
+        "COMMON",
+        "UNCOMMON",
+        "RARE",
+        "CASE",
+        "LEGENDARY"
+      ]
+    },
+    "__schema13": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "__schema14": {
+      "$ref": "#/$defs/__schema15"
+    },
+    "__schema15": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "__schema16": {
+      "$ref": "#/$defs/__schema15"
+    },
+    "__schema17": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/__schema6"
+      }
+    },
+    "__schema18": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "ALWAYS",
+              "CLAIM_VISIBLE",
+              "CLAIM_COMMITMENT",
+              "CLAIM_EPISTEMIC",
+              "EVIDENCE_OWNED",
+              "EVIDENCE_INTACT",
+              "ROUTE_USED",
+              "RESOURCE_RANGE",
+              "PHASE_IS",
+              "TURN_RANGE",
+              "OBJECTIVE_DONE",
+              "FLAG_EQUALS",
+              "OUTCOME_IS",
+              "ALL_REQUIRED_OBJECTIVES",
+              "SOME_REQUIRED_OBJECTIVES",
+              "RESOURCE_EXCEEDS",
+              "TURN_EXCEEDED",
+              "NO_SOLVABLE_PATH",
+              "ALL_OF",
+              "ANY_OF",
+              "NOT"
+            ]
+          },
+          "claim_id": {
+            "$ref": "#/$defs/__schema6"
+          },
+          "evidence_id": {
+            "$ref": "#/$defs/__schema6"
+          },
+          "route_id": {
+            "$ref": "#/$defs/__schema6"
+          },
+          "node_id": {
+            "$ref": "#/$defs/__schema6"
+          },
+          "objective_id": {
+            "$ref": "#/$defs/__schema6"
+          },
+          "flag_id": {
+            "$ref": "#/$defs/__schema6"
+          },
+          "encounter_id": {
+            "$ref": "#/$defs/__schema6"
+          },
+          "outcome": {
+            "$ref": "#/$defs/__schema1"
+          },
+          "resource": {
+            "$ref": "#/$defs/__schema1"
+          },
+          "commitment": {
+            "$ref": "#/$defs/__schema19"
+          },
+          "epistemic": {
+            "$ref": "#/$defs/__schema20"
+          },
+          "state": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/__schema19"
+              },
+              {
+                "$ref": "#/$defs/__schema20"
+              },
+              {
+                "type": "string",
+                "enum": [
+                  "NORMAL",
+                  "COMPOUND",
+                  "DISTORTED",
+                  "HIDDEN",
+                  "LOCKED",
+                  "DUPLICATED"
+                ]
+              }
+            ]
+          },
+          "value": {
+            "$ref": "#/$defs/__schema21"
+          },
+          "min": {
+            "$ref": "#/$defs/__schema11"
+          },
+          "max": {
+            "$ref": "#/$defs/__schema11"
+          },
+          "min_ratio": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "$ref": "#/$defs/__schema11"
+          },
+          "conditions": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/__schema22"
+            }
+          },
+          "condition": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "$ref": "#/$defs/__schema24"
+            }
+          }
+        },
+        "required": [
+          "type"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "__schema19": {
+      "type": "string",
+      "enum": [
+        "UNSTATED",
+        "ASSERTED",
+        "COMMITTED",
+        "REVISED",
+        "RETRACTED",
+        "CONTRADICTED"
+      ]
+    },
+    "__schema20": {
+      "type": "string",
+      "enum": [
+        "UNKNOWN",
+        "SUSPECTED",
+        "PROVISIONAL",
+        "SUPPORTED",
+        "REFUTED",
+        "UNRESOLVED"
+      ]
+    },
+    "__schema21": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/__schema21"
+          }
+        },
+        {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/__schema21"
+          }
+        }
+      ]
+    },
+    "__schema22": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/__schema23"
+      }
+    },
+    "__schema23": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/__schema23"
+          }
+        },
+        {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/__schema23"
+          }
+        }
+      ]
+    },
+    "__schema24": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/__schema24"
+          }
+        },
+        {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/__schema24"
+          }
+        }
+      ]
+    }
+  },
+  "$id": "./rewards.schema.json"
+}

@@ -1,0 +1,169 @@
+{
+  "$schema": "../../schemas/cards.schema.json",
+  "schema_version": "1.0",
+  "cards": [
+    {
+      "card_id": "card_query_who",
+      "name_key": "card.query.who.name",
+      "description_key": "card.query.who.description",
+      "category": "BASE",
+      "intent": "QUERY",
+      "cost": { "cp": 1 },
+      "target": { "kind": "ROUTE", "facets": ["WHO"] },
+      "modifiers": [],
+      "starting_copies": 1
+    },
+    {
+      "card_id": "card_query_when",
+      "name_key": "card.query.when.name",
+      "description_key": "card.query.when.description",
+      "category": "BASE",
+      "intent": "QUERY",
+      "cost": { "cp": 1 },
+      "target": { "kind": "ROUTE", "facets": ["WHEN"] },
+      "modifiers": [],
+      "starting_copies": 1
+    },
+    {
+      "card_id": "card_clarify_basic",
+      "name_key": "card.clarify.basic.name",
+      "description_key": "card.clarify.basic.description",
+      "category": "BASE",
+      "intent": "CLARIFY",
+      "cost": { "cp": 1 },
+      "target": { "kind": "CLAIM" },
+      "modifiers": [],
+      "starting_copies": 1
+    },
+    {
+      "card_id": "card_clarify_deep",
+      "name_key": "card.clarify.deep.name",
+      "description_key": "card.clarify.deep.description",
+      "category": "BASE",
+      "intent": "CLARIFY",
+      "cost": { "cp": 2 },
+      "target": { "kind": "CLAIM" },
+      "modifiers": [],
+      "starting_copies": 0
+    },
+    {
+      "card_id": "card_confirm_basic",
+      "name_key": "card.confirm.basic.name",
+      "description_key": "card.confirm.basic.description",
+      "category": "BASE",
+      "intent": "CONFIRM",
+      "cost": { "cp": 1 },
+      "target": { "kind": "CLAIM", "min_evidence": 1 },
+      "modifiers": [],
+      "starting_copies": 1
+    },
+    {
+      "card_id": "card_confirm_careful",
+      "name_key": "card.confirm.careful.name",
+      "description_key": "card.confirm.careful.description",
+      "category": "BASE",
+      "intent": "CONFIRM",
+      "cost": { "cp": 2 },
+      "target": { "kind": "CLAIM", "min_evidence": 1 },
+      "modifiers": [],
+      "starting_copies": 0
+    },
+    {
+      "card_id": "card_contradict_basic",
+      "name_key": "card.contradict.basic.name",
+      "description_key": "card.contradict.basic.description",
+      "category": "BASE",
+      "intent": "CONTRADICT",
+      "cost": { "cp": 2 },
+      "target": { "kind": "CLAIM", "min_evidence": 1 },
+      "modifiers": [],
+      "starting_copies": 1
+    },
+    {
+      "card_id": "card_contradict_precise",
+      "name_key": "card.contradict.precise.name",
+      "description_key": "card.contradict.precise.description",
+      "category": "BASE",
+      "intent": "CONTRADICT",
+      "cost": { "cp": 3 },
+      "target": { "kind": "CLAIM", "min_evidence": 1 },
+      "modifiers": [],
+      "starting_copies": 0
+    },
+    {
+      "card_id": "card_recover_breathe",
+      "name_key": "card.recover.breathe.name",
+      "description_key": "card.recover.breathe.description",
+      "category": "BASE",
+      "intent": "RECOVER",
+      "cost": { "cp": 1 },
+      "target": { "kind": "SELF" },
+      "modifiers": [],
+      "starting_copies": 1
+    },
+    {
+      "card_id": "card_recover_pace",
+      "name_key": "card.recover.pace.name",
+      "description_key": "card.recover.pace.description",
+      "category": "BASE",
+      "intent": "RECOVER",
+      "cost": { "cp": 1 },
+      "target": { "kind": "SELF" },
+      "modifiers": [],
+      "starting_copies": 0
+    },
+    {
+      "card_id": "card_pressure",
+      "name_key": "card.pressure.name",
+      "description_key": "card.pressure.description",
+      "category": "SPECIAL",
+      "intent": "PRESSURE",
+      "cost": { "cp": 2 },
+      "target": { "kind": "CLAIM" },
+      "modifiers": [],
+      "starting_copies": 0
+    },
+    {
+      "card_id": "card_forensic",
+      "name_key": "card.forensic.name",
+      "description_key": "card.forensic.description",
+      "category": "SPECIAL",
+      "intent": "FORENSIC",
+      "cost": { "cp": 2 },
+      "target": { "kind": "EVIDENCE" },
+      "modifiers": [],
+      "starting_copies": 0
+    },
+    {
+      "card_id": "card_special_notice",
+      "name_key": "card.special.notice.name",
+      "description_key": "card.special.notice.description",
+      "category": "SPECIAL",
+      "intent": "SPECIAL",
+      "cost": { "cp": 1 },
+      "target": { "kind": "SPECIAL" },
+      "modifiers": [],
+      "special_effect_id": "effect_procedure_notice",
+      "starting_copies": 0
+    },
+    {
+      "card_id": "card_commit_clip",
+      "name_key": "card.commit.clip.name",
+      "description_key": "card.commit.clip.description",
+      "category": "EXCLUSIVE",
+      "intent": "COMMIT",
+      "cost": { "cp": 2 },
+      "target": { "kind": "CLAIM" },
+      "modifiers": [],
+      "starting_copies": 0
+    }
+  ],
+  "initial_deck": [
+    "card_query_who",
+    "card_query_when",
+    "card_clarify_basic",
+    "card_confirm_basic",
+    "card_contradict_basic",
+    "card_recover_breathe"
+  ]
+}

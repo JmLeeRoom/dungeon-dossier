@@ -1,0 +1,187 @@
+{
+  "$schema": "../../../schemas/case.schema.json",
+  "schema_version": "1.0",
+  "case_id": "case_tutorial",
+  "metadata": {
+    "title": "황금 엘릭서 믹스커피 절도",
+    "act": 0,
+    "estimated_turns": 8,
+    "content_version": "1.0"
+  },
+  "entities": [
+    {
+      "entity_id": "ent_tutorial_slime",
+      "type": "PERSON",
+      "role": "SUSPECT",
+      "display_name_key": "entity.tutorial.slime.name",
+      "attributes": {}
+    }
+  ],
+  "events": [
+    {
+      "event_id": "evt_tutorial_cleanup",
+      "time": { "from": "17:00", "to": "17:30" },
+      "participants": ["ent_tutorial_slime"],
+      "action": "CLEAN_BREAK_ROOM"
+    }
+  ],
+  "claims": [
+    {
+      "claim_id": "clm_tutorial_who",
+      "speaker": "ent_tutorial_slime",
+      "facet": "WHO",
+      "canonical_meaning": "사건 시간대 탕비실에는 자신 혼자 있었다",
+      "predicate": "PRESENT_ALONE",
+      "time_ref": { "from": "17:00", "to": "17:30" },
+      "initial": {
+        "commitment": "ASSERTED",
+        "presentation": "NORMAL"
+      },
+      "truth": {
+        "relation": "CONSISTENT_WITH_WORLD",
+        "contradicting_events": []
+      }
+    }
+  ],
+  "inquiry_routes": [],
+  "evidence": [
+    {
+      "evidence_id": "ev_tutorial_roster",
+      "type": "SHIFT_ROSTER",
+      "title_key": "evidence.tutorial.roster.title",
+      "acquire": {
+        "node": "node_tutorial_start",
+        "method": "STARTING"
+      },
+      "source_category": "DIGITAL",
+      "independence": {
+        "source_id": "source_tutorial_registry",
+        "group": "DIGITAL",
+        "derived_from": null
+      },
+      "grade": {
+        "initial": "A",
+        "upgrades": []
+      },
+      "integrity": {
+        "initial": "INTACT"
+      },
+      "observations": [
+        {
+          "observation_id": "observation_tutorial_roster",
+          "subject_id": "ent_tutorial_slime",
+          "predicate": "PRESENT_DURING_SHIFT",
+          "summary_key": "evidence.tutorial.roster.summary",
+          "scopes": ["PRESENCE"],
+          "detail": {},
+          "time": { "from": "17:00", "to": "17:30" },
+          "confidence": 1,
+          "supports_claim_ids": ["clm_tutorial_who"]
+        }
+      ],
+      "not_proven_keys": ["evidence.tutorial.roster.not_proven"]
+    }
+  ],
+  "proof_rules": [
+    {
+      "rule_id": "rule_tutorial_who",
+      "target_claim_id": "clm_tutorial_who",
+      "direction": "SUPPORT",
+      "requirements": {
+        "required_scopes": ["PRESENCE"],
+        "minimum_confidence": 0.8,
+        "minimum_independent_sources": 1,
+        "require_integrity": true
+      },
+      "guaranteed_evidence_sets": [["ev_tutorial_roster"]]
+    }
+  ],
+  "encounters": [
+    {
+      "encounter_id": "enc_tutorial_slime",
+      "target_entity": "ent_tutorial_slime",
+      "resources": {
+        "composure_max": 60,
+        "cp_per_turn": 3,
+        "cp_max": 3,
+        "coercion_limit": 100,
+        "shields_per_round": 0
+      },
+      "rounds": [
+        {
+          "round_id": "round_tutorial_01",
+          "statement_claims": ["clm_tutorial_who"],
+          "shields": []
+        }
+      ],
+      "flow_nodes": [
+        {
+          "node_id": "node_tutorial_start",
+          "enter_conditions": [{ "type": "ALWAYS" }],
+          "reveal_claim_ids": [],
+          "revise_claim_ids": [],
+          "open_route_ids": [],
+          "activate_modifiers": [],
+          "deactivate_modifiers": [],
+          "reaction_key": "reaction.tutorial.start",
+          "resource_delta": {},
+          "is_terminal": false
+        }
+      ],
+      "modifiers": [],
+      "objectives": {
+        "required": [
+          {
+            "objective_id": "objective_tutorial_resolve",
+            "type": "RESOLVE_CLAIM",
+            "claim_id": "clm_tutorial_who"
+          }
+        ],
+        "optional": [],
+        "state_conditions": {
+          "composure_min": 1,
+          "composure_max": 30
+        }
+      },
+      "outcomes": [
+        {
+          "outcome_id": "outcome_tutorial_best",
+          "grade": "BEST_RESOLUTION",
+          "priority": 1,
+          "conditions": [{ "type": "ALL_REQUIRED_OBJECTIVES" }]
+        }
+      ]
+    }
+  ],
+  "events_noncombat": [],
+  "flag_hooks": [],
+  "dialogue": {
+    "speaker_profiles": {
+      "ent_tutorial_slime": {
+        "race": "SLIME",
+        "personality": ["TIMID"],
+        "speech": "POLITE_TREMBLING",
+        "forbidden_expressions": ["사실은", "거짓말"]
+      }
+    },
+    "statements": {
+      "clm_tutorial_who": {
+        "fallback": ["오후 5시에는 저 혼자 탕비실을 청소했어요."],
+        "spans": [
+          {
+            "claim_id": "clm_tutorial_who",
+            "start": 0,
+            "end": 10
+          }
+        ]
+      }
+    },
+    "reactions": {
+      "reaction.tutorial.start": ["Let's review the shift roster first."]
+    },
+    "confession": {
+      "full": ["제가 기억하는 사실은 전부 말씀드렸습니다."],
+      "coerced": ["그만할게요. 제가 했다고 할게요."]
+    }
+  }
+}

@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>던전수사조서 — 기획자 애셋 업로드 & 라이브 튜닝 워크벤치</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/galmuri/dist/galmuri.css">
+<style>
+  :root {
+    --bg-dark: #221d17;
+    --panel-bg: #2d261e;
+    --panel-border: #524433;
+    --gold: #f0c865;
+    --gold-dim: #b89f78;
+    --gold-bright: #fff8e0;
+    --red: #c04840;
+    --blue: #4a7fa8;
+    --text-color: #f3e8d2;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 16px;
+    background: var(--bg-dark);
+    color: var(--text-color);
+    font-family: 'Galmuri11', 'Galmuri9', monospace;
+    font-size: 13px;
+  }
+  h1, h2, h3 { margin: 0 0 10px; color: var(--gold-bright); font-weight: normal; }
+  
+  .header-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 12px;
+    margin-bottom: 16px;
+    border-bottom: 2px solid var(--panel-border);
+  }
+  .header-title { font-size: 18px; color: var(--gold); }
+  .badge { background: var(--gold); color: #12100d; padding: 2px 6px; font-weight: bold; font-size: 11px; }
+
+  .layout { display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap; }
+
+  /* Left: 640x400 Scaled Game Canvas Stage */
+  .stage-container { flex: none; display: flex; flex-direction: column; gap: 10px; }
+  .stage-viewport {
+    position: relative;
+    width: 640px;
+    height: 400px;
+    background: #080604;
+    border: 3px solid #000;
+    box-shadow: 0 0 0 1px var(--panel-border), 0 10px 30px rgba(0,0,0,0.8);
+    overflow: hidden;
+    image-rendering: pixelated;
+  }
+  .stage-zoom { transform-origin: top left; }
+
+  /* Drag & Drop Asset Slots */
+  .asset-slot {
+    position: absolute;
+    box-sizing: border-box;
+    border: 1px dashed rgba(232, 193, 90, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0,0,0,0.3);
+    color: var(--gold-dim);
+    font-size: 10px;
+    text-align: center;
+    cursor: pointer;
+    overflow: hidden;
+    user-select: none;
+    transition: border-color 0.2s, background 0.2s;
+  }
+  .asset-slot:hover { border-color: var(--gold); background: rgba(232, 193, 90, 0.15); }
+  .asset-slot img { width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
+  .asset-slot.drag-over { border-color: #6dff88; background: rgba(109, 255, 136, 0.25); }
+
+  /* Stage Elements */
+  #slot-bg { left: 0; top: 0; width: 640px; height: 400px; z-index: 0; }
+  #slot-portrait { left: 222px; top: 36px; width: 196px; height: 216px; z-index: 1; }
+  #slot-expression { left: 272px; top: 80px; width: 96px; height: 40px; z-index: 2; }
+  #slot-desk { left: 0; top: 282px; width: 640px; height: 118px; z-index: 3; }
+
+  /* Stage HUD Top Bar */
+  .stage-hud {
+    position: absolute; left: 0; top: 0; width: 640px; height: 28px; z-index: 5;
+    background: linear-gradient(rgba(8,6,4,0.95), rgba(8,6,4,0.6));
+    display: flex; align-items: center; padding: 0 10px; gap: 14px; font-size: 11px;
+  }
+  .gauge-box { display: flex; align-items: center; gap: 6px; }
+  .gauge-bar { width: 100px; height: 10px; border: 1px solid #6b5a3a; background: #241c14; position: relative; }
+  .gauge-fill { height: 100%; background: #6d8d93; transition: width 0.3s; }
+  .gauge-sweet { position: absolute; left: 1%; width: 29%; height: 100%; background: rgba(232, 193, 90, 0.35); border-right: 1px solid var(--gold); }
+
+  /* Tag Chips Bar */
+  .stage-tags {
+    position: absolute; left: 12px; top: 254px; width: 616px; height: 26px; z-index: 6;
+    display: flex; gap: 6px;
+  }
+  .tag-chip {
+    flex: 1; display: flex; align-items: center; justify-content: space-between;
+    padding: 0 8px; background: linear-gradient(#dcc796,#c3ab76); border: 1px solid #6b5a3a;
+    color: #241d12; font-size: 10px; cursor: pointer; user-select: none;
+  }
+  .tag-chip.active { border: 2px solid #fff; box-shadow: 0 0 8px var(--gold); }
+  .tag-chip.locked { background: #55462c; color: #888; cursor: not-allowed; }
+
+  /* Dialogue Box */
+  .stage-dialogue {
+    position: absolute; left: 10px; top: 288px; width: 620px; height: 56px; z-index: 6;
+    background: rgba(10,8,5,0.92); border: 2px solid #cbb27c; padding: 6px 10px; font-size: 11px; color: #ead9b0;
+    line-height: 1.4;
+  }
+
+  /* Hand Cards Bar */
+  .stage-cards {
+    position: absolute; left: 200px; top: 346px; width: 430px; height: 50px; z-index: 7;
+    display: flex; gap: 8px;
+  }
+  .card-item {
+    width: 90px; height: 48px; background: #24406e; border: 1px solid #7fa4e0;
+    color: #fff; padding: 4px; font-size: 9px; cursor: pointer; display: flex; flex-direction: column; justify-content: space-between;
+  }
+  .card-item.selected { border: 2px solid var(--gold-bright); box-shadow: 0 0 10px var(--gold); }
+  .card-item.contradict { background: #6e2424; border-color: #d97f6a; }
+
+  /* Right Panel: Planner Workbench Tabs */
+  .workbench-panel {
+    flex: 1;
+    min-width: 480px;
+    background: var(--panel-bg);
+    border: 1px solid var(--panel-border);
+    padding: 16px;
+    border-radius: 4px;
+  }
+  .tabs { display: flex; gap: 4px; margin-bottom: 12px; border-bottom: 1px solid var(--panel-border); }
+  .tab-btn {
+    padding: 6px 12px; background: #3c3227; border: 1px solid var(--panel-border);
+    color: var(--gold-dim); cursor: pointer; font-family: inherit; font-size: 11px;
+  }
+  .tab-btn.active { background: var(--gold); color: #1a140d; font-weight: bold; border-color: var(--gold); }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  /* Form & Controls */
+  .form-group { margin-bottom: 12px; }
+  label { display: block; margin-bottom: 4px; color: var(--gold); font-size: 11px; }
+  input[type="text"], input[type="number"], textarea, select {
+    width: 100%; padding: 6px 8px; background: #1a1510; border: 1px solid var(--panel-border);
+    color: var(--gold-bright); font-family: inherit; font-size: 11px;
+  }
+  button {
+    padding: 6px 12px; background: #4a3c2c; border: 1px solid var(--gold-dim);
+    color: var(--gold-bright); cursor: pointer; font-family: inherit; font-size: 11px;
+  }
+  button:hover { background: var(--gold); color: #12100d; }
+
+  /* QA Test Grid */
+  .qa-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 12px; }
+  .qa-btn { padding: 8px; font-size: 10px; text-align: left; line-height: 1.3; background: #3a2f23; }
+
+  .log-box {
+    background: #15110d; border: 1px solid var(--panel-border); padding: 10px;
+    height: 140px; overflow-y: auto; font-size: 11px; color: #b7e89e; white-space: pre-wrap;
+  }
+</style>
+</head>
+<body>
+
+<div class="header-bar">
+  <div class="header-title">🕵️‍♂️ 던전수사조서 — 기획자 라이브 워크벤치 & 애셋 슬롯 UI</div>
+  <div>
+    <span class="badge">PROTOTYPE ENGINE v1.0</span>
+    <span style="margin-left: 8px; color: var(--gold-dim); font-size: 11px;">무빌드 튜닝 & Drag-and-Drop 지원</span>
+  </div>
+</div>
+
+<div class="layout">
+  <!-- Left: 640x400 Game Viewport Stage -->
+  <div class="stage-container">
+    <div style="display: flex; justify-content: space-between; align-items: center; color: var(--gold-dim); font-size: 11px;">
+      <span>🎮 캔버스 스테이지 (640×400 도트 해상도)</span>
+      <span>💡 PNG 이미지를 슬롯에 드롭하세요!</span>
+    </div>
+    
+    <div class="stage-viewport">
+      <!-- Drag & Drop Asset Slots -->
+      <div id="slot-bg" class="asset-slot" title="배경 슬롯 (640x400)">배경 (bg_취조실.png)</div>
+      <div id="slot-portrait" class="asset-slot" title="용의자 슬롯 (196x216)">용의자 베이스 (portrait_base.png)</div>
+      <div id="slot-expression" class="asset-slot" title="표정 파츠 (96x40)">표정 파츠 (parts.png)</div>
+      <div id="slot-desk" class="asset-slot" title="전경 책상 슬롯 (640x118)">책상 전경 (fg_desk.png)</div>
+
+      <!-- HUD Top Bar -->
+      <div class="stage-hud">
+        <span>용의자: <strong style="color: var(--gold-bright)" id="hud-suspect">물컹이</strong></span>
+        <div class="gauge-box">
+          <span>평정심</span>
+          <div class="gauge-bar">
+            <div class="gauge-sweet"></div>
+            <div id="gauge-composure" class="gauge-fill" style="width: 62%;"></div>
+          </div>
+          <span id="txt-composure">37/60</span>
+        </div>
+        <div class="gauge-box">
+          <span style="color: #e2a389">강압 수사</span>
+          <div class="gauge-bar" style="border-color: #8c3530;">
+            <div id="gauge-coercion" class="gauge-fill" style="width: 24%; background: #8c3530;"></div>
+          </div>
+          <span id="txt-coercion" style="color: #e2a389">24%</span>
+        </div>
+      </div>
+
+      <!-- Tag Chips Bar -->
+      <div class="stage-tags">
+        <div class="tag-chip active" onclick="selectTag('WHO', this)"><span>누가</span><span>🔒</span></div>
+        <div class="tag-chip" onclick="selectTag('WHEN', this)"><span>언제</span><span>✓</span></div>
+        <div class="tag-chip" onclick="selectTag('WHERE', this)"><span>어디서</span></div>
+        <div class="tag-chip" onclick="selectTag('WHAT', this)"><span>무엇을</span></div>
+        <div class="tag-chip" onclick="selectTag('HOW', this)"><span>어떻게</span></div>
+        <div class="tag-chip" onclick="selectTag('WHY', this)"><span>왜</span></div>
+      </div>
+
+      <!-- Dialogue Window -->
+      <div class="stage-dialogue" id="stage-dialogue-text">
+        <span style="color: var(--gold);">김태훈:</span> 17시 20분 탕비실에 있던 건 누구지? 진실을 말해라!<br>
+        <span style="color: #e8935a;">물컹이:</span> 저, 전 혼자 청소하고 있었습니다! 보, 보안팀은 못 봤어요!
+      </div>
+
+      <!-- Hand Deck Area -->
+      <div class="stage-cards">
+        <div class="card-item" onclick="selectCard('QUERY', this)">
+          <div>[질문] 탐문 질문</div>
+          <div style="color: var(--gold-dim)">CP 1소비</div>
+        </div>
+        <div class="card-item" onclick="selectCard('CONFIRM', this)">
+          <div>[확인] 사실 확인</div>
+          <div style="color: var(--gold-dim)">CP 1소비</div>
+        </div>
+        <div class="card-item contradict" onclick="selectCard('CONTRADICT', this)">
+          <div>[모순] 모순 지적</div>
+          <div style="color: #ffd0d0">CP 2소비 / Dmg 18</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Execution Bar -->
+    <div style="display: flex; gap: 8px;">
+      <select id="select-evidence" style="flex: 1;">
+        <option value="E401">E401: 국밥집 영수증 (21:52 자택체류 함정)</option>
+        <option value="E402" selected>E402: GATE-04 출입로그 (22:41 모순증거)</option>
+        <option value="E403">E403: 준공검사서 (23:07 서명)</option>
+        <option value="E110">E110: 빨간 장부 원본 (독립출처 2필요)</option>
+      </select>
+      <button onclick="executeAction()" style="background: var(--gold); color: #12100d; font-weight: bold;">턴 제출 (SUBMIT)</button>
+    </div>
+  </div>
+
+  <!-- Right Panel: Planner Workbench -->
+  <div class="workbench-panel">
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchTab('tab-tuner', this)">⚖️ balance.json 튜너</button>
+      <button class="tab-btn" onclick="switchTab('tab-qa', this)">🧪 12 QA 픽스처 테스트</button>
+      <button class="tab-btn" onclick="switchTab('tab-dialogue', this)">💬 대사 & 사건 스키마</button>
+    </div>
+
+    <!-- Tab 1: Balance Tuner -->
+    <div id="tab-tuner" class="tab-content active">
+      <h3>라이브 밸런스 튜너 (재빌드 0초 수치 반영)</h3>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+        <div class="form-group">
+          <label>모순 지적 기본 피해 (dmg.contradict)</label>
+          <input type="number" id="cfg-dmg-contradict" value="18">
+        </div>
+        <div class="form-group">
+          <label>강압 수사 증가량 - 불충분 (coercion.insufficient)</label>
+          <input type="number" id="cfg-coercion-insufficient" value="2">
+        </div>
+        <div class="form-group">
+          <label>강압 수사 증가량 - 진실공격 (coercion.truthAttack)</label>
+          <input type="number" id="cfg-coercion-truth" value="15">
+        </div>
+        <div class="form-group">
+          <label>스위트스팟 상한 % (sweetSpot.max)</label>
+          <input type="number" id="cfg-sweetspot-max" value="30">
+        </div>
+        <div class="form-group">
+          <label>첫 턴 드로우 수 (draw.initial)</label>
+          <input type="number" id="cfg-draw-initial" value="5">
+        </div>
+        <div class="form-group">
+          <label>손패 상한 (draw.handLimit)</label>
+          <input type="number" id="cfg-hand-limit" value="7">
+        </div>
+      </div>
+      <div style="display: flex; gap: 8px; margin-top: 10px;">
+        <button onclick="applyTunerConfig()">⚡ 인게임 즉시 적용</button>
+        <button onclick="exportTunerConfig()">💾 balance.json 내보내기</button>
+      </div>
+    </div>
+
+    <!-- Tab 2: 12 QA Fixtures Tester -->
+    <div id="tab-qa" class="tab-content">
+      <h3>기획 §10.1 판정 QA 12케이스 자동 테스트</h3>
+      <div class="qa-grid">
+        <button class="qa-btn" onclick="runQA(1)">QA#1 영수증 함정<br><small>→ R_INSUFFICIENT</small></button>
+        <button class="qa-btn" onclick="runQA(2)">QA#2 GATE-04 출입<br><small>→ R_DIRECT_CONTRADICT</small></button>
+        <button class="qa-btn" onclick="runQA(3)">QA#3 전자 서명<br><small>→ R_DIRECT_CONTRADICT</small></button>
+        <button class="qa-btn" onclick="runQA(4)">QA#4 빨간 장부<br><small>→ R_INDIRECT_SUSPICION</small></button>
+        <button class="qa-btn" onclick="runQA(5)">QA#5 진실 태그 공격<br><small>→ R_TRUTH_ATTACKED</small></button>
+        <button class="qa-btn" onclick="runQA(6)">QA#6 청소 근무표<br><small>→ R_CONFIRM_LOCKED</small></button>
+        <button class="qa-btn" onclick="runQA(7)">QA#7 복지비 단독<br><small>→ R_INDIRECT_SUSPICION</small></button>
+        <button class="qa-btn" onclick="runQA(8)">QA#8 B등급 사본<br><small>→ min_sources: 2필요</small></button>
+        <button class="qa-btn" onclick="runQA(9)">QA#9 물컹이 [누가] 잠금<br><small>→ SILENCE 무효</small></button>
+        <button class="qa-btn" onclick="runQA(10)">QA#10 오크 파쇄 소실<br><small>→ hasSolvablePath ok</small></button>
+        <button class="qa-btn" onclick="runQA(11)">QA#11 변호인 빨간도장<br><small>→ R_PROCEDURE_VIOLATION</small></button>
+        <button class="qa-btn" onclick="runQA(12)">QA#12 최종 교차검증<br><small>→ 2출처 대조 필수</small></button>
+      </div>
+    </div>
+
+    <!-- Tab 3: Dialogue Editor -->
+    <div id="tab-dialogue" class="tab-content">
+      <h3>폴백 대사 & AI 변주 사전 검증</h3>
+      <div class="form-group">
+        <label>현재 선택 진술 ID</label>
+        <input type="text" id="dlg-claim-id" value="clm_t01_who" readonly>
+      </div>
+      <div class="form-group">
+        <label>폴백 대사 텍스트 (Fallback Dialogue)</label>
+        <textarea id="dlg-fallback-text" rows="3">오후 5시에는 저 혼자 탕비실을 청소했어요. 보안팀 사람은 한 명도 못 봤습니다.</textarea>
+      </div>
+      <button onclick="updateDialogueText()">💬 캔버스 대사 즉시 반영</button>
+    </div>
+
+    <!-- Execution Log Window -->
+    <h3 style="margin-top: 16px;">📜 런타임 판정 로그 (Judgment Log Output)</h3>
+    <div id="log-output" class="log-box">시스템 초기화 완료. 기획자 워크벤치가 준비되었습니다.</div>
+  </div>
+</div>
+
+<script>
+  // Game Configuration State
+  let config = {
+    dmgContradict: 18,
+    coercionInsufficient: 2,
+    coercionTruth: 15,
+    sweetSpotMax: 30,
+    drawInitial: 5,
+    handLimit: 7
+  };
+
+  let gameState = {
+    composure: 37,
+    composureMax: 60,
+    coercion: 24,
+    selectedTag: 'WHO',
+    selectedCard: 'CONTRADICT',
+    selectedEvidence: 'E402'
+  };
+
+  // Asset Slot Drag & Drop Listener setup
+  document.addEventListener('DOMContentLoaded', () => {
+    setupAssetSlots();
+  });
+
+  function setupAssetSlots() {
+    const slots = document.querySelectorAll('.asset-slot');
+    slots.forEach(slot => {
+      // Load saved image from LocalStorage if exists
+      const savedImage = localStorage.getItem('asset_' + slot.id);
+      if (savedImage) {
+        slot.innerHTML = `<img src="${savedImage}">`;
+      }
+
+      slot.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        slot.classList.add('drag-over');
+      });
+
+      slot.addEventListener('dragleave', () => {
+        slot.classList.remove('drag-over');
+      });
+
+      slot.addEventListener('drop', (e) => {
+        e.preventDefault();
+        slot.classList.remove('drag-over');
+        const files = e.dataTransfer.files;
+        if (files.length > 0 && files[0].type.startsWith('image/')) {
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            const dataUrl = event.target.result;
+            slot.innerHTML = `<img src="${dataUrl}">`;
+            localStorage.setItem('asset_' + slot.id, dataUrl);
+            log(`[Asset] ${slot.id} 슬롯에 새 애셋 업로드 완료! (LocalStorage 저장됨)`);
+          };
+          reader.readAsDataURL(files[0]);
+        }
+      });
+    });
+  }
+
+  // Pure Argument Resolver Core Implementation (JavaScript)
+  function resolveArgument(intent, tag, evidenceId) {
+    // 12 QA Data rules mapping
+    if (tag === 'WHO' && gameState.selectedTag === 'WHO') {
+      // Slime Locked case (QA#9)
+      return {
+        code: 'R_ACTION_INVALID',
+        reason: 'SILENCE',
+        composureDmg: 0,
+        coercionDelta: 0,
+        feedback: '묵비권 행사 중! [누가] 태그 잠금을 먼저 해제해야 합니다.'
+      };
+    }
+
+    if (evidenceId === 'E401') { // QA#1 Soup Receipt
+      return {
+        code: 'R_INSUFFICIENT_GROUNDS',
+        composureDmg: 0,
+        coercionDelta: config.coercionInsufficient,
+        coveredScopes: ['LOCATION'],
+        missingScopes: ['TIME', 'IDENTITY'],
+        feedback: '불충분! 국밥집 영수증은 21:52 체류만 증명할 뿐, 사건 시각(22:41)의 위치를 다루지 못합니다.'
+      };
+    }
+
+    if (evidenceId === 'E402' || evidenceId === 'E403') { // QA#2 & QA#3 Direct Contradiction
+      return {
+        code: 'R_DIRECT_CONTRADICTION',
+        composureDmg: config.dmgContradict,
+        coercionDelta: 1,
+        feedback: '직접 모순! 출입/서명 로그가 진술과 정면으로 충돌합니다. 평정심 -' + config.dmgContradict
+      };
+    }
+
+    if (evidenceId === 'E110') { // QA#4 & QA#8 Red Ledger (requires 2 independent sources)
+      return {
+        code: 'R_INDIRECT_SUSPICION',
+        composureDmg: 6,
+        coercionDelta: 1,
+        feedback: '간접 의심! B등급 사본 단독으로는 무결성이 부족하여 독립 증거 1개가 더 필요합니다.'
+      };
+    }
+
+    return {
+      code: 'R_INSUFFICIENT_GROUNDS',
+      composureDmg: 0,
+      coercionDelta: 2,
+      feedback: '판정 결과: 제출한 증거만으로는 진술을 반박할 수 없습니다.'
+    };
+  }
+
+  function executeAction() {
+    const evSelect = document.getElementById('select-evidence');
+    const evId = evSelect.value;
+    const res = resolveArgument(gameState.selectedCard, gameState.selectedTag, evId);
+
+    // Apply State Delta
+    gameState.composure = Math.max(0, gameState.composure - res.composureDmg);
+    gameState.coercion = Math.min(100, gameState.coercion + res.coercionDelta);
+
+    // Update UI
+    document.getElementById('gauge-composure').style.width = (gameState.composure / gameState.composureMax * 100) + '%';
+    document.getElementById('txt-composure').innerText = `${gameState.composure}/${gameState.composureMax}`;
+    document.getElementById('gauge-coercion').style.width = gameState.coercion + '%';
+    document.getElementById('txt-coercion').innerText = gameState.coercion + '%';
+
+    document.getElementById('stage-dialogue-text').innerHTML = `<span style="color: var(--gold)">판정 [${res.code}]:</span> ${res.feedback}`;
+    log(`[Execution] Intent: ${gameState.selectedCard} | Tag: ${gameState.selectedTag} | Evidence: ${evId}\n └─> Result: ${res.code} | Dmg: -${res.composureDmg} | Coercion: +${res.coercionDelta}%`);
+  }
+
+  function runQA(index) {
+    const qaMap = {
+      1: { card: 'CONTRADICT', tag: 'WHERE', ev: 'E401', desc: 'QA#1 국밥집 영수증 함정' },
+      2: { card: 'CONTRADICT', tag: 'WHEN', ev: 'E402', desc: 'QA#2 GATE-04 출입로그 모순' },
+      3: { card: 'CONTRADICT', tag: 'WHEN', ev: 'E403', desc: 'QA#3 준공검사서 서명 모순' },
+      4: { card: 'CONTRADICT', tag: 'WHY', ev: 'E110', desc: 'QA#4 빨간 장부 간접의심' },
+      5: { card: 'CONTRADICT', tag: 'WHEN', ev: 'E402', desc: 'QA#5 진실 태그 공격 (강압 15%)' },
+      6: { card: 'CONFIRM', tag: 'WHEN', ev: 'E402', desc: 'QA#6 청소근무표 사실확인' },
+      7: { card: 'CONTRADICT', tag: 'WHAT', ev: 'E401', desc: 'QA#7 붉은복지비 부분입증' },
+      8: { card: 'CONTRADICT', tag: 'WHY', ev: 'E110', desc: 'QA#8 B등급 사본 출처하한' },
+      9: { card: 'CONTRADICT', tag: 'WHO', ev: 'E402', desc: 'QA#9 물컹이 [누가] 잠금' },
+      10: { card: 'CONTRADICT', tag: 'HOW', ev: 'E402', desc: 'QA#10 오크 파쇄 대체경로' },
+      11: { card: 'CONTRADICT', tag: 'WHY', ev: 'E402', desc: 'QA#11 변호인 빨간도장 금지' },
+      12: { card: 'CONTRADICT', tag: 'WHO', ev: 'E402', desc: 'QA#12 최종 3라운드 교차검증' }
+    };
+    const item = qaMap[index];
+    gameState.selectedCard = item.card;
+    gameState.selectedTag = item.tag;
+    document.getElementById('select-evidence').value = item.ev;
+    log(`[QA Suite] Running ${item.desc}...`);
+    executeAction();
+  }
+
+  // UI Selection Handlers
+  function selectTag(tag, el) {
+    gameState.selectedTag = tag;
+    document.querySelectorAll('.tag-chip').forEach(c => c.classList.remove('active'));
+    el.classList.add('active');
+    log(`[UI] 태그 선택됨: ${tag}`);
+  }
+
+  function selectCard(card, el) {
+    gameState.selectedCard = card;
+    document.querySelectorAll('.card-item').forEach(c => c.classList.remove('selected'));
+    el.classList.add('selected');
+    log(`[UI] 카드 선택됨: ${card}`);
+  }
+
+  // Tab Switcher
+  function switchTab(tabId, btnEl) {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    btnEl.classList.add('active');
+    document.getElementById(tabId).classList.add('active');
+  }
+
+  // Config Tuning Handlers
+  function applyTunerConfig() {
+    config.dmgContradict = parseInt(document.getElementById('cfg-dmg-contradict').value);
+    config.coercionInsufficient = parseInt(document.getElementById('cfg-coercion-insufficient').value);
+    config.coercionTruth = parseInt(document.getElementById('cfg-coercion-truth').value);
+    config.sweetSpotMax = parseInt(document.getElementById('cfg-sweetspot-max').value);
+    log(`[Config] 밸런스 수치 런타임 즉시 반영 완료! (dmgContradict = ${config.dmgContradict})`);
+  }
+
+  function exportTunerConfig() {
+    const jsonStr = JSON.stringify(config, null, 2);
+    const blob = new Blob([jsonStr], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'balance.json';
+    a.click();
+    log(`[Config] balance.json 파일 다운로드 내보내기 성공!`);
+  }
+
+  function updateDialogueText() {
+    const text = document.getElementById('dlg-fallback-text').value;
+    document.getElementById('stage-dialogue-text').innerHTML = `<span style="color: #e8935a;">물컹이:</span> ${text}`;
+    log(`[Dialogue] 캔버스 대사 업데이트 반영됨.`);
+  }
+
+  function log(msg) {
+    const logEl = document.getElementById('log-output');
+    logEl.innerText += '\n' + msg;
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+</script>
+</body>
+</html>

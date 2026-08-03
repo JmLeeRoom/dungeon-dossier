@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/galmuri/dist/galmuri.css">
+<style>
+body{margin:0;background:#12100d;color:#d9c9a5;font-family:'Galmuri11','Galmuri9',monospace}
+a{color:#e8c15a;text-decoration:none}a:hover{color:#fff3d0}
+@keyframes omCaret{0%,49%{opacity:1}50%,100%{opacity:0}}
+@keyframes omHl{0%{box-shadow:0 0 0 3px #e8c15a,0 0 22px 6px rgba(232,193,90,.85)}100%{box-shadow:0 0 0 3px rgba(232,193,90,0),0 0 2px 0 rgba(232,193,90,0)}}
+@keyframes omGlow{0%,100%{box-shadow:0 0 3px 1px rgba(255,244,200,.4)}50%{box-shadow:0 0 9px 3px rgba(255,244,200,.95)}}
+</style>
+<script src="image-slot.js"></script>
+</helmet>
+<div style="min-height:100vh;padding:20px 24px 40px;box-sizing:border-box">
+  <div style="display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin-bottom:16px">
+    <div style="font-family:'Galmuri14',monospace;font-size:17px;color:#f0e2ba">던전 수사 조서 — 심문 화면 애셋 목업</div>
+    <div style="font-size:11px;color:#96855f">PNG를 슬롯에 드래그하면 저장되어 새로고침 후에도 유지 · 표시 배율 {{zoomLabel}} · 내부 해상도 640×400 · 16색/씬</div>
+    <div style="font-size:11px;color:#6e6148">배율·라벨·표정 파츠는 우측 상단 Tweaks에서</div>
+  </div>
+  <div style="display:flex;gap:22px;align-items:flex-start;flex-wrap:wrap">
+    <div style="flex:none">
+      <div style="zoom:{{stageZoom}}">
+        <div style="position:relative;width:640px;height:400px;overflow:hidden;border:3px solid #000;box-shadow:0 0 0 1px #2c2620,0 10px 30px rgba(0,0,0,.6);background:#0b0906;image-rendering:pixelated">
+          <div style="position:absolute;left:0;top:0;width:640px;height:400px;z-index:0">
+            <image-slot id="bg-room" shape="rect" placeholder="bg_취조실_기본 · 640×400"></image-slot>
+            <div style="position:absolute;inset:0;pointer-events:none;border:1px dashed rgba(232,193,90,.45);display:{{ovl}}"><span style="position:absolute;left:4px;bottom:4px;font:9px 'Galmuri9';color:#e8c15a;background:rgba(0,0,0,.6);padding:1px 4px">bg_취조실_기본 640×400</span></div>
+          </div>
+          <div style="position:absolute;left:222px;top:40px;width:196px;height:216px;z-index:1">
+            <image-slot id="portrait-base" shape="rect" fit="contain" placeholder="portrait_하피_base"></image-slot>
+            <div style="position:absolute;inset:0;pointer-events:none;border:1px dashed rgba(232,193,90,.55);display:{{ovl}}"><span style="position:absolute;left:3px;top:3px;font:9px 'Galmuri9';color:#e8c15a;background:rgba(0,0,0,.6);padding:1px 4px">portrait_base 196×216</span></div>
+          </div>
+          <sc-if value="{{partsOn}}" hint-placeholder-val="{{ true }}">
+            <div style="position:absolute;left:272px;top:84px;width:96px;height:40px;z-index:2">
+              <image-slot id="portrait-parts" shape="rect" fit="contain" placeholder="표정 파츠"></image-slot>
+              <div style="position:absolute;inset:0;pointer-events:none;border:1px dashed rgba(120,200,255,.6);display:{{ovl}}"><span style="position:absolute;left:3px;top:-13px;font:9px 'Galmuri9';color:#9fd4ff;background:rgba(0,0,0,.6);padding:1px 4px">parts 오버레이 96×40</span></div>
+            </div>
+          </sc-if>
+          <div style="position:absolute;left:0px;top:282px;width:640px;height:118px;z-index:3;pointer-events:none">
+            <div style="position:absolute;inset:0;pointer-events:auto"><image-slot id="fg-desk" shape="rect" fit="contain" placeholder="fg_책상_전경 (투명 PNG)"></image-slot></div>
+            <div style="position:absolute;inset:0;pointer-events:none;border:1px dashed rgba(180,150,90,.4);display:{{ovl}}"><span style="position:absolute;left:4px;top:2px;font:9px 'Galmuri9';color:#cdb47c;background:rgba(0,0,0,.6);padding:1px 4px">fg_책상 640×118</span></div>
+          </div>
+          <div style="position:absolute;left:0;top:0;width:640px;height:26px;z-index:5;background:linear-gradient(rgba(8,6,4,.88),rgba(8,6,4,.5))">
+            <div style="position:absolute;left:8px;top:4px;display:flex;align-items:center;gap:6px">
+              <span style="background:#7a1f1a;color:#f2e3c0;font-size:9px;padding:2px 5px;border:1px solid #3d0f0c">용의자</span>
+              <span style="font-family:'Galmuri14',monospace;font-size:14px;color:#f2e3c0">하피</span>
+            </div>
+            <div style="position:absolute;left:190px;top:5px;display:flex;align-items:center;gap:4px">
+              <div style="position:relative;width:16px;height:16px;flex:none"><image-slot id="icon-composure" shape="rect" fit="contain" placeholder="16"></image-slot></div>
+              <span style="font-size:10px;color:#ead9ab;white-space:nowrap">평정심</span>
+              <span style="font-size:11px;color:#ead9ab">[</span>
+              <div style="display:flex;gap:2px">
+                <sc-for list="{{compCells}}" as="c" hint-placeholder-count="10"><div style="width:9px;height:12px;border:1px solid #c9b784;background:{{c.bg}}"></div></sc-for>
+              </div>
+              <span style="font-size:11px;color:#ead9ab">]</span>
+            </div>
+            <div style="position:absolute;left:358px;top:5px;display:flex;align-items:center;gap:3px;white-space:nowrap">
+              <div style="position:relative;width:16px;height:16px;flex:none"><image-slot id="icon-coercion" shape="rect" fit="contain" placeholder="16"></image-slot></div>
+              <span style="font-size:10px;color:#e2a389;white-space:nowrap">강압 수사</span>
+              <span style="font-size:11px;color:#e2a389">[</span>
+              <div style="display:flex;gap:1px">
+                <sc-for list="{{coerCells}}" as="c" hint-placeholder-count="20"><div style="width:6px;height:12px;border:1px solid #a06046;background:{{c.bg}}"></div></sc-for>
+              </div>
+              <span style="font-size:11px;color:#e2a389">]</span>
+            </div>
+          </div>
+          <div style="position:absolute;left:12px;top:256px;width:616px;height:26px;z-index:6;display:flex;gap:8px">
+            <div style="flex:1;display:flex;align-items:center;gap:4px;padding:0 4px 0 10px;background:linear-gradient(#dcc796,#c3ab76);border:2px solid #6b5a3a;color:#241d12;font-size:10px;clip-path:polygon(9px 0,100% 0,100% 100%,9px 100%,0 50%);box-shadow:0 0 7px rgba(255,255,255,.75)"><span style="width:4px;height:4px;background:#241d12;border-radius:50%;opacity:.6"></span>누가<span style="margin-left:auto;width:9px;height:11px;background:#f4ecd2;border:1px solid #6b5a3a;clip-path:polygon(50% 0,100% 22%,100% 60%,50% 100%,0 60%,0 22%)"></span></div>
+            <div style="flex:1;display:flex;align-items:center;gap:4px;padding:0 4px 0 10px;background:linear-gradient(#dcc796,#c3ab76);border:2px solid #6b5a3a;color:#241d12;font-size:10px;clip-path:polygon(9px 0,100% 0,100% 100%,9px 100%,0 50%);box-shadow:0 0 7px rgba(255,255,255,.75)"><span style="width:4px;height:4px;background:#241d12;border-radius:50%;opacity:.6"></span>언제<span style="margin-left:auto;width:9px;height:11px;background:#f4ecd2;border:1px solid #6b5a3a;clip-path:polygon(50% 0,100% 22%,100% 60%,50% 100%,0 60%,0 22%)"></span></div>
+            <div style="flex:1;display:flex;align-items:center;gap:4px;padding:0 4px 0 10px;background:linear-gradient(#dcc796,#c3ab76);border:2px solid #6b5a3a;color:#241d12;font-size:10px;clip-path:polygon(9px 0,100% 0,100% 100%,9px 100%,0 50%)"><span style="width:4px;height:4px;background:#241d12;border-radius:50%;opacity:.6"></span>어디서</div>
+            <div style="flex:1;display:flex;align-items:center;gap:4px;padding:0 4px 0 10px;background:linear-gradient(#9a8459,#7d6a45),linear-gradient(115deg,transparent 46%,#4a3c26 46%,#4a3c26 54%,transparent 54%);background-blend-mode:multiply;border:2px solid #55462c;color:#241d12;font-size:10px;clip-path:polygon(9px 0,100% 0,100% 100%,9px 100%,0 50%)"><span style="width:4px;height:4px;background:#241d12;border-radius:50%;opacity:.6"></span>무엇을<span style="margin-left:auto;font-size:9px;color:#3d3220">✕</span></div>
+            <div style="flex:1;display:flex;align-items:center;gap:4px;padding:0 4px 0 10px;background:linear-gradient(#dcc796,#c3ab76);border:2px solid #6b5a3a;color:#241d12;font-size:10px;clip-path:polygon(9px 0,100% 0,100% 100%,9px 100%,0 50%)"><span style="width:4px;height:4px;background:#241d12;border-radius:50%;opacity:.6"></span>어떻게</div>
+            <div style="flex:1;display:flex;align-items:center;gap:4px;padding:0 4px 0 10px;background:linear-gradient(#e6d09b,#cdb47c);border:2px solid #8a6f38;color:#241d12;font-size:10px;clip-path:polygon(9px 0,100% 0,100% 100%,9px 100%,0 50%);animation:omGlow 1.3s infinite"><span style="width:4px;height:4px;background:#241d12;border-radius:50%;opacity:.6"></span>왜</div>
+          </div>
+          <div style="position:absolute;left:110px;top:292px;width:436px;height:56px;z-index:6;box-sizing:border-box;background:rgba(10,8,5,.93);border:2px solid #cbb27c;padding:5px 9px;font-size:10px;line-height:1.55;color:#ead9b0">
+            <div><span style="color:#e8c15a">김태훈:</span> 부두에서 뭘 하고 있었지? 진흙 속에서 네 송장이 나왔다. 불어, 새대가리. //</div>
+            <div><span style="color:#e8935a">하피:</span> 저, 전 몰라요! 그냥 배달이었다구요! 소, 송장은 봉인돼 있었어요! 전 아무것도 못 봤어요!<span style="display:inline-block;width:6px;height:10px;background:#ead9b0;margin-left:3px;animation:omCaret 1s steps(1) infinite"></span></div>
+          </div>
+          <div style="position:absolute;left:468px;top:352px;width:80px;height:18px;z-index:6;display:flex;align-items:center;justify-content:center;background:linear-gradient(#5a4f38,#463d2b);border:2px solid #6b5a3a;color:#a3946c;font-size:9px;opacity:.75">진술 확보 —</div>
+          <div style="position:absolute;left:6px;top:348px;width:148px;height:52px;z-index:7;transform:rotate(-3deg);background:linear-gradient(#c9a86b,#b3925a);border:2px solid #6b532f;box-shadow:2px 3px 0 rgba(0,0,0,.45);padding:2px 5px;box-sizing:border-box">
+            <div style="font-size:9px;color:#241d12;margin-bottom:2px;white-space:nowrap">사건: 하피 택배 사건</div>
+            <div style="display:flex;gap:4px">
+              <div style="width:36px;height:36px;position:relative;flex:none;background:#8d744a;border:1px solid #5c4a28"><image-slot id="ev-1" shape="rect" fit="contain" placeholder="36"></image-slot><div style="position:absolute;inset:0;pointer-events:none;border:1px dashed rgba(60,40,10,.6);display:{{ovl}}"></div></div>
+              <div style="width:36px;height:36px;position:relative;flex:none;background:#8d744a;border:1px solid #5c4a28"><image-slot id="ev-2" shape="rect" fit="contain" placeholder="36"></image-slot><div style="position:absolute;inset:0;pointer-events:none;border:1px dashed rgba(60,40,10,.6);display:{{ovl}}"></div></div>
+              <div style="width:36px;height:36px;position:relative;flex:none;background:#8d744a;border:1px solid #5c4a28"><image-slot id="ev-3" shape="rect" fit="contain" placeholder="36"></image-slot><div style="position:absolute;inset:0;pointer-events:none;border:1px dashed rgba(60,40,10,.6);display:{{ovl}}"></div></div>
+              <div style="font-size:8px;color:#3a2d16;line-height:1.25;padding-top:1px;overflow:hidden">현장<br>지도<br>프로필</div>
+            </div>
+          </div>
+          <div style="position:absolute;left:216px;top:342px;width:208px;z-index:7;display:flex;gap:8px">
+            <div style="width:64px;height:88px;box-sizing:border-box;background:#24406e;border:2px solid #7fa4e0;box-shadow:0 2px 0 #000;display:flex;flex-direction:column;transform:rotate(-3deg)">
+              <div style="font-size:9px;color:#fff;text-align:center;padding:2px 0 1px">탐문 질문</div>
+              <div style="flex:1;margin:1px 3px 3px;position:relative;background:#182b4c"><image-slot id="card-art-1" shape="rect" fit="contain" placeholder="56×44"></image-slot><div style="position:absolute;inset:0;pointer-events:none;border:1px dashed rgba(180,205,245,.5);display:{{ovl}}"></div></div>
+            </div>
+            <div style="width:64px;height:88px;box-sizing:border-box;background:#6e2424;border:2px solid #d97f6a;box-shadow:0 2px 0 #000;display:flex;flex-direction:column">
+              <div style="font-size:9px;color:#fff;text-align:center;padding:2px 0 1px">모순 지적</div>
+              <div style="flex:1;margin:1px 3px 3px;position:relative;background:#4c1818"><image-slot id="card-art-2" shape="rect" fit="contain" placeholder="56×44"></image-slot><div style="position:absolute;inset:0;pointer-events:none;border:1px dashed rgba(245,190,180,.5);display:{{ovl}}"></div></div>
+            </div>
+            <div style="width:64px;height:88px;box-sizing:border-box;background:#6e5a1c;border:2px solid #d9bc5e;box-shadow:0 2px 0 #000;display:flex;flex-direction:column;transform:rotate(3deg)">
+              <div style="font-size:9px;color:#fff;text-align:center;padding:2px 0 1px">압박</div>
+              <div style="flex:1;margin:1px 3px 3px;position:relative;background:#4c3e12"><image-slot id="card-art-3" shape="rect" fit="contain" placeholder="56×44"></image-slot><div style="position:absolute;inset:0;pointer-events:none;border:1px dashed rgba(245,225,160,.5);display:{{ovl}}"></div></div>
+            </div>
+          </div>
+          <div style="position:absolute;left:554px;top:302px;width:72px;height:88px;z-index:6">
+            <image-slot id="partner" shape="rect" fit="contain" placeholder="파트너"></image-slot>
+            <div style="position:absolute;inset:0;pointer-events:none;border:1px dashed rgba(140,220,255,.5);display:{{ovl}}"><span style="position:absolute;left:0px;top:-13px;font:9px 'Galmuri9';color:#9fd4ff;background:rgba(0,0,0,.6);padding:1px 4px">partner 72×88</span></div>
+          </div>
+          <div style="position:absolute;pointer-events:none;z-index:50;border:0;{{hlStyle}}"></div>
+        </div>
+      </div>
+      <div style="margin-top:18px;max-width:1280px">
+        <div style="font-size:12px;color:#c9b784;margin-bottom:8px">크기별 프리뷰 트레이 <span style="color:#6e6148">— 규격만 맞춰 아무 이미지나 드래그해 도트 확인 (원본 px 그대로)</span></div>
+        <div style="zoom:{{stageZoom}}">
+          <div style="display:flex;gap:14px;align-items:flex-end;image-rendering:pixelated">
+            <div style="display:flex;flex-direction:column;align-items:center;gap:3px"><div style="width:16px;height:16px;position:relative;background:#1a1713;border:1px dashed #4a4030"><image-slot id="f16" shape="rect" fit="contain" placeholder=""></image-slot></div><span style="font:8px 'Galmuri9';color:#8a7a5c">16×16 아이콘</span></div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:3px"><div style="width:36px;height:36px;position:relative;background:#1a1713;border:1px dashed #4a4030"><image-slot id="f36" shape="rect" fit="contain" placeholder=""></image-slot></div><span style="font:8px 'Galmuri9';color:#8a7a5c">36×36 증거</span></div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:3px"><div style="width:56px;height:44px;position:relative;background:#1a1713;border:1px dashed #4a4030"><image-slot id="f56" shape="rect" fit="contain" placeholder=""></image-slot></div><span style="font:8px 'Galmuri9';color:#8a7a5c">56×44 카드 일러</span></div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:3px"><div style="width:96px;height:26px;position:relative;background:#1a1713;border:1px dashed #4a4030"><image-slot id="f96" shape="rect" fit="contain" placeholder=""></image-slot></div><span style="font:8px 'Galmuri9';color:#8a7a5c">96×26 태그칩</span></div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:3px"><div style="width:72px;height:88px;position:relative;background:#1a1713;border:1px dashed #4a4030"><image-slot id="f72" shape="rect" fit="contain" placeholder=""></image-slot></div><span style="font:8px 'Galmuri9';color:#8a7a5c">72×88 파트너·카드</span></div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:3px"><div style="width:160px;height:100px;position:relative;background:#1a1713;border:1px dashed #4a4030"><image-slot id="f160" shape="rect" fit="contain" placeholder=""></image-slot></div><span style="font:8px 'Galmuri9';color:#8a7a5c">320×200 컷 (½ 표시)</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div style="width:330px;flex:none;background:#1a1713;border:1px solid #2c2620;padding:14px 14px 12px;box-sizing:border-box">
+      <div style="font-family:'Galmuri14',monospace;font-size:13px;color:#f0e2ba;margin-bottom:2px">애셋 규격 체크리스트 <span style="font-size:10px;color:#96855f">[초안]</span></div>
+      <div style="font-size:10px;color:#8a7a5c;margin-bottom:10px">행을 클릭하면 스테이지에서 해당 슬롯 위치를 표시</div>
+      <sc-for list="{{manifest}}" as="r" hint-placeholder-count="14">
+        <div onClick="{{r.go}}" style="display:flex;gap:8px;align-items:flex-start;padding:6px 6px;border-bottom:1px solid #262019;cursor:{{r.cur}}" style-hover="background:#221d16">
+          <div style="flex:1;min-width:0">
+            <div style="font-size:11px;color:#e3d5ae">{{r.name}} <span style="font-size:9px;color:#7d9bc4">{{r.tag}}</span></div>
+            <div style="font-size:9px;color:#8a7a5c;line-height:1.4;margin-top:1px">{{r.note}}</div>
+          </div>
+          <span style="font-size:10px;color:#96855f;flex:none;padding-top:1px">{{r.count}}</span>
+          <span style="font:10px 'Galmuri9';color:#12100d;background:#c9b784;padding:2px 5px;flex:none;white-space:nowrap">{{r.size}}</span>
+        </div>
+      </sc-for>
+      <div style="font-size:9px;color:#8a7a5c;line-height:1.6;margin-top:10px">
+        합계 ≈ 60점 규모 (기획 §8.7) · 명명 규칙 <span style="color:#c9b784">카테고리_이름_상태.png</span> · 16색/씬 · 상태 변형은 시트 1장 통합<br>
+        방어막 아이콘은 내부 유형과 무관하게 <span style="color:#c9b784">1종 동일 외형</span>만 제작 (구현계획 §7.3 공정성)<br>
+        규격 수치는 이 목업의 제안값 — M1 플레이스홀더 규격 확정(G-14) 때 동결<br>
+        슬롯에 넣은 이미지는 이 목업(브라우저)에만 저장 — 게임 빌드 assets/ 반영은 별도
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{
+  &quot;stageZoom&quot;: { &quot;editor&quot;: &quot;enum&quot;, &quot;options&quot;: [&quot;1&quot;, &quot;2&quot;, &quot;3&quot;], &quot;default&quot;: &quot;2&quot;, &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;스테이지&quot; },
+  &quot;showLabels&quot;: { &quot;editor&quot;: &quot;boolean&quot;, &quot;default&quot;: true, &quot;tsType&quot;: &quot;boolean&quot;, &quot;section&quot;: &quot;스테이지&quot; },
+  &quot;showParts&quot;: { &quot;editor&quot;: &quot;boolean&quot;, &quot;default&quot;: true, &quot;tsType&quot;: &quot;boolean&quot;, &quot;section&quot;: &quot;스테이지&quot; }
+}">
+class Component extends DCLogic {
+  state = { hl: null };
+  RECTS = {
+    "bg-room": [0, 0, 640, 400],
+    "fg-desk": [0, 282, 640, 118],
+    "portrait-base": [222, 40, 196, 216],
+    "portrait-parts": [272, 84, 96, 40],
+    "icon-composure": [190, 5, 16, 16],
+    "icon-coercion": [372, 5, 16, 16],
+    "card-art-1": [219, 345, 58, 46],
+    "ev-1": [13, 363, 36, 36],
+    "partner": [554, 302, 72, 88]
+  };
+  DATA = [
+    { name: "bg_취조실_기본", note: "팔레트 스왑 시안·세피아·마젠타 = 사전 베이크 3장 별도", size: "640×400", count: "×4", slot: "bg-room" },
+    { name: "fg_책상_전경", note: "하단 전경 레이어 · 투명 PNG (포트레이트가 뒤로 들어감)", size: "640×118", count: "×1", slot: "fg-desk" },
+    { name: "portrait_{이름}_base", note: "용의자 9종 · 데스크 뒤 중앙 정렬", size: "196×216", count: "×9", slot: "portrait-base" },
+    { name: "portrait_{이름}_parts", note: "눈썹·땀·입 오버레이 시트 + parts.json 좌표", size: "96×40", count: "×9", slot: "portrait-parts" },
+    { name: "ui_태그칩", note: "상태 4종 시트: 기본·방어막·파훼·흔들림 (스테이지는 CSS 임시)", size: "96×26", count: "×4", slot: null },
+    { name: "ui_방어막", note: "전 유형 동일 외형 1종만 — §7.3 공정성", size: "12×14", count: "×1", slot: null },
+    { name: "ui_아이콘_평정심", note: "상단 HUD 게이지 아이콘", size: "16×16", count: "×1", slot: "icon-composure" },
+    { name: "ui_아이콘_강압", note: "상단 HUD 게이지 아이콘", size: "16×16", count: "×1", slot: "icon-coercion" },
+    { name: "ui_카드프레임", note: "파랑(질문)·빨강(추궁)·금(특수) — 스테이지는 CSS 임시", size: "64×88", count: "×3", slot: null },
+    { name: "card_{카드명}_일러", note: "카드 14종 일러스트 (부록 C)", size: "56×44", count: "×14", slot: "card-art-1" },
+    { name: "ev_{사건}_{증거명}", note: "증거 썸네일 · 카드형 ~20 (O-1 확정 시 목록형 별도)", size: "36×36", count: "×20", slot: "ev-1" },
+    { name: "partner_슬라임", note: "상태 2~3종 (기본·놀람)", size: "72×88", count: "×3", slot: "partner" },
+    { name: "ui_대화창_9패치", note: "타자기 진술창 프레임 타일", size: "24×24", count: "×1", slot: null },
+    { name: "cut_공용", note: "이벤트 공용 컷 4종 (P1)", size: "320×200", count: "×4", slot: null }
+  ];
+  hlSlot(id) {
+    if (!this.RECTS[id]) return;
+    clearTimeout(this._t);
+    this.setState({ hl: id });
+    this._t = setTimeout(() => this.setState({ hl: null }), 1800);
+  }
+  renderVals() {
+    const stageZoom = Number(this.props.stageZoom ?? "2") || 2;
+    const labelsOn = this.props.showLabels ?? true;
+    const partsOn = this.props.showParts ?? true;
+    const r = this.state.hl ? this.RECTS[this.state.hl] : null;
+    const hlStyle = r
+      ? "display:block;left:" + (r[0] - 3) + "px;top:" + (r[1] - 3) + "px;width:" + (r[2] + 6) + "px;height:" + (r[3] + 6) + "px;animation:omHl 1.7s ease-out forwards"
+      : "display:none";
+    const manifest = this.DATA.map((d) => ({
+      ...d,
+      go: d.slot ? () => this.hlSlot(d.slot) : undefined,
+      cur: d.slot ? "pointer" : "default",
+      tag: d.slot ? "슬롯 ↖" : ""
+    }));
+    const mk = (n, f, on, off) => Array.from({ length: n }, (_, i) => ({ bg: i < f ? on : off }));
+    return {
+      stageZoom,
+      zoomLabel: stageZoom + "×",
+      ovl: labelsOn ? "block" : "none",
+      partsOn,
+      hlStyle,
+      manifest,
+      compCells: mk(10, 4, "#e2d4a6", "rgba(14,11,8,.45)"),
+      coerCells: mk(20, 3, "#c2563d", "rgba(14,11,8,.45)")
+    };
+  }
+}
+</script>
+</body>
+</html>

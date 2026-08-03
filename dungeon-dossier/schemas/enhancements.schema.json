@@ -1,0 +1,326 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "$ref": "#/$defs/__schema0"
+    },
+    "schema_version": {
+      "$ref": "#/$defs/__schema2"
+    },
+    "enhancements": {
+      "$ref": "#/$defs/__schema3"
+    }
+  },
+  "required": [
+    "schema_version",
+    "enhancements"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "__schema0": {
+      "maxLength": 500,
+      "$ref": "#/$defs/__schema1"
+    },
+    "__schema1": {
+      "type": "string",
+      "minLength": 1
+    },
+    "__schema2": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+(?:\\.\\d+)?$"
+    },
+    "__schema3": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "enhancement_id": {
+            "$ref": "#/$defs/__schema4"
+          },
+          "name_key": {
+            "$ref": "#/$defs/__schema5"
+          },
+          "description_key": {
+            "$ref": "#/$defs/__schema5"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "STAMP",
+              "POST_IT",
+              "CLIP"
+            ]
+          },
+          "color": {
+            "type": "string",
+            "enum": [
+              "BLUE",
+              "RED"
+            ]
+          },
+          "facet": {
+            "type": "string",
+            "enum": [
+              "WHO",
+              "WHEN",
+              "WHERE",
+              "WHAT",
+              "HOW",
+              "WHY"
+            ]
+          },
+          "compatible_intents": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "QUERY",
+                "CLARIFY",
+                "CONFIRM",
+                "CONTRADICT",
+                "RECOVER",
+                "PRESSURE",
+                "FORENSIC",
+                "SPECIAL",
+                "COMMIT",
+                "CROSS_CHECK"
+              ]
+            }
+          },
+          "compatible_card_ids": {
+            "minItems": 0,
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/__schema4"
+            }
+          },
+          "merge_card_ids": {
+            "minItems": 2,
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/__schema4"
+            }
+          },
+          "result_card_id": {
+            "$ref": "#/$defs/__schema4"
+          },
+          "cost": {
+            "type": "object",
+            "properties": {
+              "cp": {
+                "$ref": "#/$defs/__schema6"
+              },
+              "dp": {
+                "$ref": "#/$defs/__schema9"
+              },
+              "stress": {
+                "$ref": "#/$defs/__schema10"
+              },
+              "coercion": {
+                "$ref": "#/$defs/__schema11"
+              },
+              "trust": {
+                "$ref": "#/$defs/__schema12"
+              }
+            },
+            "additionalProperties": false
+          },
+          "effects": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/__schema13"
+            }
+          },
+          "acquisition": {
+            "$ref": "#/$defs/__schema1"
+          }
+        },
+        "required": [
+          "enhancement_id",
+          "name_key",
+          "description_key",
+          "type",
+          "effects"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "__schema4": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160
+    },
+    "__schema5": {
+      "maxLength": 240,
+      "$ref": "#/$defs/__schema1"
+    },
+    "__schema6": {
+      "$ref": "#/$defs/__schema7"
+    },
+    "__schema7": {
+      "minimum": 0,
+      "$ref": "#/$defs/__schema8"
+    },
+    "__schema8": {
+      "type": "number"
+    },
+    "__schema9": {
+      "$ref": "#/$defs/__schema7"
+    },
+    "__schema10": {
+      "$ref": "#/$defs/__schema7"
+    },
+    "__schema11": {
+      "$ref": "#/$defs/__schema7"
+    },
+    "__schema12": {
+      "$ref": "#/$defs/__schema7"
+    },
+    "__schema13": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "ADJUST_RESOURCE",
+            "SET_CLAIM_STATE",
+            "REVEAL_CLAIMS",
+            "REVISE_CLAIMS",
+            "DRAW_CARDS",
+            "DISCARD_CARDS",
+            "LOCK_CARD",
+            "SEAL_EVIDENCE",
+            "GRANT_EVIDENCE",
+            "UPGRADE_EVIDENCE",
+            "ACTIVATE_MODIFIER",
+            "DEACTIVATE_MODIFIER",
+            "MODIFY_SHIELDS",
+            "SET_FLAG",
+            "TRIGGER_QTE",
+            "OPEN_ROUTE",
+            "DISTORT_CLAIM_VIEW",
+            "DUPLICATE_CLAIM_VIEW",
+            "RESTORE_CLAIM_VIEW",
+            "LOCK_CLAIM",
+            "LOCK_ACTION",
+            "ALTER_ACTION_COST",
+            "DAMAGE_EVIDENCE",
+            "REMOVE_EVIDENCE",
+            "REDUCE_CP",
+            "ADD_TIMER",
+            "INCREASE_RESISTANCE",
+            "DRAW_CARD",
+            "DISCARD_CARD",
+            "APPLY_STRESS",
+            "APPLY_COERCION",
+            "CHANGE_PHASE",
+            "SPAWN_STATEMENT",
+            "UNLOCK_EVIDENCE_SLOT"
+          ]
+        },
+        "target": {
+          "$ref": "#/$defs/__schema4"
+        },
+        "targets": {
+          "minItems": 0,
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/__schema4"
+          }
+        },
+        "resource": {
+          "$ref": "#/$defs/__schema1"
+        },
+        "delta": {
+          "$ref": "#/$defs/__schema8"
+        },
+        "value": {
+          "$ref": "#/$defs/__schema14"
+        },
+        "duration_turns": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "parameters": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/__schema15"
+          }
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "additionalProperties": false
+    },
+    "__schema14": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/__schema14"
+          }
+        },
+        {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/__schema14"
+          }
+        }
+      ]
+    },
+    "__schema15": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/__schema15"
+          }
+        },
+        {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/__schema15"
+          }
+        }
+      ]
+    }
+  },
+  "$id": "./enhancements.schema.json"
+}

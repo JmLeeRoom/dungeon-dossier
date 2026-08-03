@@ -1,0 +1,45 @@
+{
+  "name": "dungeon-dossier",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.18.0",
+  "engines": {
+    "node": ">=20.19.0 <21",
+    "pnpm": ">=11.18.0"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.node.json",
+    "lint": "eslint . --max-warnings 0",
+    "arch": "depcruise --config dependency-cruiser.config.cjs src",
+    "test": "vitest run",
+    "test:gates": "vitest run tests/ai tests/ai-contract tests/app tests/arch tests/content-io tests/dev tests/engine tests/judgment tests/leakage tests/schema tests/ui",
+    "content:validate": "node tools/validate/index.mjs",
+    "placeholder:generate": "node tools/placeholder/index.mjs",
+    "schema:export": "vitest run tests/schema/schema-export.test.ts",
+    "palette:check": "node tools/palette-check/index.mjs",
+    "simulate:smoke": "vitest run tests/routes/smoke-best.test.ts tests/flags tests/replay",
+    "simulate:full": "vitest run tests/routes tests/flags tests/replay",
+    "check": "corepack pnpm lint && corepack pnpm arch && corepack pnpm typecheck && corepack pnpm test && corepack pnpm content:validate && corepack pnpm palette:check && corepack pnpm simulate:smoke && corepack pnpm build"
+  },
+  "dependencies": {
+    "howler": "2.2.4",
+    "pixi.js": "8.19.0",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/howler": "2.2.13",
+    "@types/node": "20.19.33",
+    "@types/pngjs": "6.0.5",
+    "dependency-cruiser": "17.4.3",
+    "eslint": "10.8.0",
+    "pngjs": "7.0.0",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.65.0",
+    "vite": "8.2.0",
+    "vitest": "4.1.10"
+  }
+}

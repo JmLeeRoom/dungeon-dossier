@@ -1,0 +1,358 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500
+    },
+    "save_version": {
+      "type": "number",
+      "const": 1
+    },
+    "case_id": {
+      "$ref": "#/$defs/__schema0"
+    },
+    "content_version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+(?:\\.\\d+)?$"
+    },
+    "run_seed": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 4294967295
+    },
+    "claims": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "claim_id": {
+            "$ref": "#/$defs/__schema0"
+          },
+          "commitment": {
+            "type": "string",
+            "enum": [
+              "UNSTATED",
+              "ASSERTED",
+              "COMMITTED",
+              "REVISED",
+              "RETRACTED",
+              "CONTRADICTED"
+            ]
+          },
+          "epistemic": {
+            "type": "string",
+            "enum": [
+              "UNKNOWN",
+              "SUSPECTED",
+              "PROVISIONAL",
+              "SUPPORTED",
+              "REFUTED",
+              "UNRESOLVED"
+            ]
+          },
+          "presentation": {
+            "type": "string",
+            "enum": [
+              "NORMAL",
+              "COMPOUND",
+              "DISTORTED",
+              "HIDDEN",
+              "LOCKED",
+              "DUPLICATED"
+            ]
+          },
+          "resistance": {
+            "$ref": "#/$defs/__schema1"
+          },
+          "exposed": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "claim_id",
+          "commitment",
+          "epistemic",
+          "presentation",
+          "resistance",
+          "exposed"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "evidence_id": {
+            "$ref": "#/$defs/__schema0"
+          },
+          "acquired": {
+            "type": "boolean"
+          },
+          "grade": {
+            "type": "string",
+            "enum": [
+              "A",
+              "B",
+              "C"
+            ]
+          },
+          "integrity": {
+            "type": "string",
+            "enum": [
+              "INTACT",
+              "DEGRADED",
+              "DISPUTED",
+              "DESTROYED"
+            ]
+          },
+          "sealed_until_turn": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/__schema1"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "revealed_details": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "evidence_id",
+          "acquired",
+          "grade",
+          "integrity",
+          "sealed_until_turn",
+          "revealed_details"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "deck": {
+      "type": "object",
+      "properties": {
+        "draw_pile": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/__schema0"
+          }
+        },
+        "hand": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/__schema0"
+          }
+        },
+        "discard_pile": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/__schema0"
+          }
+        },
+        "exhaust_pile": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/__schema0"
+          }
+        },
+        "locked_cards": {
+          "type": "object",
+          "propertyNames": {
+            "$ref": "#/$defs/__schema0"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/__schema1"
+          }
+        }
+      },
+      "required": [
+        "draw_pile",
+        "hand",
+        "discard_pile",
+        "exhaust_pile",
+        "locked_cards"
+      ],
+      "additionalProperties": false
+    },
+    "flags": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {
+        "anyOf": [
+          {
+            "type": "boolean"
+          },
+          {
+            "type": "number"
+          },
+          {
+            "type": "string"
+          }
+        ]
+      }
+    },
+    "resources": {
+      "type": "object",
+      "properties": {
+        "cp": {
+          "$ref": "#/$defs/__schema2"
+        },
+        "stress": {
+          "$ref": "#/$defs/__schema2"
+        },
+        "dp": {
+          "$ref": "#/$defs/__schema2"
+        },
+        "composure": {
+          "$ref": "#/$defs/__schema2"
+        },
+        "coercion": {
+          "$ref": "#/$defs/__schema2"
+        },
+        "trust": {
+          "$ref": "#/$defs/__schema2"
+        },
+        "turn": {
+          "$ref": "#/$defs/__schema1"
+        }
+      },
+      "required": [
+        "cp",
+        "stress",
+        "dp",
+        "composure",
+        "coercion",
+        "trust",
+        "turn"
+      ],
+      "additionalProperties": false
+    },
+    "encounter": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "encounter_id": {
+              "$ref": "#/$defs/__schema0"
+            },
+            "flow_node_id": {
+              "$ref": "#/$defs/__schema0"
+            },
+            "round_index": {
+              "$ref": "#/$defs/__schema1"
+            },
+            "entered_flow_nodes": {
+              "minItems": 0,
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/__schema0"
+              }
+            },
+            "active_modifiers": {
+              "minItems": 0,
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/__schema0"
+              }
+            },
+            "completed_objectives": {
+              "minItems": 0,
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/__schema0"
+              }
+            },
+            "shield_durability": {
+              "type": "object",
+              "propertyNames": {
+                "$ref": "#/$defs/__schema0"
+              },
+              "additionalProperties": {
+                "$ref": "#/$defs/__schema2"
+              }
+            }
+          },
+          "required": [
+            "encounter_id",
+            "flow_node_id",
+            "round_index",
+            "entered_flow_nodes",
+            "active_modifiers",
+            "completed_objectives",
+            "shield_durability"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "used_routes": {
+      "minItems": 0,
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/__schema0"
+      }
+    },
+    "acquired_relics": {
+      "minItems": 0,
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/__schema0"
+      }
+    },
+    "acquired_enhancements": {
+      "minItems": 0,
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/__schema0"
+      }
+    }
+  },
+  "required": [
+    "save_version",
+    "case_id",
+    "content_version",
+    "run_seed",
+    "claims",
+    "evidence",
+    "deck",
+    "flags",
+    "resources",
+    "encounter",
+    "used_routes",
+    "acquired_relics",
+    "acquired_enhancements"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "__schema0": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160
+    },
+    "__schema1": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "__schema2": {
+      "type": "number",
+      "minimum": 0
+    }
+  },
+  "$id": "./save.schema.json"
+}

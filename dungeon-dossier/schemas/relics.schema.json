@@ -1,0 +1,502 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "$ref": "#/$defs/__schema0"
+    },
+    "schema_version": {
+      "$ref": "#/$defs/__schema2"
+    },
+    "relics": {
+      "$ref": "#/$defs/__schema3"
+    }
+  },
+  "required": [
+    "schema_version",
+    "relics"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "__schema0": {
+      "maxLength": 500,
+      "$ref": "#/$defs/__schema1"
+    },
+    "__schema1": {
+      "type": "string",
+      "minLength": 1
+    },
+    "__schema2": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+(?:\\.\\d+)?$"
+    },
+    "__schema3": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "relic_id": {
+            "$ref": "#/$defs/__schema4"
+          },
+          "name_key": {
+            "$ref": "#/$defs/__schema5"
+          },
+          "description_key": {
+            "$ref": "#/$defs/__schema5"
+          },
+          "rarity": {
+            "type": "string",
+            "enum": [
+              "COMMON",
+              "RARE",
+              "CASE",
+              "LEGENDARY"
+            ]
+          },
+          "acquisition": {
+            "$ref": "#/$defs/__schema1"
+          },
+          "activation": {
+            "type": "string",
+            "enum": [
+              "PASSIVE",
+              "ENCOUNTER_START",
+              "MANUAL",
+              "ON_RESOLUTION"
+            ]
+          },
+          "conditions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "ALWAYS",
+                    "CLAIM_VISIBLE",
+                    "CLAIM_COMMITMENT",
+                    "CLAIM_EPISTEMIC",
+                    "EVIDENCE_OWNED",
+                    "EVIDENCE_INTACT",
+                    "ROUTE_USED",
+                    "RESOURCE_RANGE",
+                    "PHASE_IS",
+                    "TURN_RANGE",
+                    "OBJECTIVE_DONE",
+                    "FLAG_EQUALS",
+                    "OUTCOME_IS",
+                    "ALL_REQUIRED_OBJECTIVES",
+                    "SOME_REQUIRED_OBJECTIVES",
+                    "RESOURCE_EXCEEDS",
+                    "TURN_EXCEEDED",
+                    "NO_SOLVABLE_PATH",
+                    "ALL_OF",
+                    "ANY_OF",
+                    "NOT"
+                  ]
+                },
+                "claim_id": {
+                  "$ref": "#/$defs/__schema4"
+                },
+                "evidence_id": {
+                  "$ref": "#/$defs/__schema4"
+                },
+                "route_id": {
+                  "$ref": "#/$defs/__schema4"
+                },
+                "node_id": {
+                  "$ref": "#/$defs/__schema4"
+                },
+                "objective_id": {
+                  "$ref": "#/$defs/__schema4"
+                },
+                "flag_id": {
+                  "$ref": "#/$defs/__schema4"
+                },
+                "encounter_id": {
+                  "$ref": "#/$defs/__schema4"
+                },
+                "outcome": {
+                  "$ref": "#/$defs/__schema1"
+                },
+                "resource": {
+                  "$ref": "#/$defs/__schema1"
+                },
+                "commitment": {
+                  "$ref": "#/$defs/__schema6"
+                },
+                "epistemic": {
+                  "$ref": "#/$defs/__schema7"
+                },
+                "state": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/__schema6"
+                    },
+                    {
+                      "$ref": "#/$defs/__schema7"
+                    },
+                    {
+                      "type": "string",
+                      "enum": [
+                        "NORMAL",
+                        "COMPOUND",
+                        "DISTORTED",
+                        "HIDDEN",
+                        "LOCKED",
+                        "DUPLICATED"
+                      ]
+                    }
+                  ]
+                },
+                "value": {
+                  "$ref": "#/$defs/__schema8"
+                },
+                "min": {
+                  "$ref": "#/$defs/__schema9"
+                },
+                "max": {
+                  "$ref": "#/$defs/__schema9"
+                },
+                "min_ratio": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1,
+                  "$ref": "#/$defs/__schema9"
+                },
+                "conditions": {
+                  "minItems": 1,
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/__schema10"
+                  }
+                },
+                "condition": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {
+                    "$ref": "#/$defs/__schema12"
+                  }
+                }
+              },
+              "required": [
+                "type"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "effects": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/__schema13"
+            }
+          },
+          "uses_per_encounter": {
+            "$ref": "#/$defs/__schema15"
+          },
+          "linked_flag_id": {
+            "$ref": "#/$defs/__schema4"
+          }
+        },
+        "required": [
+          "relic_id",
+          "name_key",
+          "description_key",
+          "rarity",
+          "acquisition",
+          "activation",
+          "conditions",
+          "effects"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "__schema4": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160
+    },
+    "__schema5": {
+      "maxLength": 240,
+      "$ref": "#/$defs/__schema1"
+    },
+    "__schema6": {
+      "type": "string",
+      "enum": [
+        "UNSTATED",
+        "ASSERTED",
+        "COMMITTED",
+        "REVISED",
+        "RETRACTED",
+        "CONTRADICTED"
+      ]
+    },
+    "__schema7": {
+      "type": "string",
+      "enum": [
+        "UNKNOWN",
+        "SUSPECTED",
+        "PROVISIONAL",
+        "SUPPORTED",
+        "REFUTED",
+        "UNRESOLVED"
+      ]
+    },
+    "__schema8": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/__schema8"
+          }
+        },
+        {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/__schema8"
+          }
+        }
+      ]
+    },
+    "__schema9": {
+      "type": "number"
+    },
+    "__schema10": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/__schema11"
+      }
+    },
+    "__schema11": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/__schema11"
+          }
+        },
+        {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/__schema11"
+          }
+        }
+      ]
+    },
+    "__schema12": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/__schema12"
+          }
+        },
+        {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/__schema12"
+          }
+        }
+      ]
+    },
+    "__schema13": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "ADJUST_RESOURCE",
+            "SET_CLAIM_STATE",
+            "REVEAL_CLAIMS",
+            "REVISE_CLAIMS",
+            "DRAW_CARDS",
+            "DISCARD_CARDS",
+            "LOCK_CARD",
+            "SEAL_EVIDENCE",
+            "GRANT_EVIDENCE",
+            "UPGRADE_EVIDENCE",
+            "ACTIVATE_MODIFIER",
+            "DEACTIVATE_MODIFIER",
+            "MODIFY_SHIELDS",
+            "SET_FLAG",
+            "TRIGGER_QTE",
+            "OPEN_ROUTE",
+            "DISTORT_CLAIM_VIEW",
+            "DUPLICATE_CLAIM_VIEW",
+            "RESTORE_CLAIM_VIEW",
+            "LOCK_CLAIM",
+            "LOCK_ACTION",
+            "ALTER_ACTION_COST",
+            "DAMAGE_EVIDENCE",
+            "REMOVE_EVIDENCE",
+            "REDUCE_CP",
+            "ADD_TIMER",
+            "INCREASE_RESISTANCE",
+            "DRAW_CARD",
+            "DISCARD_CARD",
+            "APPLY_STRESS",
+            "APPLY_COERCION",
+            "CHANGE_PHASE",
+            "SPAWN_STATEMENT",
+            "UNLOCK_EVIDENCE_SLOT"
+          ]
+        },
+        "target": {
+          "$ref": "#/$defs/__schema4"
+        },
+        "targets": {
+          "minItems": 0,
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/__schema4"
+          }
+        },
+        "resource": {
+          "$ref": "#/$defs/__schema1"
+        },
+        "delta": {
+          "$ref": "#/$defs/__schema9"
+        },
+        "value": {
+          "$ref": "#/$defs/__schema14"
+        },
+        "duration_turns": {
+          "$ref": "#/$defs/__schema15"
+        },
+        "parameters": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/__schema16"
+          }
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "additionalProperties": false
+    },
+    "__schema14": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/__schema14"
+          }
+        },
+        {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/__schema14"
+          }
+        }
+      ]
+    },
+    "__schema15": {
+      "type": "integer",
+      "exclusiveMinimum": 0,
+      "maximum": 9007199254740991
+    },
+    "__schema16": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/__schema16"
+          }
+        },
+        {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/__schema16"
+          }
+        }
+      ]
+    }
+  },
+  "$id": "./relics.schema.json"
+}
