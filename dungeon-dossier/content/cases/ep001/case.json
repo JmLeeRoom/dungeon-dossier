@@ -114,6 +114,7 @@
       "time_ref": { "from": "22:00", "to": "22:20" },
       "initial": { "commitment": "ASSERTED", "presentation": "NORMAL" },
       "resistance": 1,
+      "is_required": true,
       "truth": {
         "relation": "CONTRADICTED_BY_WORLD",
         "contradicting_events": ["evt_ep001_ledger_edit"]
@@ -144,6 +145,7 @@
       "predicate": "MOVED_ONLY_EMPTY_CRATES",
       "initial": { "commitment": "ASSERTED", "presentation": "NORMAL" },
       "resistance": 1,
+      "is_required": true,
       "truth": {
         "relation": "CONTRADICTED_BY_WORLD",
         "contradicting_events": ["evt_ep001_crate_transfer"]
@@ -173,6 +175,7 @@
       "predicate": "DENY_TRANSFER_PROFIT",
       "initial": { "commitment": "ASSERTED", "presentation": "NORMAL" },
       "resistance": 2,
+      "is_required": true,
       "truth": {
         "relation": "CONTRADICTED_BY_WORLD",
         "contradicting_events": ["evt_ep001_seal_payment"]
@@ -333,7 +336,7 @@
       "predicate": "SUCCUBUS_STAYED_IN_RECEPTION_ROOM",
       "initial": { "commitment": "ASSERTED", "presentation": "NORMAL" },
       "resistance": 2,
-      "is_required": false,
+      "is_required": true,
       "truth": {
         "relation": "CONTRADICTED_BY_WORLD",
         "contradicting_events": ["evt_ep001_seal_payment"]
@@ -557,6 +560,26 @@
           "detail": { "crate_count": 4 },
           "confidence": 1,
           "contradicts_claim_ids": ["clm_ep001_what"]
+        },
+        {
+          "observation_id": "observation_ep001_cargo_sequence",
+          "subject_id": "ent_ep001_orc",
+          "predicate": "MANIFEST_ORDERS_NIGHT_LOADING_SEQUENCE",
+          "summary_key": "evidence.ep001.cargo_manifest.sequence",
+          "scopes": ["SEQUENCE", "ACTION"],
+          "detail": { "loading_order": 4 },
+          "time": { "from": "22:19", "to": "22:37" },
+          "confidence": 0.9
+        },
+        {
+          "observation_id": "observation_ep001_cargo_origin",
+          "subject_id": "ent_ep001_orc",
+          "location_id": "ent_ep001_warehouse",
+          "predicate": "MANIFEST_LISTS_WEST_WAREHOUSE_ORIGIN",
+          "summary_key": "evidence.ep001.cargo_manifest.origin",
+          "scopes": ["LOCATION", "OWNERSHIP"],
+          "detail": { "origin": "WEST_WAREHOUSE" },
+          "confidence": 0.9
         }
       ],
       "not_proven_keys": ["evidence.ep001.cargo_manifest.not_destination"]
@@ -614,6 +637,120 @@
         }
       ],
       "not_proven_keys": ["evidence.ep001.commission_note.not_forgery_method"]
+    },
+    {
+      "evidence_id": "ev_ep001_orc_backup_bundle",
+      "type": "RECOVERED_BACKUP_BUNDLE",
+      "title_key": "evidence.ep001.orc_backup_bundle.title",
+      "acquire": { "node": "node_ep001_orc_start", "method": "STARTING" },
+      "source_category": "DIGITAL",
+      "independence": {
+        "source_id": "source_ep001_orc_backup_relay",
+        "group": "DIGITAL",
+        "derived_from": null
+      },
+      "grade": { "initial": "B", "upgrades": [] },
+      "integrity": { "initial": "INTACT" },
+      "observations": [
+        {
+          "observation_id": "observation_ep001_backup_operator",
+          "predicate": "BACKUP_IDENTIFIES_LEDGER_OPERATOR",
+          "summary_key": "evidence.ep001.orc_backup_bundle.operator",
+          "scopes": ["IDENTITY", "ACTION"],
+          "detail": { "relay": "WEST_SERVICE", "record": "OPERATOR_AUDIT" },
+          "confidence": 0.85,
+          "contradicts_claim_ids": ["clm_ep001_who"]
+        },
+        {
+          "observation_id": "observation_ep001_backup_timeline",
+          "predicate": "BACKUP_PRESERVES_NIGHT_SEQUENCE",
+          "summary_key": "evidence.ep001.orc_backup_bundle.timeline",
+          "scopes": ["TIME", "SEQUENCE"],
+          "detail": { "relay": "WEST_SERVICE", "clock": "INDEPENDENT_UPS" },
+          "time": { "from": "22:07", "to": "22:15" },
+          "confidence": 0.85,
+          "contradicts_claim_ids": ["clm_ep001_when"]
+        },
+        {
+          "observation_id": "observation_ep001_backup_location",
+          "predicate": "BACKUP_LOCATES_ORC_AT_WEST_WAREHOUSE",
+          "summary_key": "evidence.ep001.orc_backup_bundle.location",
+          "scopes": ["LOCATION", "PRESENCE"],
+          "detail": { "relay": "WEST_SERVICE", "sensor": "DOOR_REPEATER" },
+          "time": { "from": "22:19", "to": "22:37" },
+          "confidence": 0.85,
+          "contradicts_claim_ids": ["clm_ep001_where"]
+        },
+        {
+          "observation_id": "observation_ep001_backup_cargo",
+          "predicate": "BACKUP_RECORDS_FILLED_CRATE_TRANSFER",
+          "summary_key": "evidence.ep001.orc_backup_bundle.cargo",
+          "scopes": ["ACTION", "OWNERSHIP"],
+          "detail": { "relay": "WEST_SERVICE", "crate_count": 4 },
+          "confidence": 0.85,
+          "contradicts_claim_ids": ["clm_ep001_what"]
+        },
+        {
+          "observation_id": "observation_ep001_backup_seal",
+          "predicate": "BACKUP_RECORDS_UNREGISTERED_SEAL_BATCH",
+          "summary_key": "evidence.ep001.orc_backup_bundle.seal",
+          "scopes": ["INTEGRITY", "ACTION"],
+          "detail": { "relay": "WEST_SERVICE", "wax_batch": "UNREGISTERED" },
+          "confidence": 0.85,
+          "contradicts_claim_ids": ["clm_ep001_how"]
+        },
+        {
+          "observation_id": "observation_ep001_backup_commission",
+          "predicate": "BACKUP_LINKS_TRANSFER_COMMISSION",
+          "summary_key": "evidence.ep001.orc_backup_bundle.commission",
+          "scopes": ["MOTIVE", "OWNERSHIP"],
+          "detail": { "relay": "WEST_SERVICE", "payment": "SILVER_MARKS" },
+          "confidence": 0.85,
+          "contradicts_claim_ids": ["clm_ep001_why"]
+        },
+        {
+          "observation_id": "observation_ep001_backup_succubus_location",
+          "subject_id": "ent_ep001_succubus",
+          "location_id": "ent_ep001_warehouse",
+          "predicate": "BACKUP_LOCATES_SUCCUBUS_AT_WAREHOUSE",
+          "summary_key": "evidence.ep001.orc_backup_bundle.succubus_location",
+          "scopes": ["LOCATION", "PRESENCE"],
+          "detail": { "relay": "WEST_SERVICE", "sensor": "RECEPTION_REPEATER" },
+          "time": { "from": "22:20", "to": "22:44" },
+          "confidence": 0.85,
+          "contradicts_claim_ids": ["clm_ep001_succubus_where"]
+        }
+      ],
+      "not_proven_keys": ["evidence.ep001.orc_backup_bundle.not_mastermind"]
+    },
+    {
+      "evidence_id": "ev_ep001_reception_register",
+      "type": "RECEPTION_REGISTER",
+      "title_key": "evidence.ep001.reception_register.title",
+      "acquire": { "node": "node_ep001_succubus_start", "method": "STARTING" },
+      "source_category": "DOCUMENT",
+      "independence": {
+        "source_id": "source_ep001_reception_desk",
+        "group": "DOCUMENT",
+        "derived_from": null
+      },
+      "grade": { "initial": "A", "upgrades": [] },
+      "integrity": { "initial": "INTACT" },
+      "observations": [
+        {
+          "observation_id": "observation_ep001_reception_register",
+          "subject_id": "ent_ep001_succubus",
+          "location_id": "ent_ep001_warehouse",
+          "predicate": "REGISTER_PLACES_SUCCUBUS_AT_WAREHOUSE",
+          "summary_key": "evidence.ep001.reception_register.summary",
+          "scopes": ["LOCATION", "PRESENCE"],
+          "detail": { "desk": "WEST_WAREHOUSE", "entry_type": "MANUAL_SIGNATURE" },
+          "time": { "from": "22:20", "to": "22:44" },
+          "confidence": 1,
+          "contradicts_claim_ids": ["clm_ep001_succubus_where"]
+        }
+      ],
+      "not_proven_keys": ["evidence.ep001.reception_register.not_seal_method"]
     }
   ],
   "proof_rules": [
@@ -627,7 +764,10 @@
         "minimum_independent_sources": 1,
         "require_integrity": true
       },
-      "guaranteed_evidence_sets": [["ev_ep001_audit_trail"]]
+      "guaranteed_evidence_sets": [
+        ["ev_ep001_audit_trail"],
+        ["ev_ep001_orc_backup_bundle", "ev_ep001_cargo_manifest"]
+      ]
     },
     {
       "rule_id": "rule_ep001_when",
@@ -639,7 +779,10 @@
         "minimum_independent_sources": 1,
         "require_integrity": true
       },
-      "guaranteed_evidence_sets": [["ev_ep001_bell_access_log"]]
+      "guaranteed_evidence_sets": [
+        ["ev_ep001_bell_access_log"],
+        ["ev_ep001_orc_backup_bundle", "ev_ep001_cargo_manifest"]
+      ]
     },
     {
       "rule_id": "rule_ep001_where",
@@ -651,7 +794,10 @@
         "minimum_independent_sources": 1,
         "require_integrity": true
       },
-      "guaranteed_evidence_sets": [["ev_ep001_west_gate_log"]]
+      "guaranteed_evidence_sets": [
+        ["ev_ep001_orc_backup_bundle", "ev_ep001_cargo_manifest"],
+        ["ev_ep001_west_gate_log"]
+      ]
     },
     {
       "rule_id": "rule_ep001_what",
@@ -663,7 +809,10 @@
         "minimum_independent_sources": 1,
         "require_integrity": true
       },
-      "guaranteed_evidence_sets": [["ev_ep001_cargo_manifest"]]
+      "guaranteed_evidence_sets": [
+        ["ev_ep001_cargo_manifest"],
+        ["ev_ep001_orc_backup_bundle", "ev_ep001_seal_residue"]
+      ]
     },
     {
       "rule_id": "rule_ep001_how",
@@ -675,7 +824,10 @@
         "minimum_independent_sources": 1,
         "require_integrity": true
       },
-      "guaranteed_evidence_sets": [["ev_ep001_seal_residue"]]
+      "guaranteed_evidence_sets": [
+        ["ev_ep001_seal_residue"],
+        ["ev_ep001_orc_backup_bundle", "ev_ep001_cargo_manifest"]
+      ]
     },
     {
       "rule_id": "rule_ep001_why",
@@ -687,7 +839,25 @@
         "minimum_independent_sources": 1,
         "require_integrity": true
       },
-      "guaranteed_evidence_sets": [["ev_ep001_commission_note"]]
+      "guaranteed_evidence_sets": [
+        ["ev_ep001_commission_note"],
+        ["ev_ep001_orc_backup_bundle", "ev_ep001_cargo_manifest"]
+      ]
+    },
+    {
+      "rule_id": "rule_ep001_succubus_where",
+      "target_claim_id": "clm_ep001_succubus_where",
+      "direction": "CONTRADICT",
+      "requirements": {
+        "required_scopes": ["LOCATION", "PRESENCE"],
+        "minimum_confidence": 0.8,
+        "minimum_independent_sources": 1,
+        "require_integrity": true
+      },
+      "guaranteed_evidence_sets": [
+        ["ev_ep001_reception_register"],
+        ["ev_ep001_orc_backup_bundle", "ev_ep001_seal_residue"]
+      ]
     }
   ],
   "encounters": [
@@ -736,22 +906,39 @@
           "is_terminal": true
         }
       ],
-      "modifiers": [],
+      "modifiers": [
+        {
+          "modifier_id": "mod_ep001_goblin_coercion_reflect",
+          "trigger": "ON_RESOLUTION",
+          "condition": null,
+          "effect": {
+            "type": "APPLY_COERCION",
+            "resource": "coercion",
+            "delta": 2
+          },
+          "counterplay": {
+            "allowed_intents": ["SPECIAL", "CLARIFY"],
+            "partner_skills": [],
+            "always_available": true
+          },
+          "activation_limit": 2,
+          "priority": 20
+        }
+      ],
       "objectives": {
         "required": [
           {
             "objective_id": "objective_ep001_goblin_who",
             "type": "REFUTE_CLAIM",
             "claim_id": "clm_ep001_who"
-          }
-        ],
-        "optional": [
+          },
           {
             "objective_id": "objective_ep001_goblin_when",
             "type": "REFUTE_CLAIM",
             "claim_id": "clm_ep001_when"
           }
         ],
+        "optional": [],
         "state_conditions": {
           "composure_min": 1,
           "composure_max": 27,
@@ -819,22 +1006,59 @@
           "is_terminal": true
         }
       ],
-      "modifiers": [],
+      "modifiers": [
+        {
+          "modifier_id": "mod_ep001_orc_countdown",
+          "trigger": "ON_TURN_START",
+          "condition": null,
+          "effect": {
+            "type": "ADD_TIMER",
+            "duration_turns": 3
+          },
+          "counterplay": {
+            "allowed_intents": ["CONTRADICT"],
+            "partner_skills": [],
+            "always_available": true
+          },
+          "activation_limit": 1,
+          "priority": 30
+        },
+        {
+          "modifier_id": "mod_ep001_orc_evidence_damage",
+          "trigger": "ON_TURN_START",
+          "condition": null,
+          "effect": {
+            "type": "DAMAGE_EVIDENCE",
+            "target_selector": {
+              "scope": "OWNED",
+              "ids": ["ev_ep001_west_gate_log"],
+              "count": 1,
+              "selection": "DETERMINISTIC_BY_INDEX"
+            }
+          },
+          "counterplay": {
+            "allowed_intents": ["FORENSIC", "CONTRADICT"],
+            "partner_skills": [],
+            "always_available": true
+          },
+          "activation_limit": 1,
+          "priority": 20
+        }
+      ],
       "objectives": {
         "required": [
           {
             "objective_id": "objective_ep001_orc_where",
             "type": "REFUTE_CLAIM",
             "claim_id": "clm_ep001_where"
-          }
-        ],
-        "optional": [
+          },
           {
             "objective_id": "objective_ep001_orc_what",
             "type": "REFUTE_CLAIM",
             "claim_id": "clm_ep001_what"
           }
         ],
+        "optional": [],
         "state_conditions": {
           "composure_min": 1,
           "composure_max": 30,
@@ -874,14 +1098,17 @@
             "clm_ep001_succubus_who",
             "clm_ep001_succubus_when",
             "clm_ep001_succubus_where",
+            "clm_ep001_how"
+          ],
+          "shields": [{ "claim_id": "clm_ep001_how", "durability": 2 }]
+        },
+        {
+          "round_id": "round_ep001_succubus_02",
+          "statement_claims": [
             "clm_ep001_succubus_what",
-            "clm_ep001_how",
             "clm_ep001_why"
           ],
-          "shields": [
-            { "claim_id": "clm_ep001_how", "durability": 2 },
-            { "claim_id": "clm_ep001_why", "durability": 1 }
-          ]
+          "shields": [{ "claim_id": "clm_ep001_why", "durability": 1 }]
         }
       ],
       "flow_nodes": [
@@ -892,8 +1119,8 @@
             "clm_ep001_succubus_who",
             "clm_ep001_succubus_when",
             "clm_ep001_succubus_where",
-            "clm_ep001_succubus_what",
             "clm_ep001_how",
+            "clm_ep001_succubus_what",
             "clm_ep001_why"
           ],
           "revise_claim_ids": [],
@@ -902,25 +1129,89 @@
           "deactivate_modifiers": [],
           "reaction_key": "reaction.ep001.succubus.start",
           "resource_delta": {},
+          "is_terminal": false
+        },
+        {
+          "node_id": "node_ep001_succubus_reckoning",
+          "enter_conditions": [
+            {
+              "type": "CLAIM_EPISTEMIC",
+              "claim_id": "clm_ep001_how",
+              "state": "REFUTED"
+            }
+          ],
+          "reveal_claim_ids": [
+            "clm_ep001_succubus_what",
+            "clm_ep001_why"
+          ],
+          "revise_claim_ids": [],
+          "open_route_ids": [],
+          "activate_modifiers": [],
+          "deactivate_modifiers": [],
+          "reaction_key": "reaction.ep001.succubus.start",
+          "resource_delta": {},
           "is_terminal": true
         }
       ],
-      "modifiers": [],
+      "modifiers": [
+        {
+          "modifier_id": "mod_ep001_succubus_card_lock",
+          "trigger": "ON_ENCOUNTER_START",
+          "condition": null,
+          "effect": {
+            "type": "LOCK_CARD",
+            "target_selector": {
+              "scope": "HAND",
+              "ids": ["card_contradict_basic"],
+              "count": 1,
+              "selection": "DETERMINISTIC_BY_INDEX"
+            },
+            "duration_turns": 2
+          },
+          "counterplay": {
+            "allowed_intents": ["CLARIFY", "CROSS_CHECK"],
+            "partner_skills": [],
+            "always_available": true
+          },
+          "activation_limit": 1,
+          "priority": 30
+        },
+        {
+          "modifier_id": "mod_ep001_succubus_countdown",
+          "trigger": "ON_ENCOUNTER_START",
+          "condition": null,
+          "effect": {
+            "type": "ADD_TIMER",
+            "duration_turns": 3
+          },
+          "counterplay": {
+            "allowed_intents": ["CONTRADICT", "CROSS_CHECK"],
+            "partner_skills": [],
+            "always_available": true
+          },
+          "activation_limit": 1,
+          "priority": 20
+        }
+      ],
       "objectives": {
         "required": [
           {
             "objective_id": "objective_ep001_succubus_how",
             "type": "REFUTE_CLAIM",
             "claim_id": "clm_ep001_how"
-          }
-        ],
-        "optional": [
+          },
           {
             "objective_id": "objective_ep001_succubus_why",
             "type": "REFUTE_CLAIM",
             "claim_id": "clm_ep001_why"
+          },
+          {
+            "objective_id": "objective_ep001_succubus_where",
+            "type": "REFUTE_CLAIM",
+            "claim_id": "clm_ep001_succubus_where"
           }
         ],
+        "optional": [],
         "state_conditions": {
           "composure_min": 1,
           "composure_max": 42,
@@ -990,7 +1281,73 @@
       "per_attempt_costs": { "stress": 2 }
     }
   ],
-  "flag_hooks": [],
+  "flag_hooks": [
+    {
+      "flag_id": "F-08",
+      "description_key": "flag.no_coercion",
+      "default_value": false,
+      "set_by": [
+        {
+          "encounter": "enc_ep001_goblin",
+          "outcome": "BEST_RESOLUTION",
+          "value": true
+        }
+      ],
+      "consumed_by": [
+        {
+          "encounter": "enc_ep001_orc",
+          "apply": {
+            "type": "ADJUST_RESOURCE",
+            "resource": "coercion",
+            "delta": -5
+          }
+        }
+      ]
+    },
+    {
+      "flag_id": "F-10",
+      "description_key": "flag.clean_record",
+      "default_value": false,
+      "set_by": [
+        {
+          "encounter": "enc_ep001_orc",
+          "outcome": "BEST_RESOLUTION",
+          "value": true
+        }
+      ],
+      "consumed_by": [
+        {
+          "encounter": "enc_ep001_succubus",
+          "apply": {
+            "type": "ADJUST_RESOURCE",
+            "resource": "dp",
+            "delta": 5
+          }
+        }
+      ]
+    },
+    {
+      "flag_id": "F-11",
+      "description_key": "flag.first_case_closed",
+      "default_value": false,
+      "set_by": [
+        {
+          "encounter": "enc_ep001_succubus",
+          "outcome": "BEST_RESOLUTION",
+          "value": true
+        }
+      ],
+      "consumed_by": [
+        {
+          "encounter": "enc_ep004_dwarf",
+          "apply": {
+            "type": "REDUCE_CP",
+            "delta": -1
+          }
+        }
+      ]
+    }
+  ],
   "dialogue": {
     "speaker_profiles": {
       "ent_ep001_goblin": {

@@ -70,6 +70,216 @@
       "height": 216,
       "label": "MINOTAUR",
       "theme": "magenta"
+    },
+    {
+      "directory": "portraits",
+      "category": "portrait",
+      "name": "고블린",
+      "state": "base",
+      "width": 196,
+      "height": 216,
+      "label": "GOBLIN",
+      "theme": "cyan"
+    },
+    {
+      "directory": "portraits",
+      "category": "portrait",
+      "name": "오크",
+      "state": "base",
+      "width": 196,
+      "height": 216,
+      "label": "ORC",
+      "theme": "magenta"
+    },
+    {
+      "directory": "portraits",
+      "category": "portrait",
+      "name": "드워프",
+      "state": "base",
+      "width": 196,
+      "height": 216,
+      "label": "DWARF",
+      "theme": "sepia"
+    },
+    {
+      "directory": "portraits",
+      "category": "portrait",
+      "name": "사이클롭스",
+      "state": "base",
+      "width": 196,
+      "height": 216,
+      "label": "CYCLOPS",
+      "theme": "cyan"
+    },
+    {
+      "directory": "portraits",
+      "category": "portrait",
+      "name": "서큐버스",
+      "state": "base",
+      "width": 196,
+      "height": 216,
+      "label": "SUCCUBUS",
+      "theme": "magenta"
+    },
+    {
+      "directory": "portraits",
+      "category": "portrait",
+      "name": "타락한_용사",
+      "state": "base",
+      "width": 196,
+      "height": 216,
+      "label": "FALLEN HERO",
+      "theme": "neutral"
+    },
+    {
+      "directory": "portraits",
+      "category": "portrait",
+      "name": "김태훈",
+      "state": "base",
+      "width": 196,
+      "height": 216,
+      "label": "KIM TAEHOON",
+      "theme": "sepia"
+    },
+    {
+      "directory": "portraits",
+      "category": "portrait",
+      "name": "김_인턴",
+      "state": "base",
+      "width": 196,
+      "height": 216,
+      "label": "KIM INTERN",
+      "theme": "cyan"
+    },
+    {
+      "directory": "portraits",
+      "category": "portrait",
+      "name": "켄타우로스",
+      "state": "base",
+      "width": 196,
+      "height": 216,
+      "label": "CENTAUR",
+      "theme": "sepia"
+    },
+    {
+      "directory": "portraits",
+      "category": "portrait",
+      "name": "물컹이",
+      "state": "parts",
+      "width": 96,
+      "height": 40,
+      "label": "EXPRESSION",
+      "theme": "cyan"
+    },
+    {
+      "directory": "portraits",
+      "category": "portrait",
+      "name": "하피",
+      "state": "parts",
+      "width": 96,
+      "height": 40,
+      "label": "EXPRESSION",
+      "theme": "sepia"
+    },
+    {
+      "directory": "portraits",
+      "category": "portrait",
+      "name": "미노타우로스",
+      "state": "parts",
+      "width": 96,
+      "height": 40,
+      "label": "EXPRESSION",
+      "theme": "magenta"
+    },
+    {
+      "directory": "portraits",
+      "category": "portrait",
+      "name": "고블린",
+      "state": "parts",
+      "width": 96,
+      "height": 40,
+      "label": "EXPRESSION",
+      "theme": "cyan"
+    },
+    {
+      "directory": "portraits",
+      "category": "portrait",
+      "name": "오크",
+      "state": "parts",
+      "width": 96,
+      "height": 40,
+      "label": "EXPRESSION",
+      "theme": "magenta"
+    },
+    {
+      "directory": "portraits",
+      "category": "portrait",
+      "name": "드워프",
+      "state": "parts",
+      "width": 96,
+      "height": 40,
+      "label": "EXPRESSION",
+      "theme": "sepia"
+    },
+    {
+      "directory": "portraits",
+      "category": "portrait",
+      "name": "사이클롭스",
+      "state": "parts",
+      "width": 96,
+      "height": 40,
+      "label": "EXPRESSION",
+      "theme": "cyan"
+    },
+    {
+      "directory": "portraits",
+      "category": "portrait",
+      "name": "서큐버스",
+      "state": "parts",
+      "width": 96,
+      "height": 40,
+      "label": "EXPRESSION",
+      "theme": "magenta"
+    },
+    {
+      "directory": "portraits",
+      "category": "portrait",
+      "name": "타락한_용사",
+      "state": "parts",
+      "width": 96,
+      "height": 40,
+      "label": "EXPRESSION",
+      "theme": "neutral"
+    },
+    {
+      "directory": "portraits",
+      "category": "portrait",
+      "name": "김태훈",
+      "state": "parts",
+      "width": 96,
+      "height": 40,
+      "label": "EXPRESSION",
+      "theme": "sepia"
+    },
+    {
+      "directory": "portraits",
+      "category": "portrait",
+      "name": "김_인턴",
+      "state": "parts",
+      "width": 96,
+      "height": 40,
+      "label": "EXPRESSION",
+      "theme": "cyan"
+    },
+    {
+      "directory": "portraits",
+      "category": "portrait",
+      "name": "켄타우로스",
+      "state": "parts",
+      "width": 96,
+      "height": 40,
+      "label": "EXPRESSION",
+      "theme": "sepia"
     }
   ]
 }

@@ -64,6 +64,7 @@
       "time_ref": { "from": "17:00", "to": "17:30" },
       "initial": { "commitment": "ASSERTED", "presentation": "NORMAL" },
       "resistance": 1,
+      "is_required": false,
       "truth": { "relation": "CONSISTENT_WITH_WORLD", "contradicting_events": [] }
     },
     {
@@ -242,7 +243,7 @@
       "predicate": "MINOTAUR_DENY_MEETING_HARPY",
       "initial": { "commitment": "ASSERTED", "presentation": "NORMAL" },
       "resistance": 0,
-      "is_required": false,
+      "is_required": true,
       "truth": {
         "relation": "CONTRADICTED_BY_WORLD",
         "contradicting_events": ["evt_tutorial_checkout"]
@@ -546,6 +547,62 @@
         }
       ],
       "not_proven_keys": ["evidence.tutorial.locker_inventory.not_intent"]
+    },
+    {
+      "evidence_id": "ev_tutorial_cabinet_wingprint",
+      "type": "CABINET_WINGPRINT",
+      "title_key": "evidence.tutorial.cabinet_wingprint.title",
+      "acquire": { "node": "node_tutorial_harpy", "method": "STARTING" },
+      "source_category": "PHYSICAL",
+      "independence": {
+        "source_id": "source_tutorial_cabinet_surface",
+        "group": "PHYSICAL",
+        "derived_from": null
+      },
+      "grade": { "initial": "A", "upgrades": [] },
+      "integrity": { "initial": "INTACT" },
+      "observations": [
+        {
+          "observation_id": "observation_tutorial_cabinet_wingprint",
+          "location_id": "ent_tutorial_breakroom",
+          "predicate": "HARPY_WINGPRINT_FOUND_ON_CABINET",
+          "summary_key": "evidence.tutorial.cabinet_wingprint.summary",
+          "scopes": ["IDENTITY", "PRESENCE"],
+          "detail": { "surface": "CABINET_HANDLE", "trace": "PRIMARY_FEATHER_PATTERN" },
+          "time": { "from": "17:12", "to": "17:14" },
+          "confidence": 1,
+          "contradicts_claim_ids": ["clm_tutorial_harpy_who"]
+        }
+      ],
+      "not_proven_keys": ["evidence.tutorial.cabinet_wingprint.not_item_taken"]
+    },
+    {
+      "evidence_id": "ev_tutorial_handle_forensics",
+      "type": "CABINET_HANDLE_FORENSICS",
+      "title_key": "evidence.tutorial.handle_forensics.title",
+      "acquire": { "node": "node_tutorial_minotaur", "method": "STARTING" },
+      "source_category": "PHYSICAL",
+      "independence": {
+        "source_id": "source_tutorial_handle_lab",
+        "group": "PHYSICAL",
+        "derived_from": null
+      },
+      "grade": { "initial": "A", "upgrades": [] },
+      "integrity": { "initial": "INTACT" },
+      "observations": [
+        {
+          "observation_id": "observation_tutorial_handle_forensics",
+          "location_id": "ent_tutorial_breakroom",
+          "predicate": "MINOTAUR_AND_HARPY_TRACES_OVERLAP",
+          "summary_key": "evidence.tutorial.handle_forensics.summary",
+          "scopes": ["IDENTITY", "PRESENCE"],
+          "detail": { "surface": "CABINET_HANDLE", "overlap": "HORN_OIL_AND_FEATHER" },
+          "time": { "from": "17:12", "to": "17:14" },
+          "confidence": 1,
+          "contradicts_claim_ids": ["clm_tutorial_minotaur_who"]
+        }
+      ],
+      "not_proven_keys": ["evidence.tutorial.handle_forensics.not_cup_owner"]
     }
   ],
   "proof_rules": [
@@ -562,6 +619,18 @@
       "guaranteed_evidence_sets": [["ev_tutorial_gate_log"]],
       "known_insufficient_sets": [["ev_tutorial_receipt"]],
       "partial_credit": { "scopes_covered_ratio": 0.5, "result": "SUSPECTED" }
+    },
+    {
+      "rule_id": "rule_tutorial_who",
+      "target_claim_id": "clm_tutorial_who",
+      "direction": "SUPPORT",
+      "requirements": {
+        "required_scopes": ["PRESENCE", "TIME"],
+        "minimum_confidence": 0.8,
+        "minimum_independent_sources": 1,
+        "require_integrity": true
+      },
+      "guaranteed_evidence_sets": [["ev_tutorial_roster"]]
     },
     {
       "rule_id": "rule_tutorial_where",
@@ -589,6 +658,18 @@
         "ev_tutorial_witness_note",
         "ev_tutorial_locker_inventory"
       ]]
+    },
+    {
+      "rule_id": "rule_tutorial_minotaur_who",
+      "target_claim_id": "clm_tutorial_minotaur_who",
+      "direction": "CONTRADICT",
+      "requirements": {
+        "required_scopes": ["IDENTITY", "PRESENCE"],
+        "minimum_confidence": 0.8,
+        "minimum_independent_sources": 1,
+        "require_integrity": true
+      },
+      "guaranteed_evidence_sets": [["ev_tutorial_handle_forensics"]]
     }
   ],
   "encounters": [
@@ -637,13 +718,44 @@
           "is_terminal": false
         }
       ],
-      "modifiers": [],
+      "modifiers": [
+        {
+          "modifier_id": "mod_tutorial_slime_who_lock",
+          "trigger": "ON_ENCOUNTER_START",
+          "condition": null,
+          "effect": {
+            "type": "LOCK_CLAIM",
+            "target_selector": {
+              "scope": "VISIBLE",
+              "facet": "WHO",
+              "exclude_states": {
+                "epistemic": ["SUPPORTED", "REFUTED"]
+              },
+              "count": 1,
+              "selection": "DETERMINISTIC_BY_INDEX"
+            },
+            "duration_turns": 2
+          },
+          "counterplay": {
+            "allowed_intents": ["CLARIFY", "CONFIRM"],
+            "partner_skills": [],
+            "always_available": true
+          },
+          "activation_limit": 1,
+          "priority": 30
+        }
+      ],
       "objectives": {
         "required": [
           {
             "objective_id": "objective_tutorial_when",
             "type": "REFUTE_CLAIM",
             "claim_id": "clm_tutorial_when"
+          },
+          {
+            "objective_id": "objective_tutorial_survive_turn_2",
+            "type": "SURVIVE_UNTIL_TURN",
+            "turn": 2
           }
         ],
         "optional": [
@@ -716,13 +828,45 @@
           "is_terminal": false
         }
       ],
-      "modifiers": [],
+      "modifiers": [
+        {
+          "modifier_id": "mod_tutorial_harpy_recall_qte",
+          "trigger": "ON_TURN_START",
+          "condition": null,
+          "effect": {
+            "type": "TRIGGER_QTE",
+            "parameters": {
+              "qte_id": "qte_tutorial_harpy_recall",
+              "on_success": {
+                "type": "UPGRADE_EVIDENCE",
+                "target": "ev_tutorial_witness_note"
+              },
+              "on_fail": {
+                "type": "REDUCE_CP",
+                "delta": 1
+              }
+            }
+          },
+          "counterplay": {
+            "allowed_intents": [],
+            "partner_skills": [],
+            "always_available": true
+          },
+          "activation_limit": 1,
+          "priority": 25
+        }
+      ],
       "objectives": {
         "required": [
           {
             "objective_id": "objective_tutorial_where",
             "type": "REFUTE_CLAIM",
             "claim_id": "clm_tutorial_where"
+          },
+          {
+            "objective_id": "objective_tutorial_preserve_corridor_photo",
+            "type": "PRESERVE_EVIDENCE",
+            "evidence_id": "ev_tutorial_corridor_photo"
           }
         ],
         "optional": [],
@@ -755,11 +899,17 @@
             "clm_tutorial_minotaur_who",
             "clm_tutorial_minotaur_when",
             "clm_tutorial_minotaur_where",
-            "clm_tutorial_what",
+            "clm_tutorial_what"
+          ],
+          "shields": [{ "claim_id": "clm_tutorial_what", "durability": 1 }]
+        },
+        {
+          "round_id": "round_tutorial_minotaur_02",
+          "statement_claims": [
             "clm_tutorial_minotaur_how",
             "clm_tutorial_why"
           ],
-          "shields": [{ "claim_id": "clm_tutorial_what", "durability": 1 }]
+          "shields": [{ "claim_id": "clm_tutorial_minotaur_how", "durability": 1 }]
         }
       ],
       "flow_nodes": [
@@ -783,16 +933,98 @@
           "deactivate_modifiers": [],
           "reaction_key": "reaction.tutorial.minotaur",
           "resource_delta": {},
+          "is_terminal": false
+        },
+        {
+          "node_id": "node_tutorial_minotaur_fury",
+          "enter_conditions": [
+            {
+              "type": "CLAIM_EPISTEMIC",
+              "claim_id": "clm_tutorial_what",
+              "state": "REFUTED"
+            }
+          ],
+          "reveal_claim_ids": [
+            "clm_tutorial_minotaur_how",
+            "clm_tutorial_why"
+          ],
+          "revise_claim_ids": [],
+          "open_route_ids": [],
+          "activate_modifiers": [],
+          "deactivate_modifiers": [],
+          "reaction_key": "reaction.tutorial.minotaur",
+          "resource_delta": {},
           "is_terminal": true
         }
       ],
-      "modifiers": [],
+      "modifiers": [
+        {
+          "modifier_id": "mod_tutorial_minotaur_phase_shift",
+          "trigger": "ON_COMPOSURE_THRESHOLD",
+          "condition": {
+            "type": "RESOURCE_RANGE",
+            "resource": "commandPoints",
+            "max": 0
+          },
+          "effect": {
+            "type": "CHANGE_PHASE",
+            "value": "node_tutorial_minotaur_fury"
+          },
+          "counterplay": {
+            "allowed_intents": ["RECOVER"],
+            "partner_skills": [],
+            "always_available": true
+          },
+          "activation_limit": 1,
+          "priority": 30
+        },
+        {
+          "modifier_id": "mod_tutorial_minotaur_phase_shift_resolution",
+          "trigger": "ON_RESOLUTION",
+          "condition": {
+            "type": "ALL_OF",
+            "conditions": [
+              {
+                "type": "RESOURCE_RANGE",
+                "resource": "composure",
+                "max": 60
+              },
+              {
+                "type": "RESOURCE_RANGE",
+                "resource": "commandPoints",
+                "max": 0
+              }
+            ]
+          },
+          "effect": {
+            "type": "CHANGE_PHASE",
+            "value": "node_tutorial_minotaur_fury"
+          },
+          "counterplay": {
+            "allowed_intents": ["RECOVER"],
+            "partner_skills": [],
+            "always_available": true
+          },
+          "activation_limit": 1,
+          "priority": 29
+        }
+      ],
       "objectives": {
         "required": [
           {
             "objective_id": "objective_tutorial_what",
             "type": "REFUTE_CLAIM",
             "claim_id": "clm_tutorial_what"
+          },
+          {
+            "objective_id": "objective_tutorial_minotaur_who",
+            "type": "REFUTE_CLAIM",
+            "claim_id": "clm_tutorial_minotaur_who"
+          },
+          {
+            "objective_id": "objective_tutorial_minotaur_keep_coercion",
+            "type": "KEEP_COERCION_BELOW",
+            "max": 40
           }
         ],
         "optional": [],
@@ -871,7 +1103,73 @@
       "per_attempt_costs": { "stress": 2 }
     }
   ],
-  "flag_hooks": [],
+  "flag_hooks": [
+    {
+      "flag_id": "F-02",
+      "description_key": "flag.patient_questioning",
+      "default_value": false,
+      "set_by": [
+        {
+          "encounter": "enc_tutorial_slime",
+          "outcome": "BEST_RESOLUTION",
+          "value": true
+        }
+      ],
+      "consumed_by": [
+        {
+          "encounter": "enc_tutorial_harpy",
+          "apply": {
+            "type": "ADJUST_RESOURCE",
+            "resource": "trust",
+            "delta": 1
+          }
+        }
+      ]
+    },
+    {
+      "flag_id": "F-05",
+      "description_key": "flag.evidence_intact",
+      "default_value": false,
+      "set_by": [
+        {
+          "encounter": "enc_tutorial_harpy",
+          "outcome": "BEST_RESOLUTION",
+          "value": true
+        }
+      ],
+      "consumed_by": [
+        {
+          "encounter": "enc_tutorial_minotaur",
+          "apply": {
+            "type": "UPGRADE_EVIDENCE",
+            "target": "ev_tutorial_witness_note"
+          }
+        }
+      ]
+    },
+    {
+      "flag_id": "F-06",
+      "description_key": "flag.partner_trust",
+      "default_value": false,
+      "set_by": [
+        {
+          "encounter": "enc_tutorial_minotaur",
+          "outcome": "BEST_RESOLUTION",
+          "value": true
+        }
+      ],
+      "consumed_by": [
+        {
+          "encounter": "enc_ep001_goblin",
+          "apply": {
+            "type": "ADJUST_RESOURCE",
+            "resource": "cp",
+            "delta": 1
+          }
+        }
+      ]
+    }
+  ],
   "dialogue": {
     "speaker_profiles": {
       "ent_tutorial_slime": {

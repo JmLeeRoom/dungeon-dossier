@@ -561,8 +561,15 @@ export function validateTier1Case(
             typeof path[1] === 'number'
               ? encounterNodes[path[1]]
               : undefined;
-          const known =
-            kind === 'external'
+          const bundleScopedFlagHookReference =
+            path[0] === 'flag_hooks' &&
+            (kind === 'encounter' ||
+              kind === 'event' ||
+              kind === 'choice' ||
+              (kind === 'external' && key === 'flag_id'));
+          const known = bundleScopedFlagHookReference
+            ? true
+            : kind === 'external'
               ? context.externalIds?.has(referenceId) === true
               : scopedNodes
                 ? scopedNodes.has(referenceId)

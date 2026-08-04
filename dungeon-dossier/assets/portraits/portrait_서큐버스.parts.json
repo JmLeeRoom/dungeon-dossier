@@ -1,0 +1,18 @@
+{
+  "schema_version": "1.0",
+  "base": {
+    "slot": "portrait-base",
+    "image": "portrait_서큐버스_base.png"
+  },
+  "parts": {
+    "slot": "portrait-parts",
+    "image": "portrait_서큐버스_parts.png",
+    "origin": "portrait-base",
+    "x": 50,
+    "y": 44,
+    "width": 96,
+    "height": 40,
+    "stage_x": 272,
+    "stage_y": 84
+  }
+}

@@ -65,6 +65,18 @@ export interface EncounterSession {
   targetClaimIdForFacet(facet: Facet): string | undefined;
 }
 
+const PORTRAIT_NAME_BY_RACE: Readonly<Record<string, string>> = Object.freeze({
+  SLIME: '물컹이',
+  HARPY: '하피',
+  MINOTAUR: '미노타우로스',
+  GOBLIN: '고블린',
+  ORC: '오크',
+  DWARF: '드워프',
+  CYCLOPS: '사이클롭스',
+  SUCCUBUS: '서큐버스',
+  FALLEN_HERO: '타락한_용사',
+});
+
 function required<T>(value: T | undefined, label: string): T {
   if (value === undefined) throw new Error(`${label} could not be loaded.`);
   return value;
@@ -227,6 +239,7 @@ export async function createEncounterSession(
     forbidden_expressions: [],
   };
   const fallbackCatalog = createFallbackCatalog(dialogue);
+  const portraitName = PORTRAIT_NAME_BY_RACE[profile.race];
 
   const session: EncounterSession = {
     coordinator,
@@ -297,6 +310,13 @@ export async function createEncounterSession(
         sweetSpotUnlocked: inSweetSpot,
         cards,
         evidenceCosts: Object.fromEntries(dto.evidence.map((item) => [item.evidenceId, 0])),
+        ...(portraitName === undefined
+          ? {}
+          : {
+              portraitBaseAssetKey: `portrait/${portraitName}/base`,
+              portraitPartsAssetKey: `portrait/${portraitName}/parts`,
+            }),
+        partnerAssetKey: 'portrait/김_인턴/base',
         canSecureStatement:
           snapshot.machine.state === 'CHECK_OUTCOME' && requiredComplete && inSweetSpot,
       };

@@ -3,12 +3,18 @@ import {
   preloadRuntimeAssets,
   resolveAsset,
   runtimeAssetRegistry,
+  type ManagedUiLayer,
   type MountedGameApplication,
 } from '../ui/core';
 import {
+  createEndingDirection,
   createInterrogationScreen,
+  createJudgmentDirection,
+  directionForOutcome,
+  directionForResolution,
   type InterrogationScreenController,
   type InterrogationScreenModel,
+  type TimedDirectionOverlay,
 } from '../ui/screens/interrogation';
 import { createEndingScreen } from '../ui/screens/ending';
 import { createEventScreen } from '../ui/screens/event';
@@ -25,8 +31,12 @@ import {
   type CaseDefinition,
   type RewardDefinition,
 } from '../content-io';
-import { toRenderableClaims } from '../dto';
-import type { EncounterOutcome } from '../engine/encounter';
+import { AudioPlayer, RUNTIME_SOUND_DEFINITIONS } from '../audio';
+import {
+  toRenderableClaims,
+  type ResolutionCode,
+} from '../dto';
+import type { EncounterOutcome, OutcomeEvaluation } from '../engine/encounter';
 import {
   createNodeStrip,
   currentRunNode,
@@ -35,6 +45,13 @@ import {
   type RunState,
 } from '../engine/run';
 import { createEncounterSession, type EncounterSession } from './createEncounterSession';
+import {
+  cueOutcome,
+  cueResolution,
+  cueScene,
+  outcomeCodeForEvaluation,
+  type AudioScene,
+} from './gameAudio';
 import {
   createPhase4DialogueService,
   toComposureBand,
@@ -93,6 +110,8 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
     console.warn('Galmuri11 could not be preloaded; continuing with the browser fallback.', error);
   }
   const mounted = await createGameApplication(mount);
+  const audio = new AudioPlayer();
+  audio.registerAll(RUNTIME_SOUND_DEFINITIONS);
   await preloadRuntimeAssets();
   const fallback = runtimeAssetRegistry.get('placeholder/missing/fallback');
   const assets = {
@@ -195,6 +214,9 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
   let interrogation: InterrogationScreenController | undefined;
   let openingNode = false;
   let destroyed = false;
+  let audioActivated = false;
+  let outcomeTransitionPending = false;
+  let outcomeBgmMuted = false;
   let recordDevJudgment: ((input: unknown, result: unknown) => void) | undefined;
   let destroyDevConsole = (): void => undefined;
   const resourceOverrides: Partial<Record<
@@ -217,6 +239,66 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
       encounter.flow_nodes.map((node) => node.node_id),
     ),
   );
+
+  const activateAudio = (scene: AudioScene): void => {
+    if (audioActivated) return;
+    audioActivated = true;
+    cueScene(audio, scene);
+  };
+
+  const setScene = (scene: ManagedUiLayer, audioScene: AudioScene): void => {
+    mounted.scenes.setScene(scene);
+    if (!audioActivated) return;
+    audio.play('crt_switch');
+    cueScene(audio, audioScene);
+  };
+
+  const showTimedDirection = (
+    overlay: TimedDirectionOverlay,
+    onComplete?: () => void,
+  ): void => {
+    overlay.view.eventMode = 'static';
+    let finished = false;
+    let completionRan = false;
+    let disposeOverlay: (() => void) | undefined;
+    let update = (): void => undefined;
+    const runCompletion = (): void => {
+      if (completionRan) return;
+      completionRan = true;
+      onComplete?.();
+    };
+    const stopTicker = (): boolean => {
+      if (finished) return false;
+      finished = true;
+      mounted.app.ticker.remove(update);
+      return true;
+    };
+    update = (): void => {
+      overlay.update(mounted.app.ticker.deltaMS);
+      if (!overlay.complete || !stopTicker()) return;
+      disposeOverlay?.();
+      runCompletion();
+    };
+    const layer: ManagedUiLayer = {
+      view: overlay.view,
+      onEnter: (): void => overlay.onEnter?.(),
+      onExit: (): void => overlay.onExit?.(),
+      onDestroy: (): void => {
+        const interrupted = stopTicker();
+        overlay.onDestroy?.();
+        if (interrupted && onComplete !== undefined && !destroyed) {
+          queueMicrotask(runCompletion);
+        }
+      },
+    };
+    mounted.app.ticker.add(update);
+    try {
+      disposeOverlay = mounted.scenes.showOverlay(layer);
+    } catch (error) {
+      stopTicker();
+      throw error;
+    }
+  };
 
   const syncDevFlags = (): void => {
     for (const flagId of Object.keys(devState.flags)) {
@@ -262,11 +344,12 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
       toRunStripScreenModel(runStripDefinition, runSession.snapshot),
       {
         onContinue(): void {
+          activateAudio('AMBIENT');
           void openCurrentNode().catch(handleFlowError);
         },
       },
     );
-    mounted.scenes.setScene({ view });
+    setScene({ view }, 'AMBIENT');
   };
 
   const mountEnding = (): void => {
@@ -278,13 +361,14 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
       ENDING_PRESENTATIONS,
     );
     const view = createEndingScreen(model, assets, () => {
+      activateAudio('AMBIENT');
       saveRepository.clear();
       runSession = newRunSession(freshState());
       syncDevFlags();
       devState.nodeId = strip[0]?.ref ?? 'run-complete';
       mountStrip();
     });
-    mounted.scenes.setScene({ view });
+    setScene({ view }, 'ENDING');
   };
 
   const routeAfterBoundary = (): void => {
@@ -306,6 +390,7 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
     let selected = false;
     const view = createRewardScreen(toRewardScreenModel(grade, choices), (rewardId) => {
       if (selected) return;
+      activateAudio('AMBIENT');
       selected = true;
       try {
         runSession.claimReward(rewardId);
@@ -315,7 +400,7 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
         handleFlowError(error);
       }
     });
-    mounted.scenes.setScene({ view });
+    setScene({ view }, 'AMBIENT');
   };
 
   const mountPendingReward = (): void => {
@@ -360,6 +445,7 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
     const view = createEventScreen(model, {
       onChoice(choiceId): void {
         if (completed) return;
+        activateAudio('AMBIENT');
         completed = true;
         try {
           finishEvent(event, { choiceId });
@@ -371,6 +457,7 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
       },
       onPlacementSubmit(placement): void {
         if (completed) return;
+        activateAudio('AMBIENT');
         completed = true;
         try {
           if (model.pattern !== 'B') {
@@ -392,7 +479,7 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
             },
             { onContinue: routeAfterBoundary },
           );
-          mounted.scenes.setScene({ view: resultView });
+          setScene({ view: resultView }, 'AMBIENT');
         } catch (error) {
           completed = false;
           handleFlowError(error);
@@ -400,6 +487,7 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
       },
       onInvestigate(spotId): void {
         if (completed || discoveredSpotIds.includes(spotId)) return;
+        activateAudio('AMBIENT');
         const next = [...discoveredSpotIds, spotId];
         const targetAttempts = event.pattern === 'C'
           ? Math.min(event.attempt_limit, event.spots.length)
@@ -418,10 +506,10 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
         mountEvent(node, next);
       },
     });
-    mounted.scenes.setScene({ view });
+    setScene({ view }, 'AMBIENT');
   };
 
-  const finishEncounter = (outcome: EncounterOutcome): void => {
+  const commitEncounter = (outcome: EncounterOutcome): (() => void) => {
     const active = encounterSession;
     if (active === undefined) throw new Error('No encounter is active.');
     const runNode = currentRunNode(strip, runSession.snapshot.nodeIndex);
@@ -447,11 +535,75 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
         : { outcomeRewards: authoredOutcome.rewards }),
     });
     syncDevFlags();
-    if (completion.rewardChoices.length > 0) {
-      mountReward(completion.grade, completion.rewardChoices);
+    let routed = false;
+    return (): void => {
+      if (routed) return;
+      routed = true;
+      outcomeTransitionPending = false;
+      if (outcomeBgmMuted) {
+        audio.unmute();
+        outcomeBgmMuted = false;
+      }
+      if (completion.rewardChoices.length > 0) {
+        mountReward(completion.grade, completion.rewardChoices);
+        return;
+      }
+      routeAfterBoundary();
+    };
+  };
+
+  const queueEncounterOutcome = (
+    evaluation: OutcomeEvaluation,
+    resolution?: ResolutionCode,
+  ): void => {
+    if (outcomeTransitionPending) return;
+    const outcome = evaluation.terminalOutcome;
+    if (outcome === null) throw new Error('Cannot queue a non-terminal encounter outcome.');
+    outcomeTransitionPending = true;
+    let routeAfterDirection: () => void;
+    try {
+      routeAfterDirection = commitEncounter(outcome);
+    } catch (error) {
+      outcomeTransitionPending = false;
+      throw error;
+    }
+    const finishQueuedEncounter = (): void => {
+      try {
+        routeAfterDirection();
+      } catch (error) {
+        outcomeTransitionPending = false;
+        handleFlowError(error);
+      }
+    };
+    const showEndingDirection = (): void => {
+      try {
+        const outcomeCode = outcomeCodeForEvaluation(evaluation);
+        const direction = directionForOutcome(outcomeCode);
+        cueOutcome(audio, outcomeCode);
+        outcomeBgmMuted = direction === 'ENDING_BGM_MUTE';
+        const overlay = createEndingDirection(direction, direction === 'ENDING_TRANSFER_STAMP'
+          ? { assets, audio }
+          : { assets });
+        showTimedDirection(overlay, finishQueuedEncounter);
+      } catch (error) {
+        handleFlowError(error);
+        finishQueuedEncounter();
+      }
+    };
+    if (resolution === undefined) {
+      showEndingDirection();
       return;
     }
-    routeAfterBoundary();
+    try {
+      cueResolution(audio, resolution);
+      showTimedDirection(
+        createJudgmentDirection(directionForResolution(resolution), { assets }),
+        showEndingDirection,
+      );
+    } catch (error) {
+      handleFlowError(error);
+      showEndingDirection();
+    }
   };
 
   const mountInterrogation = (renderInitialStatement = false): void => {
@@ -498,9 +650,12 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
       activeModel(),
       {
         onSelectionChange(selection): void {
+          if (outcomeTransitionPending) return;
+          audio.play('paper_flip');
           if (selection.facet !== undefined) renderStatementForFacet(selection.facet);
         },
         onSubmit(selection): void {
+          if (outcomeTransitionPending) return;
           if (selection.cardId === undefined || selection.facet === undefined) {
             controller.useFallbackStatement('선택한 진술을 다시 확인하겠습니다.');
             return;
@@ -514,18 +669,39 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
             if (active.coordinator.snapshot.machine.state === 'CHECK_OUTCOME') {
               const turnOutcome = active.coordinator.endTurn();
               if (turnOutcome.terminalOutcome !== null) {
-                finishEncounter(turnOutcome.terminalOutcome);
+                mountInterrogation();
+                queueEncounterOutcome(turnOutcome);
                 return;
               }
             }
             if (active.coordinator.snapshot.machine.state === 'FREE_REVIEW') {
               active.coordinator.beginArgument();
             }
+            audio.play('card_snap');
+            const evidenceBefore = new Map(
+              active.currentModel().dto.evidence.map((evidence) => [
+                evidence.evidenceId,
+                evidence.grade,
+              ]),
+            );
             const result = active.coordinator.submit({
               cardId: selection.cardId,
               targetClaimId,
               evidenceIds: selection.evidenceIds,
             });
+            const evidenceAfter = new Map(
+              active.currentModel().dto.evidence.map((evidence) => [
+                evidence.evidenceId,
+                evidence.grade,
+              ]),
+            );
+            const gradeOrder = ['C', 'B', 'A'] as const;
+            const evidenceWasDamaged = [...evidenceBefore].some(([evidenceId, grade]) => {
+              const currentGrade = evidenceAfter.get(evidenceId);
+              return currentGrade === undefined
+                || gradeOrder.indexOf(currentGrade) < gradeOrder.indexOf(grade);
+            });
+            if (evidenceWasDamaged) audio.play('shredder');
             recordDevJudgment?.(
               { source: 'ENCOUNTER_SUBMISSION', selection, nodeId: devState.nodeId },
               {
@@ -534,10 +710,21 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
               },
             );
             if (result.outcome.terminalOutcome !== null) {
-              finishEncounter(result.outcome.terminalOutcome);
+              mountInterrogation();
+              queueEncounterOutcome(
+                result.outcome,
+                result.resolution.code,
+              );
               return;
             }
             mountInterrogation();
+            cueResolution(audio, result.resolution.code);
+            showTimedDirection(
+              createJudgmentDirection(
+                directionForResolution(result.resolution.code),
+                { assets },
+              ),
+            );
             const reactionController = interrogation;
             const selectedClaim = toRenderableClaims(active.currentModel().dto).find(
               (claim) => claim.claimId === targetClaimId,
@@ -582,9 +769,11 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
           }
         },
         onAdvance(): void {
+          audio.play('typewriter_return');
           controller.finishStatement();
         },
         onSecureStatement(): void {
+          if (outcomeTransitionPending) return;
           try {
             const outcome = active.coordinator.secureStatement();
             recordDevJudgment?.(
@@ -594,12 +783,16 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
             if (outcome.terminalOutcome === null) {
               throw new Error('진술 확보가 종료 결과를 만들지 못했습니다.');
             }
-            finishEncounter(outcome.terminalOutcome);
+            mountInterrogation();
+            queueEncounterOutcome(outcome);
           } catch (error) {
             controller.useFallbackStatement(
               error instanceof Error ? error.message : '진술을 확보하지 못했습니다.',
             );
           }
+        },
+        onKeystroke(): void {
+          audio.play('typewriter');
         },
       },
       { assets },
@@ -607,14 +800,15 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
     interrogation = controller;
     const update = (): void => controller.update(mounted.app.ticker.deltaMS);
     mounted.app.ticker.add(update);
-    mounted.scenes.setScene({
+    const runNode = currentRunNode(strip, runSession.snapshot.nodeIndex);
+    setScene({
       view: controller.view,
       onDestroy(): void {
         mounted.app.ticker.remove(update);
         if (interrogation === controller) interrogation = undefined;
         controller.destroy();
       },
-    });
+    }, runNode?.kind === 'BOSS' ? 'BOSS' : 'INTERROGATION');
     if (renderInitialStatement) {
       const initialFacet = active.currentModel().dto.statement.find(
         (claim) => claim.presentation !== 'HIDDEN',
@@ -681,6 +875,8 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
       devState.nodeId = active.coordinator.snapshot.flowNodeId ?? active.encounterId;
       dialogueService = await prepareDialogue(active);
       if (destroyed || encounterSession !== active) return;
+      audio.play('door_knock');
+      audio.play('shuffle_bubble');
       mountInterrogation(true);
     } finally {
       openingNode = false;
@@ -764,6 +960,7 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
     destroy(): void {
       destroyed = true;
       destroyDevConsole();
+      audio.destroy();
       mounted.destroy();
     },
   };

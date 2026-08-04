@@ -140,6 +140,9 @@ export interface SimulationEncounterCatalogEntry {
     };
   }>;
   readonly initialClaims: readonly SimulationClaimState[];
+  /** Claim proof paths that complete authored claim-based objectives. */
+  readonly completionProofPaths: readonly SimulationProofPath[];
+  /** Direct-contradiction audit paths retained for the legacy BEST smoke contract. */
   readonly proofPaths: readonly SimulationProofPath[];
   readonly guaranteedObjectiveIds: readonly string[];
   readonly alternatePath: readonly string[];
@@ -349,6 +352,42 @@ function proofPathForObjective(
   };
 }
 
+function verificationProofPathForObjective(
+  definition: CaseDefinition,
+  encounter: EncounterDefinition,
+  objective: ObjectiveDefinition,
+): SimulationProofPath {
+  const contradictionObjective =
+    objective.type === 'REFUTE_CLAIM'
+      ? objective
+      : encounter.objectives.required.find(
+          (candidate) => candidate.type === 'REFUTE_CLAIM',
+        );
+  if (contradictionObjective === undefined) {
+    throw new Error(
+      `Encounter ${encounter.encounter_id} needs a REFUTE_CLAIM audit path for ${objective.objective_id}.`,
+    );
+  }
+  const path = proofPathForObjective(definition, contradictionObjective);
+  return {
+    ...path,
+    objectiveId: objective.objective_id,
+  };
+}
+
+function completionProofPathsForObjectives(
+  definition: CaseDefinition,
+  objectives: readonly ObjectiveDefinition[],
+): readonly SimulationProofPath[] {
+  return objectives.flatMap((objective) =>
+    objective.type === 'CONFIRM_CLAIM' ||
+    objective.type === 'REFUTE_CLAIM' ||
+    objective.type === 'RESOLVE_CLAIM'
+      ? [proofPathForObjective(definition, objective)]
+      : [],
+  );
+}
+
 function submissionAction(
   entryId: string,
   path: SimulationProofPath,
@@ -431,8 +470,12 @@ function buildCatalogEntry(
         : { coercion_max: stateConditions.coercion_max }),
     },
   };
+  const completionProofPaths = completionProofPathsForObjectives(
+    definition,
+    objectives.required,
+  );
   const proofPaths = objectives.required.map((objective) =>
-    proofPathForObjective(definition, objective),
+    verificationProofPathForObjective(definition, encounter, objective),
   );
   const encounterClaimIds = uniqueStrings([
     ...encounter.rounds.flatMap((round) => round.statement_claims),
@@ -493,6 +536,7 @@ function buildCatalogEntry(
     sweetSpot,
     objectives,
     initialClaims,
+    completionProofPaths,
     proofPaths,
     guaranteedObjectiveIds: proofPaths.map((path) => path.objectiveId),
     alternatePath: uniqueStrings(
@@ -615,7 +659,7 @@ function incompleteProofPath(
       .filter((objective) => !objective.completed)
       .map((objective) => objective.objectiveId),
   );
-  const path = encounter.proofPaths.find((candidate) =>
+  const path = encounter.completionProofPaths.find((candidate) =>
     incompleteObjectiveIds.has(candidate.objectiveId),
   ) ?? encounter.proofPaths.find((candidate) => candidate.composureDelta < 0);
   if (path === undefined) {
@@ -664,8 +708,9 @@ function submissionPlan(
   encounter: SimulationEncounterCatalogEntry,
   definition: CaseDefinition,
   state: EncounterRuntimeState,
+  preferredPath?: SimulationProofPath,
 ): CoordinatorSubmissionPlan {
-  const path = incompleteProofPath(encounter, state);
+  const path = preferredPath ?? incompleteProofPath(encounter, state);
   const handCards = state.deck.hand.flatMap((cardId) => {
     const card = CARD_CATALOG.cards.find((candidate) => candidate.card_id === cardId);
     return card === undefined || !cardCanBePlayed(card, state) ? [] : [card];
@@ -985,10 +1030,22 @@ function simulateBestWithCoordinator(
       );
     }
     coordinator.review();
+    const verifiedObjectiveIds = new Set(
+      inputSequence.flatMap((action) =>
+        action.kind === 'SUBMIT' &&
+        action.resolutionCode === 'R_DIRECT_CONTRADICTION'
+          ? [action.objectiveId]
+          : [],
+      ),
+    );
+    const verificationPath = encounter.proofPaths.find(
+      (path) => !verifiedObjectiveIds.has(path.objectiveId),
+    );
     const plan = submissionPlan(
       encounter,
       authored.definition,
       coordinator.snapshot,
+      verificationPath,
     );
     coordinator.beginArgument();
     const submission = coordinator.submit(plan.request);
@@ -1030,7 +1087,17 @@ function simulateBestWithCoordinator(
         false,
       );
     }
-    if (submission.outcome.bestResolution.secureStatementEnabled) {
+    const allVerificationPathsObserved = encounter.proofPaths.every(
+      (path) =>
+        verifiedObjectiveIds.has(path.objectiveId) ||
+        (submitAction.kind === 'SUBMIT' &&
+          submitAction.resolutionCode === 'R_DIRECT_CONTRADICTION' &&
+          submitAction.objectiveId === path.objectiveId),
+    );
+    if (
+      submission.outcome.bestResolution.secureStatementEnabled &&
+      allVerificationPathsObserved
+    ) {
       const action: SimulationAction = {
         actionId: `best.${encounter.caseId}.${encounter.encounterId}.secure-statement`,
         kind: 'SECURE_STATEMENT',

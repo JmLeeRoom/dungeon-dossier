@@ -114,6 +114,7 @@
       "time_ref": { "from": "01:00", "to": "01:14" },
       "initial": { "commitment": "ASSERTED", "presentation": "NORMAL" },
       "resistance": 1,
+      "is_required": true,
       "truth": {
         "relation": "CONTRADICTED_BY_WORLD",
         "contradicting_events": ["evt_ep004_safety_bypass"]
@@ -144,6 +145,7 @@
       "predicate": "AUDIO_CACHE_CONTAINED_ONLY_NORMAL_NOTICE",
       "initial": { "commitment": "ASSERTED", "presentation": "NORMAL" },
       "resistance": 2,
+      "is_required": true,
       "truth": {
         "relation": "CONTRADICTED_BY_WORLD",
         "contradicting_events": ["evt_ep004_audio_erasure"]
@@ -173,6 +175,7 @@
       "predicate": "DENY_DIVERSION_BENEFIT",
       "initial": { "commitment": "ASSERTED", "presentation": "NORMAL" },
       "resistance": 2,
+      "is_required": false,
       "truth": {
         "relation": "CONTRADICTED_BY_WORLD",
         "contradicting_events": ["evt_ep004_vip_diversion"]
@@ -318,7 +321,7 @@
       "predicate": "HERO_RECORDED_APPROVAL_AFTER_ARRIVAL",
       "initial": { "commitment": "ASSERTED", "presentation": "NORMAL" },
       "resistance": 1,
-      "is_required": false,
+      "is_required": true,
       "truth": { "relation": "PARTIALLY_TRUE", "contradicting_events": [] }
     },
     {
@@ -330,7 +333,7 @@
       "predicate": "HERO_DENY_VIP_GATE_PRESENCE",
       "initial": { "commitment": "ASSERTED", "presentation": "NORMAL" },
       "resistance": 2,
-      "is_required": false,
+      "is_required": true,
       "truth": {
         "relation": "CONTRADICTED_BY_WORLD",
         "contradicting_events": ["evt_ep004_vip_diversion"]
@@ -610,6 +613,74 @@
         }
       ],
       "not_proven_keys": ["evidence.ep004.diversion_contract.not_bypass_method"]
+    },
+    {
+      "evidence_id": "ev_ep004_platform_manifest",
+      "type": "VIP_PLATFORM_MANIFEST",
+      "title_key": "evidence.ep004.platform_manifest.title",
+      "acquire": { "node": "node_ep004_fallen_hero_start", "method": "STARTING" },
+      "source_category": "DOCUMENT",
+      "independence": {
+        "source_id": "source_ep004_platform_dispatch",
+        "group": "DOCUMENT",
+        "derived_from": null
+      },
+      "grade": { "initial": "B", "upgrades": [] },
+      "integrity": { "initial": "INTACT" },
+      "observations": [
+        {
+          "observation_id": "observation_ep004_platform_manifest",
+          "subject_id": "ent_ep004_fallen_hero",
+          "location_id": "ent_ep004_vip_gate",
+          "predicate": "MANIFEST_PLACES_HERO_AT_VIP_GATE",
+          "summary_key": "evidence.ep004.platform_manifest.summary",
+          "scopes": ["LOCATION", "PRESENCE"],
+          "detail": { "platform": "VIP_GATE", "entry": "ROUTE_APPROVAL" },
+          "time": { "from": "01:30", "to": "01:38" },
+          "confidence": 0.9,
+          "contradicts_claim_ids": ["clm_ep004_fallen_hero_where"]
+        }
+      ],
+      "not_proven_keys": ["evidence.ep004.platform_manifest.not_payment"]
+    },
+    {
+      "evidence_id": "ev_ep004_signal_switch_log",
+      "type": "SIGNAL_SWITCH_LOG",
+      "title_key": "evidence.ep004.signal_switch_log.title",
+      "acquire": { "node": "node_ep004_fallen_hero_start", "method": "STARTING" },
+      "source_category": "DIGITAL",
+      "independence": {
+        "source_id": "source_ep004_signal_interlock",
+        "group": "DIGITAL",
+        "derived_from": null
+      },
+      "grade": { "initial": "A", "upgrades": [] },
+      "integrity": { "initial": "INTACT" },
+      "observations": [
+        {
+          "observation_id": "observation_ep004_signal_switch_log",
+          "subject_id": "ent_ep004_fallen_hero",
+          "location_id": "ent_ep004_vip_gate",
+          "predicate": "HERO_TRIGGERED_MANUAL_ROUTE_SWITCH",
+          "summary_key": "evidence.ep004.signal_switch_log.summary",
+          "scopes": ["ROUTE", "ACTION"],
+          "detail": { "switch_mode": "MANUAL_OVERRIDE", "interlock": "BYPASSED" },
+          "time": { "from": "01:30", "to": "01:38" },
+          "confidence": 1,
+          "contradicts_claim_ids": ["clm_ep004_how"]
+        },
+        {
+          "observation_id": "observation_ep004_signal_switch_sequence",
+          "predicate": "SIGNAL_SWITCH_FOLLOWS_VIP_ARRIVAL",
+          "summary_key": "evidence.ep004.signal_switch_log.sequence",
+          "scopes": ["TIME", "SEQUENCE"],
+          "detail": { "arrival_order": 1, "approval_order": 2 },
+          "time": { "from": "01:30", "to": "01:38" },
+          "confidence": 1,
+          "supports_claim_ids": ["clm_ep004_fallen_hero_when"]
+        }
+      ],
+      "not_proven_keys": ["evidence.ep004.signal_switch_log.not_motive"]
     }
   ],
   "proof_rules": [
@@ -671,7 +742,10 @@
         "minimum_independent_sources": 1,
         "require_integrity": true
       },
-      "guaranteed_evidence_sets": [["ev_ep004_vip_ticket_trace"]]
+      "guaranteed_evidence_sets": [
+        ["ev_ep004_vip_ticket_trace"],
+        ["ev_ep004_signal_switch_log"]
+      ]
     },
     {
       "rule_id": "rule_ep004_why",
@@ -684,6 +758,33 @@
         "require_integrity": true
       },
       "guaranteed_evidence_sets": [["ev_ep004_diversion_contract"]]
+    },
+    {
+      "rule_id": "rule_ep004_fallen_hero_where",
+      "target_claim_id": "clm_ep004_fallen_hero_where",
+      "direction": "CONTRADICT",
+      "requirements": {
+        "required_scopes": ["LOCATION", "PRESENCE", "ROUTE", "ACTION"],
+        "minimum_confidence": 0.8,
+        "minimum_independent_sources": 2,
+        "require_integrity": true
+      },
+      "guaranteed_evidence_sets": [[
+        "ev_ep004_platform_manifest",
+        "ev_ep004_signal_switch_log"
+      ]]
+    },
+    {
+      "rule_id": "rule_ep004_fallen_hero_when",
+      "target_claim_id": "clm_ep004_fallen_hero_when",
+      "direction": "SUPPORT",
+      "requirements": {
+        "required_scopes": ["TIME", "SEQUENCE"],
+        "minimum_confidence": 0.8,
+        "minimum_independent_sources": 1,
+        "require_integrity": true
+      },
+      "guaranteed_evidence_sets": [["ev_ep004_signal_switch_log"]]
     }
   ],
   "encounters": [
@@ -735,22 +836,76 @@
           "is_terminal": true
         }
       ],
-      "modifiers": [],
+      "modifiers": [
+        {
+          "modifier_id": "mod_ep004_dwarf_double_distortion",
+          "trigger": "ON_DIRECT_CONTRADICTION",
+          "condition": null,
+          "effect": {
+            "type": "DISTORT_CLAIM_VIEW",
+            "target_selector": {
+              "scope": "VISIBLE",
+              "exclude_states": {
+                "epistemic": ["SUPPORTED", "REFUTED"],
+                "presentation": ["DISTORTED", "LOCKED"]
+              },
+              "count": 2,
+              "selection": "MOST_RECENT"
+            },
+            "duration_turns": 1
+          },
+          "counterplay": {
+            "allowed_intents": ["CLARIFY"],
+            "partner_skills": [],
+            "always_available": true
+          },
+          "activation_limit": 1,
+          "priority": 25
+        },
+        {
+          "modifier_id": "mod_ep004_dwarf_double_distortion_resolution",
+          "trigger": "ON_RESOLUTION",
+          "condition": {
+            "type": "CLAIM_EPISTEMIC",
+            "claim_id": "clm_ep004_who",
+            "epistemic": "REFUTED"
+          },
+          "effect": {
+            "type": "DISTORT_CLAIM_VIEW",
+            "target_selector": {
+              "scope": "VISIBLE",
+              "exclude_states": {
+                "epistemic": ["SUPPORTED", "REFUTED"],
+                "presentation": ["DISTORTED", "LOCKED"]
+              },
+              "count": 2,
+              "selection": "MOST_RECENT"
+            },
+            "duration_turns": 1
+          },
+          "counterplay": {
+            "allowed_intents": ["CLARIFY"],
+            "partner_skills": [],
+            "always_available": true
+          },
+          "activation_limit": 1,
+          "priority": 24
+        }
+      ],
       "objectives": {
         "required": [
           {
             "objective_id": "objective_ep004_dwarf_who",
             "type": "REFUTE_CLAIM",
             "claim_id": "clm_ep004_who"
-          }
-        ],
-        "optional": [
+          },
           {
             "objective_id": "objective_ep004_dwarf_when",
             "type": "REFUTE_CLAIM",
             "claim_id": "clm_ep004_when"
           }
         ],
+        "optional": [],
         "state_conditions": {
           "composure_min": 1,
           "composure_max": 33,
@@ -818,22 +973,39 @@
           "is_terminal": true
         }
       ],
-      "modifiers": [],
+      "modifiers": [
+        {
+          "modifier_id": "mod_ep004_cyclops_cp_suppression",
+          "trigger": "ON_ENCOUNTER_START",
+          "condition": null,
+          "effect": {
+            "type": "REDUCE_CP",
+            "resource": "commandPoints",
+            "delta": 2
+          },
+          "counterplay": {
+            "allowed_intents": ["SPECIAL", "RECOVER"],
+            "partner_skills": [],
+            "always_available": true
+          },
+          "activation_limit": 1,
+          "priority": 30
+        }
+      ],
       "objectives": {
         "required": [
           {
             "objective_id": "objective_ep004_cyclops_where",
             "type": "REFUTE_CLAIM",
             "claim_id": "clm_ep004_where"
-          }
-        ],
-        "optional": [
+          },
           {
             "objective_id": "objective_ep004_cyclops_what",
             "type": "REFUTE_CLAIM",
             "claim_id": "clm_ep004_what"
           }
         ],
+        "optional": [],
         "state_conditions": {
           "composure_min": 1,
           "composure_max": 36,
@@ -873,14 +1045,17 @@
             "clm_ep004_fallen_hero_who",
             "clm_ep004_fallen_hero_when",
             "clm_ep004_fallen_hero_where",
+            "clm_ep004_how"
+          ],
+          "shields": [{ "claim_id": "clm_ep004_how", "durability": 3 }]
+        },
+        {
+          "round_id": "round_ep004_fallen_hero_02",
+          "statement_claims": [
             "clm_ep004_fallen_hero_what",
-            "clm_ep004_how",
             "clm_ep004_why"
           ],
-          "shields": [
-            { "claim_id": "clm_ep004_how", "durability": 3 },
-            { "claim_id": "clm_ep004_why", "durability": 2 }
-          ]
+          "shields": [{ "claim_id": "clm_ep004_why", "durability": 2 }]
         }
       ],
       "flow_nodes": [
@@ -891,8 +1066,8 @@
             "clm_ep004_fallen_hero_who",
             "clm_ep004_fallen_hero_when",
             "clm_ep004_fallen_hero_where",
-            "clm_ep004_fallen_hero_what",
             "clm_ep004_how",
+            "clm_ep004_fallen_hero_what",
             "clm_ep004_why"
           ],
           "revise_claim_ids": [],
@@ -901,16 +1076,70 @@
           "deactivate_modifiers": [],
           "reaction_key": "reaction.ep004.fallen_hero.start",
           "resource_delta": {},
+          "is_terminal": false
+        },
+        {
+          "node_id": "node_ep004_fallen_hero_last_stand",
+          "enter_conditions": [
+            {
+              "type": "CLAIM_EPISTEMIC",
+              "claim_id": "clm_ep004_how",
+              "state": "REFUTED"
+            }
+          ],
+          "reveal_claim_ids": [
+            "clm_ep004_fallen_hero_what",
+            "clm_ep004_why"
+          ],
+          "revise_claim_ids": ["clm_ep004_how"],
+          "open_route_ids": [],
+          "activate_modifiers": [],
+          "deactivate_modifiers": [],
+          "reaction_key": "reaction.ep004.fallen_hero.start",
+          "resource_delta": {},
           "is_terminal": true
         }
       ],
-      "modifiers": [],
+      "modifiers": [
+        {
+          "modifier_id": "mod_ep004_fallen_hero_evidence_seal",
+          "trigger": "ON_TURN_START",
+          "condition": null,
+          "effect": {
+            "type": "SEAL_EVIDENCE",
+            "target_selector": {
+              "scope": "OWNED",
+              "ids": ["ev_ep004_vip_ticket_trace"],
+              "count": 1,
+              "selection": "DETERMINISTIC_BY_INDEX"
+            },
+            "duration_turns": 2
+          },
+          "counterplay": {
+            "allowed_intents": ["FORENSIC", "CONFIRM", "CROSS_CHECK"],
+            "partner_skills": [],
+            "always_available": true
+          },
+          "activation_limit": 1,
+          "priority": 30
+        }
+      ],
       "objectives": {
         "required": [
           {
             "objective_id": "objective_ep004_fallen_hero_how",
             "type": "REFUTE_CLAIM",
             "claim_id": "clm_ep004_how"
+          },
+          {
+            "objective_id": "objective_ep004_fallen_hero_confirm_when",
+            "type": "CONFIRM_CLAIM",
+            "claim_id": "clm_ep004_fallen_hero_when"
+          },
+          {
+            "objective_id": "objective_ep004_fallen_hero_where",
+            "type": "REFUTE_CLAIM",
+            "claim_id": "clm_ep004_fallen_hero_where"
           }
         ],
         "optional": [
@@ -992,7 +1221,51 @@
       ]
     }
   ],
-  "flag_hooks": [],
+  "flag_hooks": [
+    {
+      "flag_id": "F-12",
+      "description_key": "flag.final_route_ready",
+      "default_value": false,
+      "set_by": [
+        {
+          "event": "event_ep004_ticket_trade",
+          "choice": "choice_ep004_question_broker",
+          "value": true
+        }
+      ],
+      "consumed_by": [
+        {
+          "encounter": "enc_ep004_fallen_hero",
+          "apply": {
+            "type": "MODIFY_SHIELDS",
+            "delta": -1
+          }
+        }
+      ]
+    },
+    {
+      "flag_id": "F-13",
+      "description_key": "flag.true_ending",
+      "default_value": false,
+      "set_by": [
+        {
+          "encounter": "enc_ep004_fallen_hero",
+          "outcome": "BEST_RESOLUTION",
+          "value": true
+        }
+      ],
+      "consumed_by": [
+        {
+          "encounter": "enc_ep004_fallen_hero",
+          "apply": {
+            "type": "ADJUST_RESOURCE",
+            "resource": "trust",
+            "delta": 1
+          }
+        }
+      ]
+    }
+  ],
   "dialogue": {
     "speaker_profiles": {
       "ent_ep004_dwarf": {

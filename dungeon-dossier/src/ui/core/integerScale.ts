@@ -14,7 +14,8 @@ export function calculateIntegerViewport(containerWidth: number, containerHeight
   const scale = Math.floor(
     Math.min(containerWidth / INTERNAL_WIDTH, containerHeight / INTERNAL_HEIGHT),
   );
-  const renderScale = Math.max(1, scale);
+  // Default to 2x (1280x800) when container is unconstrained or >= 1280x800
+  const renderScale = Math.max(2, scale);
   const width = INTERNAL_WIDTH * renderScale;
   const height = INTERNAL_HEIGHT * renderScale;
 

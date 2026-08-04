@@ -349,6 +349,46 @@ function validateCommonReferences(
         });
       });
     }
+    if (file.kind === 'case' && definitions.flagIds.size > 0) {
+      catalogueEntries(root, 'flag_hooks').forEach((entry, flagIndex) => {
+        const flag = asObject(entry);
+        if (!flag) return;
+        const flagId = flag.flag_id;
+        if (typeof flagId === 'string' && !definitions.flagIds.has(flagId)) {
+          problems.push(
+            referenceProblem(file.relativePath, `flag_hooks.${flagIndex}.flag_id`, flagId),
+          );
+        }
+        const setBy: unknown[] = Array.isArray(flag.set_by)
+          ? (flag.set_by as unknown[])
+          : [];
+        const consumedBy: unknown[] = Array.isArray(flag.consumed_by)
+          ? (flag.consumed_by as unknown[])
+          : [];
+        const hooks: unknown[] = [...setBy, ...consumedBy];
+        hooks.forEach((hook, hookIndex) => {
+          const object = asObject(hook);
+          if (!object) return;
+          const references = [
+            ['encounter', definitions.encounterIds],
+            ['event', definitions.eventIds],
+            ['choice', definitions.choiceIds],
+          ] as const;
+          for (const [key, known] of references) {
+            const id = object[key];
+            if (typeof id === 'string' && !known.has(id)) {
+              problems.push(
+                referenceProblem(
+                  file.relativePath,
+                  `flag_hooks.${flagIndex}.hooks.${hookIndex}.${key}`,
+                  id,
+                ),
+              );
+            }
+          }
+        });
+      });
+    }
     if (file.kind === 'balance') {
       const byEncounter = asObject(asObject(root.overrides)?.byEncounter);
       if (byEncounter) {
