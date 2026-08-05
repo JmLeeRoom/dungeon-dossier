@@ -46,15 +46,22 @@ export interface PublicProjectionInput {
 /** Whitelist mapper: every public field is explicitly added here. */
 export function toPublicDTO(input: PublicProjectionInput): PublicDTO {
   return {
-    statement: input.knowledge.claims.map((claim) => ({
-      claimId: claim.claimId,
-      speakerId: claim.speakerId,
-      facet: claim.facet,
-      text: claim.canonicalMeaning,
-      epistemic: claim.epistemic,
-      presentation: claim.presentation,
-      resistance: claim.resistance,
-    })),
+    statement: input.knowledge.claims
+      // I-1 couples UNSTATED with HIDDEN. Check both at the final boundary so
+      // even malformed injected knowledge fails closed instead of leaking text.
+      .filter(
+        (claim) =>
+          claim.presentation !== 'HIDDEN' && claim.commitment !== 'UNSTATED',
+      )
+      .map((claim) => ({
+        claimId: claim.claimId,
+        speakerId: claim.speakerId,
+        facet: claim.facet,
+        text: claim.canonicalMeaning,
+        epistemic: claim.epistemic,
+        presentation: claim.presentation,
+        resistance: claim.resistance,
+      })),
     evidence: input.knowledge.evidence
       .filter((item) => item.acquired)
       .map((item) => ({

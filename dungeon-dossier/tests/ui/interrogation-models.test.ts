@@ -11,7 +11,10 @@ import {
   cardNeedsEvidence,
   type InterrogationCardView,
 } from '../../src/ui/screens/interrogation/model';
-import { layoutCardFan } from '../../src/ui/widgets/cardFan';
+import {
+  interrogationCardAttachments,
+  interrogationCardLayerAssetKey,
+} from '../../src/ui/screens/interrogation/createInterrogationScreen';
 import { buildEvidenceTraySlots } from '../../src/ui/widgets/evidenceTray';
 import {
   buildGaugeDisplayModel,
@@ -185,6 +188,16 @@ describe('HUD gauge display models', () => {
       filledCells: 0,
       cellCount: 1,
     });
+    expect(buildGaugeDisplayModel(42, 120, {
+      sweetSpotUnlocked: true,
+      sweetSpotMin: 18,
+      sweetSpotMax: 42,
+    }).sweetSpot).toEqual({ fromRatio: 0.15, toRatio: 0.35 });
+    expect(buildGaugeDisplayModel(42, 100, {
+      sweetSpotUnlocked: true,
+      sweetSpotMin: 60,
+      sweetSpotMax: 20,
+    }).sweetSpot).toEqual({ fromRatio: 0.2, toRatio: 0.6 });
   });
 
   it('accumulates at most five coercion warning slips at 20% steps', () => {
@@ -249,13 +262,30 @@ describe('typewriter stream', () => {
 });
 
 describe('card, evidence, and submit selection models', () => {
-  it('lays cards out as a centred deterministic fan', () => {
-    expect(layoutCardFan(3)).toEqual([
-      { x: 0, y: 4, rotation: -0.035 },
-      { x: 54, y: 0, rotation: 0 },
-      { x: 108, y: 4, rotation: 0.035 },
-    ]);
-    expect(layoutCardFan(-1)).toEqual([]);
+  it('maps authored card parts and selected evidence to runtime asset layers', () => {
+    const card: InterrogationCardView = {
+      ...CARDS[1]!,
+      attachments: { stampId: 'RED', postId: 'HOW', evidenceIds: ['ev1'] },
+    };
+    expect(interrogationCardAttachments(card, ['ev1', 'ev2'], true)).toEqual({
+      stampId: 'RED',
+      postId: 'HOW',
+      evidenceIds: ['ev1', 'ev2'],
+    });
+    expect(interrogationCardAttachments(card, ['ev2'], false).evidenceIds).toEqual(['ev1']);
+    expect(interrogationCardLayerAssetKey(card, 'base', undefined, EVIDENCE)).toBe(
+      'card/기본/템플릿',
+    );
+    expect(interrogationCardLayerAssetKey(card, 'illust', undefined, EVIDENCE)).toBe(
+      'card/모순/일러',
+    );
+    expect(interrogationCardLayerAssetKey(card, 'evidence', 'ev2', EVIDENCE)).toBe(
+      'ev/사건/증거2',
+    );
+    expect(interrogationCardLayerAssetKey(card, 'stamp', 'RED', EVIDENCE)).toBeUndefined();
+    expect(interrogationCardLayerAssetKey(card, 'post', 'card/clip/기본', EVIDENCE)).toBe(
+      'card/clip/기본',
+    );
   });
 
   it('fills three evidence slots in selected-id order and ignores unknown ids', () => {

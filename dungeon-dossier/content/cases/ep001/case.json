@@ -4,6 +4,7 @@
   "case_id": "case_ep001_red_ledger",
   "metadata": {
     "title": "붉은 장부와 사라진 보급품",
+    "background_asset_key": "배경/심문실/세피아",
     "act": 1,
     "estimated_turns": 27,
     "content_version": "1.0"
@@ -14,21 +15,33 @@
       "type": "PERSON",
       "role": "SUSPECT",
       "display_name_key": "entity.ep001.goblin.name",
-      "attributes": { "archetype": "GOBLIN" }
+      "attributes": {
+        "archetype": "GOBLIN",
+        "display_name": "고블린",
+        "portrait_asset_name": "고블린"
+      }
     },
     {
       "entity_id": "ent_ep001_orc",
       "type": "PERSON",
       "role": "SUSPECT",
       "display_name_key": "entity.ep001.orc.name",
-      "attributes": { "archetype": "ORC" }
+      "attributes": {
+        "archetype": "ORC",
+        "display_name": "오크",
+        "portrait_asset_name": "오크"
+      }
     },
     {
       "entity_id": "ent_ep001_succubus",
       "type": "PERSON",
       "role": "SUSPECT",
       "display_name_key": "entity.ep001.succubus.name",
-      "attributes": { "archetype": "SUCCUBUS" }
+      "attributes": {
+        "archetype": "SUCCUBUS",
+        "display_name": "서큐버스",
+        "portrait_asset_name": "서큐버스"
+      }
     },
     {
       "entity_id": "ent_ep001_archive",

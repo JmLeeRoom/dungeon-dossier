@@ -8,6 +8,7 @@ import {
   SIMULATION_CATALOG,
   SIMULATION_ENCOUNTER_MAP,
   SIMULATION_OUTCOMES,
+  getSimulationEncounter,
   simulateRoute,
   simulateRouteMatrix,
 } from '../../tools/simulate/routeSimulator';
@@ -89,7 +90,7 @@ describe('nightly 9 x 3 route matrix', () => {
 
   it('derives resources, objectives, cards, and proof paths from parsed case data', () => {
     for (const archetype of SIMULATION_ARCHETYPES) {
-      const encounter = SIMULATION_CATALOG[archetype];
+      const encounter = getSimulationEncounter(archetype);
       expect(
         EXPECTED_AUTHORED_ENCOUNTERS.map((candidate) =>
           encounterCoordinate(candidate.caseId, candidate.encounterId),

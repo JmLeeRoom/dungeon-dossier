@@ -646,8 +646,9 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
         }
       });
     };
+    const screenModel = activeModel();
     const controller = createInterrogationScreen(
-      activeModel(),
+      screenModel,
       {
         onSelectionChange(selection): void {
           if (outcomeTransitionPending) return;
@@ -791,6 +792,23 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
             );
           }
         },
+        ...(screenModel.partnerSkillAvailable
+          ? {
+              onUsePartner(): void {
+                if (outcomeTransitionPending) return;
+                try {
+                  active.usePartnerSkill();
+                  mountInterrogation();
+                } catch (error) {
+                  controller.useFallbackStatement(
+                    error instanceof Error
+                      ? error.message
+                      : 'Partner skill could not be used.',
+                  );
+                }
+              },
+            }
+          : {}),
         onKeystroke(): void {
           audio.play('typewriter');
         },
@@ -943,9 +961,10 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
           interrogation?.useFallbackStatement(text);
         },
         applyBalance(nextBalance: BalanceDefinition): void {
-          balanceRepository.applyInstantly(nextBalance);
+          encounterSession?.applyBalance(nextBalance);
           if (encounterSession !== undefined) {
             resourceOverrides.stress = Math.min(activeModel().stress, nextBalance.stress.max);
+            if (dialogueService !== undefined) mountInterrogation();
           }
         },
       },

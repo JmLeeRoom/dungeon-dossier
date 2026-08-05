@@ -41,19 +41,26 @@
 
   .layout { display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap; }
 
-  /* Left: 640x400 Scaled Game Canvas Stage */
+  /* Left: 640x400 internal grid rendered at 1280x800 */
   .stage-container { flex: none; display: flex; flex-direction: column; gap: 10px; }
   .stage-viewport {
     position: relative;
-    width: 640px;
-    height: 400px;
+    width: 1280px;
+    height: 800px;
+    margin: 0 auto;
     background: #080604;
-    border: 3px solid #000;
-    box-shadow: 0 0 0 1px var(--panel-border), 0 10px 30px rgba(0,0,0,0.8);
+    box-shadow: 0 0 0 2px var(--panel-border), 0 10px 40px rgba(0,0,0,0.85);
     overflow: hidden;
     image-rendering: pixelated;
   }
-  .stage-zoom { transform-origin: top left; }
+  .stage-zoom {
+    position: relative;
+    width: 640px;
+    height: 400px;
+    image-rendering: pixelated;
+    transform: scale(2);
+    transform-origin: top left;
+  }
 
   /* Drag & Drop Asset Slots */
   .asset-slot {
@@ -177,14 +184,15 @@
 </div>
 
 <div class="layout">
-  <!-- Left: 640x400 Game Viewport Stage -->
+  <!-- Left: 640x400 internal coordinates rendered at 1280x800 -->
   <div class="stage-container">
     <div style="display: flex; justify-content: space-between; align-items: center; color: var(--gold-dim); font-size: 11px;">
-      <span>🎮 캔버스 스테이지 (640×400 도트 해상도)</span>
+      <span>🎮 캔버스 스테이지 (640×400 내부 좌표 · 1280×800 HD 표시)</span>
       <span>💡 PNG 이미지를 슬롯에 드롭하세요!</span>
     </div>
     
     <div class="stage-viewport">
+      <div class="stage-zoom">
       <!-- Drag & Drop Asset Slots -->
       <div id="slot-bg" class="asset-slot" title="배경 슬롯 (640x400)">배경 (bg_취조실.png)</div>
       <div id="slot-portrait" class="asset-slot" title="용의자 슬롯 (196x216)">용의자 베이스 (portrait_base.png)</div>
@@ -241,6 +249,7 @@
           <div>[모순] 모순 지적</div>
           <div style="color: #ffd0d0">CP 2소비 / Dmg 18</div>
         </div>
+      </div>
       </div>
     </div>
 

@@ -81,6 +81,12 @@ describe('production game run state adapters', () => {
     expect(metrics.requiredClaimResolutionRatio).toBe(0);
     expect(metrics.optionalObjectiveRatio).toBe(0);
     expect(metrics.coercion).toBe(0);
+    expect(metrics.sweetSpotFinish).toBe(false);
+
+    const tuned = structuredClone(balance);
+    tuned.sweetSpot = { min: 90, max: 100 };
+    session.applyBalance(tuned);
+    expect(encounterGradeMetrics(session).sweetSpotFinish).toBe(true);
   });
 
   it('uses boolean F-13 for true, a failed terminal outcome for bad, and normal otherwise', async () => {

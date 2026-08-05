@@ -21,6 +21,9 @@
         "title_key": {
           "$ref": "#/$defs/__schema3"
         },
+        "background_asset_key": {
+          "$ref": "#/$defs/__schema0"
+        },
         "act": {
           "$ref": "#/$defs/__schema4"
         },

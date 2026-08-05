@@ -17,8 +17,6 @@ import {
   assertResourceInvariants,
   beginEncounterTurn,
   createResourceState,
-  ENCOUNTER_COMPOSURE_MAX,
-  getEncounterComposureMax,
   InsufficientCommandPointsError,
   processEncounterTurnStart,
   spendCommandPoints,
@@ -120,21 +118,6 @@ function outcomeInput(
 }
 
 describe('ResourceSystem', () => {
-  it('publishes all nine canonical composure maxima', () => {
-    expect(ENCOUNTER_COMPOSURE_MAX).toEqual({
-      SLIME: 60,
-      HARPY: 70,
-      MINOTAUR: 120,
-      GOBLIN: 90,
-      ORC: 100,
-      SUCCUBUS: 140,
-      DWARF: 110,
-      CYCLOPS: 120,
-      FALLEN_HERO: 180,
-    });
-    expect(getEncounterComposureMax('FALLEN_HERO')).toBe(180);
-  });
-
   it('creates a valid state and saturates resource changes at hard caps', () => {
     const initial = createResourceState(LIMITS, {
       composure: 999,
@@ -178,19 +161,15 @@ describe('ResourceSystem', () => {
     expect(next.turn).toBe(5);
   });
 
-  it('caps Cyclops at 2 CP until witness protection restores the normal 3', () => {
+  it('applies a data-injected CP restore cap without knowing encounter identity', () => {
     const state = resources({ commandPoints: 0, turn: 0 });
-    const beforeProtection = beginEncounterTurn(state, LIMITS, {
-      encounterArchetype: 'CYCLOPS',
-      witnessProtectionRestored: false,
+    const capped = beginEncounterTurn(state, LIMITS, {
+      commandPointRestoreCap: 2,
     });
-    const afterProtection = beginEncounterTurn(state, LIMITS, {
-      encounterArchetype: 'CYCLOPS',
-      witnessProtectionRestored: true,
-    });
+    const uncapped = beginEncounterTurn(state, LIMITS);
 
-    expect(beforeProtection.commandPoints).toBe(2);
-    expect(afterProtection.commandPoints).toBe(3);
+    expect(capped.commandPoints).toBe(2);
+    expect(uncapped.commandPoints).toBe(3);
   });
 
   it('runs draw, status ticks, and cooldown ticks in the pure turn-start operation', () => {

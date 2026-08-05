@@ -77,4 +77,25 @@ describe('layer dependency sentries', () => {
 
     expect(violations, `AI reached truth-family APIs:\n${violations.join('\n')}`).toEqual([]);
   });
+
+  it('keeps DTO contracts independent instead of re-exporting engine APIs', async () => {
+    const violations: string[] = [];
+    for (const file of await sourceFiles(path.join(SOURCE_ROOT, 'dto'))) {
+      const sourceFile = parsed(file, await readFile(file, 'utf8'));
+      for (const statement of sourceFile.statements) {
+        if (!ts.isExportDeclaration(statement)) continue;
+        const specifier = statement.moduleSpecifier;
+        if (specifier === undefined || !ts.isStringLiteral(specifier)) continue;
+        const target = resolvedImport(file, specifier.text);
+        if (target?.startsWith(path.join(SOURCE_ROOT, 'engine')) === true) {
+          violations.push(`${display(file)} -> re-exported ${specifier.text}`);
+        }
+      }
+    }
+
+    expect(
+      violations,
+      `DTO modules re-exported engine APIs:\n${violations.join('\n')}`,
+    ).toEqual([]);
+  });
 });

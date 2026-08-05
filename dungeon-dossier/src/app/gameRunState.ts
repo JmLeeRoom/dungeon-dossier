@@ -78,6 +78,7 @@ export function encounterGradeMetrics(
     throw new Error(`Missing encounter definition ${session.encounterId}.`);
   }
   const conditions = encounter.objectives.state_conditions;
+  const sweetSpot = session.coordinator.sweetSpot;
   const acquiredEvidence = Object.values(snapshot.evidence).filter(
     (evidence) => evidence.acquired,
   );
@@ -85,8 +86,8 @@ export function encounterGradeMetrics(
     requiredClaimResolutionRatio: completionRatio(snapshot.objectives.required),
     optionalObjectiveRatio: completionRatio(snapshot.objectives.optional),
     sweetSpotFinish:
-      snapshot.resources.composure >= conditions.composure_min &&
-      snapshot.resources.composure <= conditions.composure_max &&
+      snapshot.resources.composure >= sweetSpot.composureMin &&
+      snapshot.resources.composure <= sweetSpot.composureMax &&
       (conditions.coercion_max === undefined ||
         snapshot.resources.coercion <= conditions.coercion_max),
     originalsPreserved: acquiredEvidence.every(

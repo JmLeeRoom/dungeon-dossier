@@ -1,15 +1,38 @@
 import { describe, expect, it } from 'vitest';
 import { buildAssetRegistry, parseAssetFilename } from '../../src/ui/core/assetRegistry';
-import { calculateIntegerViewport } from '../../src/ui/core/integerScale';
+import {
+  calculateIntegerViewport,
+  DEFAULT_TARGET_SCALE,
+  HD_HEIGHT,
+  HD_WIDTH,
+  INTERNAL_HEIGHT,
+  INTERNAL_WIDTH,
+} from '../../src/ui/core/integerScale';
 
 describe('presentation foundation', () => {
-  it('uses an integer scale and letterboxes the 640x400 stage', () => {
-    expect(calculateIntegerViewport(1280, 900)).toEqual({
+  it('keeps the 640x400 layout grid and exposes the 1280x800 HD target', () => {
+    expect({
+      internalWidth: INTERNAL_WIDTH,
+      internalHeight: INTERNAL_HEIGHT,
+      hdWidth: HD_WIDTH,
+      hdHeight: HD_HEIGHT,
+      targetScale: DEFAULT_TARGET_SCALE,
+    }).toEqual({
+      internalWidth: 640,
+      internalHeight: 400,
+      hdWidth: 1280,
+      hdHeight: 800,
+      targetScale: 2,
+    });
+  });
+
+  it('uses a 2x integer scale for the 1280x800 HD viewport', () => {
+    expect(calculateIntegerViewport(1280, 800)).toEqual({
       scale: 2,
       width: 1280,
       height: 800,
       offsetX: 0,
-      offsetY: 50,
+      offsetY: 0,
       fits: true,
     });
   });
@@ -28,4 +51,3 @@ describe('presentation foundation', () => {
     expect(registry.get('아이콘/평정심/기본')?.url).toBe('/icon.png');
   });
 });
-

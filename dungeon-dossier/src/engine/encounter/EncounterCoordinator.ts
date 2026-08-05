@@ -138,6 +138,11 @@ export interface SubmissionResult {
   readonly missingScopes: readonly ProofScope[];
 }
 
+export interface PartnerCooldownSnapshot {
+  readonly state: 'base' | 'used';
+  readonly cooldownTurns: number;
+}
+
 function unique<T>(values: readonly T[]): readonly T[] {
   return values.filter((value, index) => values.indexOf(value) === index);
 }
@@ -233,6 +238,38 @@ function targetDirection(intent: ActionIntent): 'SUPPORT' | 'CONTRADICT' {
   return intent === 'CONFIRM' ? 'SUPPORT' : 'CONTRADICT';
 }
 
+function encounterResourceLimits(
+  encounter: EncounterDefinition,
+  encounterId: ContentId,
+  balance: BalanceDefinition,
+): EncounterResourceLimits {
+  const override = balance.overrides.byEncounter[encounterId];
+  return {
+    composureMax: override?.composureMax ?? encounter.resources.composure_max,
+    commandPointMax: override?.cpMax ?? encounter.resources.cp_max,
+    commandPointsPerTurn: override?.cpPerTurn ?? encounter.resources.cp_per_turn,
+    coercionLimit: override?.coercionLimit ?? encounter.resources.coercion_limit,
+    stressMax: balance.stress.max,
+    trustMax: balance.trust.max,
+  };
+}
+
+export interface EncounterSweetSpot {
+  readonly composureMin: number;
+  readonly composureMax: number;
+}
+
+/** `balance.sweetSpot` is authored as a percentage of the live composure cap. */
+export function encounterSweetSpot(
+  balance: BalanceDefinition,
+  limits: Pick<EncounterResourceLimits, 'composureMax'>,
+): EncounterSweetSpot {
+  return {
+    composureMin: limits.composureMax * balance.sweetSpot.min / 100,
+    composureMax: limits.composureMax * balance.sweetSpot.max / 100,
+  };
+}
+
 type CoordinatorModifierState = ModifierRuntimeState &
   Readonly<{
     claims: Readonly<Record<string, EncounterClaimRuntime>>;
@@ -251,8 +288,8 @@ export class EncounterCoordinator {
   readonly #definition: CaseDefinition;
   readonly #encounter: EncounterDefinition;
   readonly #cardDefinitions: readonly CardDefinition[];
-  readonly #balance: BalanceDefinition;
-  readonly #limits: EncounterResourceLimits;
+  #balance: BalanceDefinition;
+  #limits: EncounterResourceLimits;
   readonly #machine: EncounterStateMachine;
   #state: EncounterRuntimeState;
 
@@ -284,18 +321,7 @@ export class EncounterCoordinator {
       throw new Error('Encounter cards must have unique definitions.');
     }
 
-    const override = deps.balance.overrides.byEncounter[deps.encounterId];
-    const limits: EncounterResourceLimits = {
-      composureMax:
-        override?.composureMax ?? encounter.resources.composure_max,
-      commandPointMax: override?.cpMax ?? encounter.resources.cp_max,
-      commandPointsPerTurn:
-        override?.cpPerTurn ?? encounter.resources.cp_per_turn,
-      coercionLimit:
-        override?.coercionLimit ?? encounter.resources.coercion_limit,
-      stressMax: deps.balance.stress.max,
-      trustMax: deps.balance.trust.max,
-    };
+    const limits = encounterResourceLimits(encounter, deps.encounterId, deps.balance);
     const initialDeckCardIds = deps.initialDeckCardIds ?? cardCopies(deps.cards);
     const unknownDeckCardId = initialDeckCardIds.find(
       (cardId) => !cardIds.includes(cardId),
@@ -351,7 +377,8 @@ export class EncounterCoordinator {
         ),
         modifierActivations: {},
         durations: {},
-        cooldowns: { ...deps.balance.partner.cooldowns },
+        // balance.partner.cooldowns stores durations, not already-active timers.
+        cooldowns: {},
         actionLocks: {},
         actionCostDeltas: {},
         revealedIds: encounter.rounds
@@ -386,6 +413,69 @@ export class EncounterCoordinator {
 
   get snapshot(): EncounterRuntimeState {
     return this.#state;
+  }
+
+  /** Effective limits after case values and live balance overrides are merged. */
+  get resourceLimits(): EncounterResourceLimits {
+    return { ...this.#limits };
+  }
+
+  get sweetSpot(): EncounterSweetSpot {
+    return encounterSweetSpot(this.#balance, this.#limits);
+  }
+
+  partnerCooldown(skillId?: ContentId): PartnerCooldownSnapshot {
+    const selectedId = skillId ?? Object.keys(this.#balance.partner.cooldowns)[0];
+    const cooldownTurns = selectedId === undefined
+      ? 0
+      : (this.#state.cooldowns[selectedId] ?? 0);
+    return cooldownTurns > 0
+      ? { state: 'used', cooldownTurns }
+      : { state: 'base', cooldownTurns: 0 };
+  }
+
+  /** Starts a configured, content-keyed partner cooldown if that skill is ready. */
+  usePartnerSkill(skillId?: ContentId): PartnerCooldownSnapshot {
+    const selectedId = skillId ?? Object.keys(this.#balance.partner.cooldowns)[0];
+    if (selectedId === undefined) {
+      throw new Error('No partner skill cooldown is configured.');
+    }
+    const duration = this.#balance.partner.cooldowns[selectedId];
+    if (duration === undefined) {
+      throw new Error(`Unknown partner skill: ${selectedId}.`);
+    }
+    const current = this.partnerCooldown(selectedId);
+    if (current.state === 'used' || duration === 0) return current;
+    this.#state = {
+      ...this.#state,
+      cooldowns: { ...this.#state.cooldowns, [selectedId]: duration },
+    };
+    return this.partnerCooldown(selectedId);
+  }
+
+  /**
+   * Replaces already-validated tuning data without restarting the encounter.
+   * Existing resources are retained and only clamped if a newly lowered hard
+   * cap would otherwise make the runtime state invalid.
+   */
+  applyBalance(balance: BalanceDefinition): void {
+    const limits = encounterResourceLimits(this.#encounter, this.#encounter.encounter_id, balance);
+    const resources = clampResourceState(this.#state.resources, limits);
+    const cooldowns = Object.fromEntries(
+      Object.entries(this.#state.cooldowns).flatMap(([skillId, remaining]) => {
+        const configured = balance.partner.cooldowns[skillId];
+        if (configured === undefined || configured <= 0) return [];
+        return [[skillId, Math.min(remaining, configured)] as const];
+      }),
+    );
+    this.#balance = balance;
+    this.#limits = limits;
+    this.#state = {
+      ...this.#state,
+      resources,
+      cooldowns,
+    };
+    this.#refreshObjectives();
   }
 
   /** Safe knowledge projection consumed by the canonical DTO whitelist mapper. */
@@ -1107,6 +1197,7 @@ export class EncounterCoordinator {
   #evaluateCurrentOutcome(
     secureStatementRequested: boolean,
   ): OutcomeEvaluation {
+    const sweetSpot = this.sweetSpot;
     return evaluateOutcome({
       resources: this.#state.resources,
       objectives: this.#state.objectives,
@@ -1114,8 +1205,8 @@ export class EncounterCoordinator {
       turnLimit: this.#definition.metadata.estimated_turns,
       hasSolvablePath: this.#hasSolvablePath(),
       bestConditions: {
-        composureMin: this.#encounter.objectives.state_conditions.composure_min,
-        composureMax: this.#encounter.objectives.state_conditions.composure_max,
+        composureMin: sweetSpot.composureMin,
+        composureMax: sweetSpot.composureMax,
         ...(this.#encounter.objectives.state_conditions.coercion_max === undefined
           ? {}
           : {

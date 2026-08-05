@@ -1,5 +1,8 @@
 export const INTERNAL_WIDTH = 640;
 export const INTERNAL_HEIGHT = 400;
+export const HD_WIDTH = 1280;
+export const HD_HEIGHT = 800;
+export const DEFAULT_TARGET_SCALE = 2;
 
 export interface IntegerViewport {
   readonly scale: number;
@@ -11,11 +14,12 @@ export interface IntegerViewport {
 }
 
 export function calculateIntegerViewport(containerWidth: number, containerHeight: number): IntegerViewport {
-  const scale = Math.floor(
+  const availableScale = Math.floor(
     Math.min(containerWidth / INTERNAL_WIDTH, containerHeight / INTERNAL_HEIGHT),
   );
-  // Default to 2x (1280x800) when container is unconstrained or >= 1280x800
-  const renderScale = Math.max(2, scale);
+  const renderScale = availableScale >= DEFAULT_TARGET_SCALE
+    ? DEFAULT_TARGET_SCALE
+    : Math.max(1, availableScale);
   const width = INTERNAL_WIDTH * renderScale;
   const height = INTERNAL_HEIGHT * renderScale;
 
@@ -25,7 +29,6 @@ export function calculateIntegerViewport(containerWidth: number, containerHeight
     height,
     offsetX: Math.floor((containerWidth - width) / 2),
     offsetY: Math.floor((containerHeight - height) / 2),
-    fits: scale >= 1,
+    fits: availableScale >= renderScale,
   };
 }
-

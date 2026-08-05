@@ -79,8 +79,8 @@ export const BalanceSchema = z
       byEncounter: z.record(ContentIdSchema, EncounterBalanceOverrideSchema),
     }),
     sweetSpot: z.strictObject({
-      min: NonNegativeBalanceValueSchema,
-      max: NonNegativeBalanceValueSchema,
+      min: z.number().min(0).max(100).finite(),
+      max: z.number().min(0).max(100).finite(),
     }),
   })
   .superRefine((balance, context) => {

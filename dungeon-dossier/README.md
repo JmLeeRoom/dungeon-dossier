@@ -63,7 +63,7 @@ PNG 파일명은 `카테고리_이름_상태.png` 규칙을 따릅니다. 색 �
 ## Phase 2 심문 UI와 애셋 워크벤치
 
 - 게임: 개발 서버의 `/`에서 640×400 PixiJS 심문 화면을 실행합니다. 마우스로 카드→태그→조서 증거→제출 흐름을 완료할 수 있고, 숫자 키와 Space는 보조 입력입니다.
-- 워크벤치: `/workbench/`에서 13개 PNG 슬롯, `localStorage` 복원, Tweak Mode, 포트레이트 파츠 JSON 내보내기를 사용할 수 있습니다. 이 페이지는 게임 런타임에 import되지 않는 별도 Vite 진입점입니다.
+- 워크벤치: `/workbench/`에서 16개 PNG 슬롯, `localStorage` 복원, Tweak Mode, 포트레이트 파츠 JSON 내보내기를 사용할 수 있습니다. 이 페이지는 게임 런타임에 import되지 않는 별도 Vite 진입점입니다.
 - 워크벤치에서 내려받은 PNG는 `assets/`로 옮겨야 게임 레지스트리에 포함됩니다. 런타임 업로드 경로와 수기 매니페스트는 없습니다.
 - 한글 도트 글꼴은 [Galmuri11](https://github.com/quiple/galmuri)을 로컬 번들로 사용합니다. 라이선스는 SIL Open Font License 1.1이며 원문은 `assets/fonts/OFL-Galmuri.md`에 포함했습니다.
 

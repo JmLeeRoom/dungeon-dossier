@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   SIMULATION_ARCHETYPES,
-  SIMULATION_CATALOG,
+  getSimulationEncounter,
   simulateBestRoute,
   type SimulationAction,
 } from '../../tools/simulate/routeSimulator';
@@ -13,7 +13,7 @@ describe('BEST reachability smoke policies', () => {
   it.each(SIMULATION_ARCHETYPES)(
     '%s completes its authored path through EncounterCoordinator and explicitly secures the statement',
     (archetype) => {
-      const encounter = SIMULATION_CATALOG[archetype];
+      const encounter = getSimulationEncounter(archetype);
       const startedAt = performance.now();
       const result = simulateBestRoute(archetype, { seed: 2_026 });
       const elapsedMs = performance.now() - startedAt;

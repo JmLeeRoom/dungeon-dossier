@@ -1,5 +1,7 @@
 import {
+  parsePngHeaderDimensions,
   validatePngDescriptor,
+  validateSlotImageDimensions,
   type SlotImageState,
 } from './model.mts';
 
@@ -38,6 +40,11 @@ export function readPngAsDataUrl(file: File): Promise<string> {
   });
 }
 
+async function readPngDimensions(file: File): Promise<Readonly<{ width: number; height: number }>> {
+  const header = new Uint8Array(await file.slice(0, 24).arrayBuffer());
+  return parsePngHeaderDimensions(header);
+}
+
 const template = document.createElement('template');
 template.innerHTML = `
   <style>
@@ -45,26 +52,29 @@ template.innerHTML = `
       display: block;
       position: absolute;
       box-sizing: border-box;
-      border: 1px dashed rgba(242, 214, 142, 0.74);
+      border: 0;
       background:
         linear-gradient(135deg, rgba(242, 214, 142, 0.10) 25%, transparent 25%) 0 0 / 6px 6px,
         rgba(14, 12, 10, 0.48);
       color: #f2d68e;
       cursor: pointer;
       image-rendering: pixelated;
+      outline: 1px dashed rgba(242, 214, 142, 0.74);
+      outline-offset: -1px;
       outline: none;
       overflow: hidden;
     }
 
     :host(:hover),
     :host(:focus-visible) {
-      border-style: solid;
-      border-color: #ffe4a1;
+      outline-color: #ffe4a1;
+      outline-style: solid;
       box-shadow: inset 0 0 0 1px rgba(255, 228, 161, 0.42);
     }
 
     :host([data-selected]) {
-      border: 2px solid #68dbe2;
+      outline: 2px solid #68dbe2;
+      outline-offset: -2px;
       box-shadow: 0 0 0 2px #071519, 0 0 0 3px #68dbe2;
     }
 
@@ -73,7 +83,8 @@ template.innerHTML = `
     }
 
     :host([data-over]) {
-      border: 2px solid #8ff09a;
+      outline: 2px solid #8ff09a;
+      outline-offset: -2px;
       background: rgba(58, 126, 67, 0.44);
     }
 
@@ -284,6 +295,9 @@ export class PlannerImageSlotElement extends HTMLElement {
 
   async #ingest(file: File): Promise<void> {
     try {
+      const dimensions = await readPngDimensions(file);
+      const dimensionValidation = validateSlotImageDimensions(this.slotId, dimensions);
+      if (!dimensionValidation.ok) throw new Error(dimensionValidation.message);
       const dataUrl = await readPngAsDataUrl(file);
       const image = { dataUrl, originalName: file.name } satisfies SlotImageState;
       this.#image = image;

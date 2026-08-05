@@ -1,4 +1,8 @@
 import {
+  degreesToRadians,
+  radiansToDegrees,
+} from '../src/ui/core/assetManifest';
+import {
   IMAGE_SLOT_CHANGE_EVENT,
   IMAGE_SLOT_SELECT_EVENT,
   type ImageSlotChangeDetail,
@@ -6,6 +10,7 @@ import {
   type PlannerImageSlotElement,
 } from './image-slot.mts';
 import {
+  ASSET_MANIFEST_JSON_NAME,
   CANONICAL_SLOTS,
   PORTRAIT_PARTS_JSON_NAME,
   SLOT_IDS,
@@ -16,17 +21,25 @@ import {
   createInitialWorkbenchState,
   getPartsOffset,
   getSlotDefinition,
+  getSlotScale,
+  getSlotSourceDimension,
   isSlotId,
+  isSlotLocked,
   loadWorkbenchState,
   nudgeRect,
   patchRect,
   resetAllGeometry,
   resetSlotGeometry,
   saveWorkbenchState,
+  scaleRotatedRectFromHandle,
+  serializeAssetManifest,
   serializePortraitPartsManifest,
+  toggleSlotLock,
   withPartsOffset,
   withSlotImage,
   withSlotRect,
+  withSlotRotation,
+  withSlotScale,
   withoutSlotImage,
   type Rect,
   type SlotId,
@@ -34,6 +47,7 @@ import {
 } from './model.mts';
 
 const RECT_FIELDS = ['x', 'y', 'width', 'height'] as const;
+const ROTATE_HANDLE_GAP = 22;
 
 function requiredElement<T extends Element>(selector: string): T {
   const element = document.querySelector<T>(selector);
@@ -43,6 +57,8 @@ function requiredElement<T extends Element>(selector: string): T {
 
 const stage = requiredElement<HTMLDivElement>('#stage');
 const stageShell = requiredElement<HTMLDivElement>('#stage-shell');
+const gizmoLayer = requiredElement<HTMLDivElement>('.gizmo-layer');
+const gizmo = requiredElement<HTMLDivElement>('#gizmo');
 const tweakModeInput = requiredElement<HTMLInputElement>('#tweak-mode');
 const zoomSelect = requiredElement<HTMLSelectElement>('#stage-zoom');
 const slotSelect = requiredElement<HTMLSelectElement>('#slot-select');
@@ -56,7 +72,10 @@ const partsFieldset = requiredElement<HTMLFieldSetElement>('#parts-fieldset');
 const partsXInput = requiredElement<HTMLInputElement>('#parts-x');
 const partsYInput = requiredElement<HTMLInputElement>('#parts-y');
 const partsJson = requiredElement<HTMLPreElement>('#parts-json');
+const manifestJson = requiredElement<HTMLPreElement>('#manifest-json');
 const assetList = requiredElement<HTMLDivElement>('#asset-list');
+const lockButton = requiredElement<HTMLButtonElement>('#toggle-slot-lock');
+const lockStatus = requiredElement<HTMLOutputElement>('#lock-status');
 const chooseSelectedImageButton = requiredElement<HTMLButtonElement>('#choose-selected-image');
 const downloadSelectedImageButton = requiredElement<HTMLButtonElement>('#download-selected-image');
 const clearSelectedImageButton = requiredElement<HTMLButtonElement>('#clear-selected-image');
@@ -64,6 +83,7 @@ const clampSelectedGeometryButton = requiredElement<HTMLButtonElement>('#clamp-s
 const resetSelectedGeometryButton = requiredElement<HTMLButtonElement>('#reset-selected-geometry');
 const resetAllGeometryButton = requiredElement<HTMLButtonElement>('#reset-all-geometry');
 const downloadPartsJsonButton = requiredElement<HTMLButtonElement>('#download-parts-json');
+const downloadManifestButton = requiredElement<HTMLButtonElement>('#download-asset-manifest');
 
 const geometryInputs: Readonly<Record<keyof Rect, HTMLInputElement>> = {
   x: requiredElement<HTMLInputElement>('#geometry-x'),
@@ -71,6 +91,11 @@ const geometryInputs: Readonly<Record<keyof Rect, HTMLInputElement>> = {
   width: requiredElement<HTMLInputElement>('#geometry-width'),
   height: requiredElement<HTMLInputElement>('#geometry-height'),
 };
+const rotationInput = requiredElement<HTMLInputElement>('#geometry-rotation');
+const scaleInputs = {
+  x: requiredElement<HTMLInputElement>('#geometry-scale-x'),
+  y: requiredElement<HTMLInputElement>('#geometry-scale-y'),
+} as const;
 
 const imageSlotElements = new Map<SlotId, PlannerImageSlotElement>();
 for (const element of document.querySelectorAll<PlannerImageSlotElement>('image-slot[data-slot-id]')) {
@@ -82,13 +107,14 @@ if (
   imageSlotElements.size !== CANONICAL_SLOTS.length ||
   SLOT_IDS.some((id) => !imageSlotElements.has(id))
 ) {
-  throw new Error('워크벤치에는 정확히 13개의 canonical image-slot이 필요합니다.');
+  throw new Error(`워크벤치에는 정확히 ${CANONICAL_SLOTS.length}개의 canonical image-slot이 필요합니다.`);
 }
 
 for (const definition of CANONICAL_SLOTS) {
+  const source = getSlotSourceDimension(definition.id);
   const option = document.createElement('option');
   option.value = definition.id;
-  option.textContent = `${definition.label} · ${definition.defaultRect.width}×${definition.defaultRect.height}`;
+  option.textContent = `${definition.label} · ${source.width}×${source.height}`;
   slotSelect.append(option);
 }
 
@@ -104,7 +130,21 @@ try {
 
 let selectedId: SlotId = 'bg-room';
 let tweakMode = false;
-let zoom = 1;
+let zoom = zoomSelect.value === '2' ? 2 : 1;
+
+type GizmoMode = 'move' | 'rotate' | 'scale';
+
+interface DragSession {
+  readonly mode: GizmoMode;
+  readonly slotId: SlotId;
+  readonly pointerId: number;
+  readonly startPoint: Readonly<{ x: number; y: number }>;
+  readonly startRect: Rect;
+  readonly startRotation: number;
+  readonly startAngle: number;
+}
+
+let drag: DragSession | undefined;
 
 function setStatus(message: string, isError = false): void {
   saveStatus.value = message;
@@ -127,8 +167,19 @@ function persist(message: string): void {
 }
 
 function commit(nextState: WorkbenchState, message: string): void {
+  if (nextState === state) {
+    setStatus(`${getSlotDefinition(selectedId).label}은(는) 고정되어 있습니다.`, true);
+    return;
+  }
   state = nextState;
   persist(message);
+  render();
+}
+
+/** Live drag feedback; the final value is committed on pointer release. */
+function preview(nextState: WorkbenchState): void {
+  if (nextState === state) return;
+  state = nextState;
   render();
 }
 
@@ -138,7 +189,9 @@ function selectSlot(id: SlotId): void {
 }
 
 function formatRect(rect: Rect): string {
-  return `x ${rect.x} · y ${rect.y} · ${rect.width}×${rect.height}`;
+  const degrees = Math.round(radiansToDegrees(state.rotation[selectedId]));
+  const scale = getSlotScale(state, selectedId);
+  return `x ${rect.x} · y ${rect.y} · ${rect.width}×${rect.height} · ${degrees}° · sx ${scale.scaleX.toFixed(3)} · sy ${scale.scaleY.toFixed(3)}`;
 }
 
 function triggerDownload(href: string, filename: string): void {
@@ -166,15 +219,118 @@ function downloadTextFile(contents: string, filename: string): void {
   window.setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
+/** Converts a pointer event into 640x400 stage coordinates. */
+function stagePoint(event: PointerEvent): Readonly<{ x: number; y: number }> {
+  const bounds = stage.getBoundingClientRect();
+  return {
+    x: (event.clientX - bounds.left) / zoom,
+    y: (event.clientY - bounds.top) / zoom,
+  };
+}
+
+function rectCentre(rect: Rect): Readonly<{ x: number; y: number }> {
+  return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+}
+
+function beginDrag(mode: GizmoMode, event: PointerEvent): void {
+  if (!tweakMode || isSlotLocked(state, selectedId)) return;
+  const rect = state.geometry[selectedId];
+  const point = stagePoint(event);
+  const centre = rectCentre(rect);
+  drag = {
+    mode,
+    slotId: selectedId,
+    pointerId: event.pointerId,
+    startPoint: point,
+    startRect: rect,
+    startRotation: state.rotation[selectedId],
+    startAngle: Math.atan2(point.y - centre.y, point.x - centre.x),
+  };
+  event.preventDefault();
+  window.addEventListener('pointermove', onDragMove);
+  window.addEventListener('pointerup', onDragEnd);
+  window.addEventListener('pointercancel', onDragEnd);
+}
+
+function applyDrag(session: DragSession, event: PointerEvent): WorkbenchState {
+  const point = stagePoint(event);
+  if (session.mode === 'move') {
+    return withSlotRect(state, session.slotId, {
+      ...session.startRect,
+      x: session.startRect.x + (point.x - session.startPoint.x),
+      y: session.startRect.y + (point.y - session.startPoint.y),
+    });
+  }
+  if (session.mode === 'rotate') {
+    const centre = rectCentre(session.startRect);
+    const angle = Math.atan2(point.y - centre.y, point.x - centre.x);
+    return withSlotRotation(
+      state,
+      session.slotId,
+      session.startRotation + (angle - session.startAngle),
+    );
+  }
+  return withSlotRect(
+    state,
+    session.slotId,
+    scaleRotatedRectFromHandle(session.startRect, session.startRotation, point),
+  );
+}
+
+function onDragMove(event: PointerEvent): void {
+  if (drag === undefined || event.pointerId !== drag.pointerId) return;
+  preview(applyDrag(drag, event));
+}
+
+function onDragEnd(event: PointerEvent): void {
+  if (drag === undefined || event.pointerId !== drag.pointerId) return;
+  const session = drag;
+  drag = undefined;
+  window.removeEventListener('pointermove', onDragMove);
+  window.removeEventListener('pointerup', onDragEnd);
+  window.removeEventListener('pointercancel', onDragEnd);
+
+  const rect = state.geometry[session.slotId];
+  const moved =
+    rect.x !== session.startRect.x ||
+    rect.y !== session.startRect.y ||
+    rect.width !== session.startRect.width ||
+    rect.height !== session.startRect.height ||
+    state.rotation[session.slotId] !== session.startRotation;
+  if (!moved) {
+    render();
+    return;
+  }
+
+  const action = session.mode === 'move' ? '이동' : session.mode === 'rotate' ? '회전' : '크기 조절';
+  persist(`${getSlotDefinition(session.slotId).label} ${action}`);
+  render();
+}
+
+function renderGizmo(): void {
+  const rect = state.geometry[selectedId];
+  const locked = isSlotLocked(state, selectedId);
+  gizmo.hidden = !tweakMode;
+  gizmo.toggleAttribute('data-locked', locked);
+  gizmo.style.left = `${rect.x}px`;
+  gizmo.style.top = `${rect.y}px`;
+  gizmo.style.width = `${rect.width}px`;
+  gizmo.style.height = `${rect.height}px`;
+  gizmo.style.transform = `rotate(${state.rotation[selectedId]}rad)`;
+  gizmo.style.setProperty('--rotate-gap', `${ROTATE_HANDLE_GAP}px`);
+}
+
 function renderAssetList(): void {
   const fragment = document.createDocumentFragment();
 
   for (const definition of CANONICAL_SLOTS) {
     const image = state.images[definition.id];
+    const source = getSlotSourceDimension(definition.id);
     const row = document.createElement('div');
     row.className = 'asset-row';
     row.dataset.slotId = definition.id;
     row.toggleAttribute('data-selected', definition.id === selectedId);
+    row.toggleAttribute('data-locked', state.locks[definition.id]);
     row.tabIndex = 0;
     row.setAttribute('role', 'button');
     row.setAttribute('aria-label', `${definition.label} 선택`);
@@ -187,7 +343,7 @@ function renderAssetList(): void {
     const label = document.createElement('span');
     label.textContent = definition.label;
     const size = document.createElement('code');
-    size.textContent = `${definition.defaultRect.width}×${definition.defaultRect.height}`;
+    size.textContent = `${source.width}×${source.height}`;
     title.append(label, size);
 
     const filename = document.createElement('div');
@@ -197,7 +353,9 @@ function renderAssetList(): void {
     const status = document.createElement('div');
     status.className = 'asset-row-status';
     status.toggleAttribute('data-filled', image !== undefined);
-    status.textContent = image === undefined ? '비어 있음' : `채움 · ${image.originalName}`;
+    const lockMark = state.locks[definition.id] ? ' · 고정됨' : '';
+    status.textContent =
+      image === undefined ? `비어 있음${lockMark}` : `채움 · ${image.originalName}${lockMark}`;
 
     main.append(title, filename, status);
 
@@ -235,39 +393,57 @@ function render(): void {
     element.style.width = `${rect.width}px`;
     element.style.height = `${rect.height}px`;
     element.style.zIndex = definition.layer.toString();
+    element.style.transform = `rotate(${state.rotation[definition.id]}rad)`;
     element.setImage(state.images[definition.id]);
     element.toggleAttribute('tweak-mode', tweakMode);
+    element.toggleAttribute('data-locked', state.locks[definition.id]);
     element.toggleAttribute('data-selected', tweakMode && definition.id === selectedId);
   }
 
   stage.style.transform = `scale(${zoom})`;
+  gizmoLayer.style.transform = `scale(${zoom})`;
   stageShell.style.width = `${STAGE_WIDTH * zoom}px`;
   stageShell.style.height = `${STAGE_HEIGHT * zoom}px`;
 
   const definition = getSlotDefinition(selectedId);
+  const source = getSlotSourceDimension(selectedId);
   const rect = state.geometry[selectedId];
+  const locked = isSlotLocked(state, selectedId);
   selectedSlotLabel.textContent = definition.label;
   selectedSlotRect.textContent = formatRect(rect);
   slotSelect.value = selectedId;
-  slotDescription.textContent = `${definition.description} · 현재 ${rect.width}×${rect.height}px`;
+  slotDescription.textContent =
+    `${definition.description} · 원본 ${source.width}×${source.height}px · 배치 ${rect.width}×${rect.height}px`;
   slotDownloadName.textContent = definition.downloadName;
 
   geometryInputs.x.value = String(rect.x);
   geometryInputs.y.value = String(rect.y);
   geometryInputs.width.value = String(rect.width);
   geometryInputs.height.value = String(rect.height);
-  geometryFieldset.disabled = !tweakMode;
-  partsFieldset.disabled = !tweakMode;
+  rotationInput.value = String(Math.round(radiansToDegrees(state.rotation[selectedId])));
+  const scale = getSlotScale(state, selectedId);
+  scaleInputs.x.value = String(Math.round(scale.scaleX * 100));
+  scaleInputs.y.value = String(Math.round(scale.scaleY * 100));
+  geometryFieldset.disabled = !tweakMode || locked;
+  partsFieldset.disabled = !tweakMode || isSlotLocked(state, 'suspect-state-parts');
+
+  lockButton.setAttribute('aria-pressed', String(locked));
+  lockButton.toggleAttribute('data-locked', locked);
+  lockButton.textContent = locked ? '고정 해제' : '확정 / 고정';
+  lockStatus.value = locked ? '고정됨 · 드래그 차단' : '자유 편집';
+  lockStatus.textContent = lockStatus.value;
 
   const partsOffset = getPartsOffset(state.geometry);
   partsXInput.value = String(partsOffset.x);
   partsYInput.value = String(partsOffset.y);
   partsJson.textContent = serializePortraitPartsManifest(state.geometry);
+  manifestJson.textContent = serializeAssetManifest(state);
 
   const hasSelectedImage = state.images[selectedId] !== undefined;
   downloadSelectedImageButton.disabled = !hasSelectedImage;
   clearSelectedImageButton.disabled = !hasSelectedImage;
 
+  renderGizmo();
   renderAssetList();
 }
 
@@ -286,6 +462,21 @@ stage.addEventListener(IMAGE_SLOT_CHANGE_EVENT, (event) => {
   );
 });
 
+stageShell.addEventListener('pointerdown', (event) => {
+  if (!tweakMode || !(event.target instanceof Element)) return;
+  const handle = event.target.closest<HTMLButtonElement>('[data-gizmo]');
+  if (handle !== null) {
+    beginDrag(handle.dataset.gizmo === 'rotate' ? 'rotate' : 'scale', event);
+    return;
+  }
+  const slotElement = event.target.closest<PlannerImageSlotElement>('image-slot[data-slot-id]');
+  const id = slotElement?.dataset.slotId;
+  if (id === undefined || !isSlotId(id)) return;
+  selectedId = id;
+  render();
+  beginDrag('move', event);
+});
+
 tweakModeInput.addEventListener('change', () => {
   tweakMode = tweakModeInput.checked;
   setStatus(tweakMode ? 'Tweak Mode 켜짐' : 'Tweak Mode 꺼짐');
@@ -299,6 +490,16 @@ zoomSelect.addEventListener('change', () => {
 
 slotSelect.addEventListener('change', () => {
   if (isSlotId(slotSelect.value)) selectSlot(slotSelect.value);
+});
+
+lockButton.addEventListener('click', () => {
+  state = toggleSlotLock(state, selectedId);
+  persist(
+    isSlotLocked(state, selectedId)
+      ? `${getSlotDefinition(selectedId).label} 고정됨`
+      : `${getSlotDefinition(selectedId).label} 고정 해제`,
+  );
+  render();
 });
 
 chooseSelectedImageButton.addEventListener('click', () => {
@@ -319,6 +520,37 @@ clearSelectedImageButton.addEventListener('click', () => {
 geometryFieldset.addEventListener('click', (event) => {
   const target = event.target;
   if (!(target instanceof Element)) return;
+  const rotateButton = target.closest<HTMLButtonElement>('button[data-rotation-delta]');
+  if (rotateButton !== null) {
+    const delta = Number(rotateButton.dataset.rotationDelta);
+    if (!Number.isFinite(delta)) return;
+    commit(
+      withSlotRotation(
+        state,
+        selectedId,
+        state.rotation[selectedId] + degreesToRadians(delta),
+      ),
+      `${getSlotDefinition(selectedId).label} 회전 조정`,
+    );
+    return;
+  }
+  const scaleButton = target.closest<HTMLButtonElement>('button[data-scale-delta]');
+  if (scaleButton !== null) {
+    const delta = Number(scaleButton.dataset.scaleDelta);
+    const axis = scaleButton.dataset.scaleAxis;
+    if (!Number.isFinite(delta) || (axis !== 'x' && axis !== 'y')) return;
+    const scale = getSlotScale(state, selectedId);
+    commit(
+      withSlotScale(
+        state,
+        selectedId,
+        axis === 'x' ? scale.scaleX + delta / 100 : scale.scaleX,
+        axis === 'y' ? scale.scaleY + delta / 100 : scale.scaleY,
+      ),
+      `${getSlotDefinition(selectedId).label} 크기 조정`,
+    );
+    return;
+  }
   const button = target.closest<HTMLButtonElement>('button[data-geometry-field]');
   if (button === null) return;
   const field = button.dataset.geometryField;
@@ -348,6 +580,38 @@ for (const field of RECT_FIELDS) {
   });
 }
 
+rotationInput.addEventListener('change', () => {
+  const degrees = Number(rotationInput.value);
+  if (!Number.isFinite(degrees)) {
+    render();
+    return;
+  }
+  commit(
+    withSlotRotation(state, selectedId, degreesToRadians(degrees)),
+    `${getSlotDefinition(selectedId).label} 회전 입력`,
+  );
+});
+
+for (const axis of ['x', 'y'] as const) {
+  scaleInputs[axis].addEventListener('change', () => {
+    const percent = Number(scaleInputs[axis].value);
+    if (!Number.isFinite(percent) || percent <= 0) {
+      render();
+      return;
+    }
+    const scale = getSlotScale(state, selectedId);
+    commit(
+      withSlotScale(
+        state,
+        selectedId,
+        axis === 'x' ? percent / 100 : scale.scaleX,
+        axis === 'y' ? percent / 100 : scale.scaleY,
+      ),
+      `${getSlotDefinition(selectedId).label} ${axis === 'x' ? '가로' : '세로'} 크기 입력`,
+    );
+  });
+}
+
 clampSelectedGeometryButton.addEventListener('click', () => {
   commit(
     withSlotRect(state, selectedId, clampRect(state.geometry[selectedId])),
@@ -363,7 +627,7 @@ resetSelectedGeometryButton.addEventListener('click', () => {
 });
 
 resetAllGeometryButton.addEventListener('click', () => {
-  commit(resetAllGeometry(state), '13개 슬롯 기본 좌표 복원');
+  commit(resetAllGeometry(state), `${CANONICAL_SLOTS.length}개 슬롯 기본 좌표 복원`);
 });
 
 partsFieldset.addEventListener('click', (event) => {
@@ -375,14 +639,14 @@ partsFieldset.addEventListener('click', (event) => {
   const delta = Number(button.dataset.delta);
   if ((axis !== 'x' && axis !== 'y') || !Number.isFinite(delta)) return;
   const offset = getPartsOffset(state.geometry);
-  selectedId = 'portrait-parts';
+  selectedId = 'suspect-state-parts';
   commit(
     withPartsOffset(
       state,
       axis === 'x' ? offset.x + delta : offset.x,
       axis === 'y' ? offset.y + delta : offset.y,
     ),
-    '표정 파츠 오프셋 조정',
+    '상태 파츠 오프셋 조정',
   );
 });
 
@@ -393,8 +657,8 @@ function applyPartsInputs(): void {
     render();
     return;
   }
-  selectedId = 'portrait-parts';
-  commit(withPartsOffset(state, x, y), '표정 파츠 오프셋 입력');
+  selectedId = 'suspect-state-parts';
+  commit(withPartsOffset(state, x, y), '상태 파츠 오프셋 입력');
 }
 
 partsXInput.addEventListener('change', applyPartsInputs);
@@ -406,6 +670,11 @@ downloadPartsJsonButton.addEventListener('click', () => {
     PORTRAIT_PARTS_JSON_NAME,
   );
   setStatus(`${PORTRAIT_PARTS_JSON_NAME} 다운로드`);
+});
+
+downloadManifestButton.addEventListener('click', () => {
+  downloadTextFile(serializeAssetManifest(state), ASSET_MANIFEST_JSON_NAME);
+  setStatus(`${ASSET_MANIFEST_JSON_NAME} 다운로드`);
 });
 
 function isRectField(value: string | undefined): value is keyof Rect {

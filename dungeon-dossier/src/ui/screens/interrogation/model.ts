@@ -1,4 +1,5 @@
-import type { PublicDTO } from '../../../dto';
+import type { PartnerCooldownView, PublicDTO, SuspectStatePart } from '../../../dto';
+import type { CardAttachments } from '../../widgets/cardLayers';
 
 export interface InterrogationCardView {
   readonly cardId: string;
@@ -8,6 +9,7 @@ export interface InterrogationCardView {
   readonly cpCost: number;
   readonly requiresEvidence: boolean;
   readonly artAssetKey?: string;
+  readonly attachments?: CardAttachments;
 }
 
 export interface InterrogationTurnView {
@@ -29,12 +31,20 @@ export interface InterrogationScreenModel {
   readonly composureMax: number;
   readonly coercionMax: number;
   readonly sweetSpotUnlocked: boolean;
+  readonly sweetSpotMin?: number;
+  readonly sweetSpotMax?: number;
   readonly cards: readonly InterrogationCardView[];
   readonly selectedEvidenceIds?: readonly string[];
   readonly evidenceCosts?: Readonly<Record<string, number>>;
+  readonly backgroundAssetKey?: string;
   readonly portraitBaseAssetKey?: string;
-  readonly portraitPartsAssetKey?: string;
-  readonly partnerAssetKey?: string;
+  /** One asset key per suspect state sheet; `base` may be omitted. */
+  readonly portraitStatePartsAssetKeys?: Readonly<Partial<Record<SuspectStatePart, string>>>;
+  readonly partnerBaseAssetKey?: string;
+  readonly partnerUsedAssetKey?: string;
+  readonly suspectStatePart: SuspectStatePart;
+  readonly partnerCooldown: PartnerCooldownView;
+  readonly partnerSkillAvailable: boolean;
   readonly canSecureStatement?: boolean;
 }
 
@@ -49,7 +59,10 @@ export interface InterrogationCallbacks {
   readonly onSubmit?: (selection: InterrogationSelection) => void;
   readonly onAdvance?: () => void;
   readonly onSecureStatement?: () => void;
+  readonly onUsePartner?: () => void;
   readonly onKeystroke?: () => void;
+  /** Raised when a card is dragged onto a tag chip and docked there. */
+  readonly onCardDock?: (cardId: string, facet: InterrogationSelection['facet']) => void;
 }
 
 export interface InterrogationAssetLookup {

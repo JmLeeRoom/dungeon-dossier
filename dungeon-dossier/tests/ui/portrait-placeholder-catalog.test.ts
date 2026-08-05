@@ -137,63 +137,80 @@ describe('portrait placeholder catalog', () => {
     await rm(temporaryDirectory, { recursive: true, force: true });
   });
 
-  it('generates 12 bases, 12 transparent parts sheets, and 12 manifests deterministically', async () => {
+  it('generates 12 bases, 24 transparent state sheets, and 12 manifests deterministically', async () => {
     await runPlaceholder(temporaryDirectory, ['--config', CONFIG_PATH]);
     const generatedDirectory = path.join(temporaryDirectory, 'portraits');
     const files = await readdir(generatedDirectory);
     const baseFiles = files.filter((file) => file.endsWith('_base.png')).sort();
-    const partsFiles = files.filter((file) => file.endsWith('_parts.png')).sort();
-    const manifests = files.filter((file) => file.endsWith('.parts.json')).sort();
+    const statePartFiles = files
+      .filter((file) => file.endsWith('_upset.png') || file.endsWith('_lose.png'))
+      .sort();
+    const manifests = files.filter((file) => file.endsWith('.state-parts.json')).sort();
     expect(baseFiles).toHaveLength(12);
-    expect(partsFiles).toHaveLength(12);
+    expect(statePartFiles).toHaveLength(24);
     expect(manifests).toHaveLength(12);
 
     const firstBytes = new Map<string, Buffer>();
     for (const name of PORTRAIT_NAMES) {
       const baseName = `portrait_${name}_base.png`;
-      const partsName = `portrait_${name}_parts.png`;
-      const manifestName = `portrait_${name}.parts.json`;
+      const manifestName = `portrait_${name}.state-parts.json`;
       const baseBytes = await readFile(path.join(generatedDirectory, baseName));
-      const partsBytes = await readFile(path.join(generatedDirectory, partsName));
       const manifestBytes = await readFile(path.join(generatedDirectory, manifestName));
       firstBytes.set(baseName, baseBytes);
-      firstBytes.set(partsName, partsBytes);
       firstBytes.set(manifestName, manifestBytes);
 
       const base = PNG.sync.read(baseBytes);
-      const parts = PNG.sync.read(partsBytes);
       expect({ width: base.width, height: base.height }).toEqual({
-        width: 196,
-        height: 216,
+        width: 512,
+        height: 512,
       });
-      expect({ width: parts.width, height: parts.height }).toEqual({
-        width: 96,
-        height: 40,
-      });
-      const baseSummary = pixelSummary(base);
-      const partsSummary = pixelSummary(parts);
-      expect(baseSummary.colours).toBeLessThanOrEqual(16);
-      expect(partsSummary.colours).toBeLessThanOrEqual(16);
-      expect(partsSummary.transparent).toBeGreaterThan(0);
-      expect(partsSummary.visible).toBeGreaterThan(0);
+      expect(pixelSummary(base).colours).toBeLessThanOrEqual(16);
+
+      for (const state of ['upset', 'lose'] as const) {
+        const partsName = `portrait_${name}_${state}.png`;
+        const partsBytes = await readFile(path.join(generatedDirectory, partsName));
+        firstBytes.set(partsName, partsBytes);
+        const parts = PNG.sync.read(partsBytes);
+        expect({ width: parts.width, height: parts.height }).toEqual({
+          width: 512,
+          height: 512,
+        });
+        const partsSummary = pixelSummary(parts);
+        expect(partsSummary.colours).toBeLessThanOrEqual(16);
+        expect(partsSummary.transparent).toBeGreaterThan(0);
+        expect(partsSummary.visible).toBeGreaterThan(0);
+      }
 
       expect(JSON.parse(manifestBytes.toString('utf8'))).toEqual({
-        schema_version: '1.0',
+        schema_version: '2.0',
         base: {
-          slot: 'portrait-base',
+          slot: 'suspect-base',
           image: baseName,
+          width: 512,
+          height: 512,
         },
-        parts: {
-          slot: 'portrait-parts',
-          image: partsName,
-          origin: 'portrait-base',
-          x: 50,
-          y: 44,
-          width: 96,
-          height: 40,
-          stage_x: 272,
-          stage_y: 84,
-        },
+        state_parts: [
+          {
+            state: 'upset',
+            slot: 'suspect-state-parts',
+            image: `portrait_${name}_upset.png`,
+            origin: 'suspect-base',
+            x: 0,
+            y: 0,
+            width: 512,
+            height: 512,
+          },
+          {
+            state: 'lose',
+            slot: 'suspect-state-parts',
+            image: `portrait_${name}_lose.png`,
+            origin: 'suspect-base',
+            x: 0,
+            y: 0,
+            width: 512,
+            height: 512,
+          },
+        ],
       });
       expect(manifestBytes.toString('utf8').endsWith('\n')).toBe(true);
     }
@@ -205,9 +222,9 @@ describe('portrait placeholder catalog', () => {
 
     const manifestPath = path.join(
       generatedDirectory,
-      'portrait_타락한_용사.parts.json',
+      'portrait_타락한_용사.state-parts.json',
     );
-    const canonicalManifest = firstBytes.get('portrait_타락한_용사.parts.json');
+    const canonicalManifest = firstBytes.get('portrait_타락한_용사.state-parts.json');
     if (canonicalManifest === undefined) throw new Error('Missing canonical manifest bytes.');
     const sentinel = Buffer.from('do-not-overwrite-manifest');
     await writeFile(manifestPath, sentinel);
@@ -218,7 +235,7 @@ describe('portrait placeholder catalog', () => {
     expect(await readFile(manifestPath)).toEqual(canonicalManifest);
   }, 30_000);
 
-  it('rejects an orphan parts sheet and preserves underscored multiword names', async () => {
+  it('rejects an orphan state sheet and preserves underscored multiword names', async () => {
     const orphanDirectory = path.join(temporaryDirectory, 'orphan');
     let orphanStderr = '';
     try {
@@ -228,11 +245,11 @@ describe('portrait placeholder catalog', () => {
         '--name',
         '없는_용의자',
         '--state',
-        'parts',
+        'upset',
         '--width',
-        '96',
+        '512',
         '--height',
-        '40',
+        '512',
       ]);
     } catch (error) {
       orphanStderr = execErrorStderr(error);
@@ -244,20 +261,24 @@ describe('portrait placeholder catalog', () => {
         path.join(
           temporaryDirectory,
           'portraits',
-          'portrait_김_인턴.parts.json',
+          'portrait_김_인턴.state-parts.json',
         ),
         'utf8',
       ),
-    ) as { base: { image: string }; parts: { image: string; x: number; y: number } };
+    ) as {
+      base: { image: string };
+      state_parts: readonly { state: string; image: string; x: number; y: number }[];
+    };
     expect(manifest.base.image).toBe('portrait_김_인턴_base.png');
-    expect(manifest.parts).toMatchObject({
-      image: 'portrait_김_인턴_parts.png',
-      x: 50,
-      y: 44,
+    expect(manifest.state_parts.map((part) => part.state)).toEqual(['upset', 'lose']);
+    expect(manifest.state_parts[0]).toMatchObject({
+      image: 'portrait_김_인턴_upset.png',
+      x: 0,
+      y: 0,
     });
   });
 
-  it('builds exactly the 24 checked-in runtime portrait keys', async () => {
+  it('builds the 37 checked-in runtime portrait keys including the partner cooldown sheet', async () => {
     const files = (await readdir(PORTRAIT_DIRECTORY))
       .filter((file) => file.endsWith('.png'))
       .sort();
@@ -269,10 +290,14 @@ describe('portrait placeholder catalog', () => {
         ]),
       ),
     );
-    const expectedKeys = PORTRAIT_NAMES.flatMap((name) => [
-      `portrait/${name}/base`,
-      `portrait/${name}/parts`,
-    ]).sort();
+    const expectedKeys = [
+      ...PORTRAIT_NAMES.flatMap((name) => [
+        `portrait/${name}/base`,
+        `portrait/${name}/upset`,
+        `portrait/${name}/lose`,
+      ]),
+      'portrait/김_인턴/used',
+    ].sort();
 
     expect([...registry.keys()].sort()).toEqual(expectedKeys);
   });
@@ -299,19 +324,23 @@ describe('portrait placeholder catalog', () => {
       });
       const model = session.currentModel();
       expect(model.portraitBaseAssetKey).toBe(`portrait/${portraitName}/base`);
-      expect(model.portraitPartsAssetKey).toBe(`portrait/${portraitName}/parts`);
-      expect(model.partnerAssetKey).toBe('portrait/김_인턴/base');
-      const { portraitBaseAssetKey, portraitPartsAssetKey, partnerAssetKey } = model;
-      if (
-        portraitBaseAssetKey === undefined ||
-        portraitPartsAssetKey === undefined ||
-        partnerAssetKey === undefined
-      ) {
-        throw new Error(`Missing portrait asset keys for ${encounterId}.`);
+      expect(model.portraitStatePartsAssetKeys).toEqual({
+        base: `portrait/${portraitName}/base`,
+        upset: `portrait/${portraitName}/upset`,
+        lose: `portrait/${portraitName}/lose`,
+      });
+      expect(model.partnerBaseAssetKey).toBe('portrait/김_인턴/base');
+      expect(model.partnerUsedAssetKey).toBe('portrait/김_인턴/used');
+      const keys = [
+        model.portraitBaseAssetKey,
+        ...Object.values(model.portraitStatePartsAssetKeys ?? {}),
+        model.partnerBaseAssetKey,
+        model.partnerUsedAssetKey,
+      ];
+      for (const key of keys) {
+        if (key === undefined) throw new Error(`Missing portrait asset keys for ${encounterId}.`);
+        expect(registry.has(key), key).toBe(true);
       }
-      expect(registry.has(portraitBaseAssetKey)).toBe(true);
-      expect(registry.has(portraitPartsAssetKey)).toBe(true);
-      expect(registry.has(partnerAssetKey)).toBe(true);
     }
   });
 });

@@ -366,10 +366,14 @@
       "type": "object",
       "properties": {
         "min": {
-          "$ref": "#/$defs/__schema7"
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
         },
         "max": {
-          "$ref": "#/$defs/__schema7"
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
         }
       },
       "required": [

@@ -98,12 +98,18 @@ describe('tools/placeholder CLI', () => {
 
     const expected = [
       ['ui/placeholder_missing_fallback.png', 64, 64],
-      ['bg/배경_심문실_시안.png', 640, 400],
-      ['bg/배경_심문실_세피아.png', 640, 400],
-      ['bg/배경_심문실_마젠타.png', 640, 400],
-      ['portraits/portrait_물컹이_base.png', 196, 216],
-      ['portraits/portrait_하피_base.png', 196, 216],
-      ['portraits/portrait_미노타우로스_base.png', 196, 216],
+      ['bg/배경_심문실_시안.png', 1280, 800],
+      ['bg/배경_심문실_세피아.png', 1280, 800],
+      ['bg/배경_심문실_마젠타.png', 1280, 800],
+      ['fg/전경_책상_기본.png', 1280, 236],
+      ['portraits/portrait_물컹이_base.png', 512, 512],
+      ['portraits/portrait_하피_base.png', 512, 512],
+      ['portraits/portrait_미노타우로스_base.png', 512, 512],
+      ['cards/card_기본_템플릿.png', 640, 725],
+      ['cards/card_질문_일러.png', 256, 256],
+      ['evidence/ev_사건_증거1.png', 128, 128],
+      ['ui/아이콘_평정심_기본.png', 32, 32],
+      ['ui/아이콘_강압_기본.png', 32, 32],
     ] as const;
 
     for (const [relativePath, width, height] of expected) {

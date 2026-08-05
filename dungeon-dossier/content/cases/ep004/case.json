@@ -4,6 +4,7 @@
   "case_id": "case_ep004_midnight_express",
   "metadata": {
     "title": "심야 용맥 급행의 우회권",
+    "background_asset_key": "배경/심문실/마젠타",
     "act": 4,
     "estimated_turns": 32,
     "content_version": "1.0"
@@ -14,21 +15,33 @@
       "type": "PERSON",
       "role": "SUSPECT",
       "display_name_key": "entity.ep004.dwarf.name",
-      "attributes": { "archetype": "DWARF" }
+      "attributes": {
+        "archetype": "DWARF",
+        "display_name": "드워프",
+        "portrait_asset_name": "드워프"
+      }
     },
     {
       "entity_id": "ent_ep004_cyclops",
       "type": "PERSON",
       "role": "SUSPECT",
       "display_name_key": "entity.ep004.cyclops.name",
-      "attributes": { "archetype": "CYCLOPS" }
+      "attributes": {
+        "archetype": "CYCLOPS",
+        "display_name": "사이클롭스",
+        "portrait_asset_name": "사이클롭스"
+      }
     },
     {
       "entity_id": "ent_ep004_fallen_hero",
       "type": "PERSON",
       "role": "SUSPECT",
       "display_name_key": "entity.ep004.fallen_hero.name",
-      "attributes": { "archetype": "FALLEN_HERO" }
+      "attributes": {
+        "archetype": "FALLEN_HERO",
+        "display_name": "타락한 용사",
+        "portrait_asset_name": "타락한_용사"
+      }
     },
     {
       "entity_id": "ent_ep004_machine_room",

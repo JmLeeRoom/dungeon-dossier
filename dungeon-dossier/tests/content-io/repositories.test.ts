@@ -81,6 +81,31 @@ describe('content repositories', () => {
     expect(repository.current().dmg.contradict).toBe(25);
   });
 
+  it('loads an arbitrary newly-authored case directory without a repository catalogue change', async () => {
+    const caseData = await fixture('cases/tutorial/case.json');
+    const requested: string[] = [];
+    const fetcher: FetchLike = async (input) => {
+      const url = typeof input === 'string'
+        ? input
+        : input instanceof URL
+          ? input.href
+          : input.url;
+      requested.push(url);
+      return new Response(JSON.stringify(caseData), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    };
+
+    const loaded = await new CaseRepository({
+      fetcher,
+      externalIds: new Set(),
+    }).load('designer-case-17');
+
+    expect(loaded?.case_id).toBe('case_tutorial');
+    expect(requested).toEqual(['/content/cases/designer-case-17/case.json']);
+  });
+
   it('throws on Tier-1 failure in development and skips with a report in release', async () => {
     const caseData = structuredClone(
       (await fixture('cases/tutorial/case.json')) as Record<string, unknown>,

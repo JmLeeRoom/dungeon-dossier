@@ -178,6 +178,8 @@ export type NonCombatEventDefinition = z.infer<typeof NonCombatEventSchema>;
 export const CaseMetadataSchema = z.strictObject({
   title: NonEmptyStringSchema,
   title_key: LocalizationKeySchema.optional(),
+  /** Runtime registry key selected by content, e.g. 배경/심문실/시안. */
+  background_asset_key: NonEmptyStringSchema.optional(),
   act: NonNegativeIntegerSchema,
   difficulty: z.number().int().positive().optional(),
   tags: z.array(NonEmptyStringSchema).optional(),

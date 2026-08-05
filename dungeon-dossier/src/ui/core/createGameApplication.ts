@@ -1,5 +1,10 @@
 import { Application, TextureSource } from 'pixi.js';
-import { calculateIntegerViewport, INTERNAL_HEIGHT, INTERNAL_WIDTH } from './integerScale';
+import {
+  calculateIntegerViewport,
+  DEFAULT_TARGET_SCALE,
+  HD_HEIGHT,
+  HD_WIDTH,
+} from './integerScale';
 import { SceneManager } from './sceneManager';
 
 export interface MountedGameApplication {
@@ -13,12 +18,12 @@ export async function createGameApplication(mount: HTMLElement): Promise<Mounted
 
   const app = new Application();
   await app.init({
-    width: INTERNAL_WIDTH,
-    height: INTERNAL_HEIGHT,
+    width: HD_WIDTH,
+    height: HD_HEIGHT,
     antialias: false,
-    autoDensity: false,
-    resolution: 1,
-    backgroundColor: 0x101018,
+    autoDensity: true,
+    resolution: window.devicePixelRatio || 1,
+    backgroundColor: 0x0f0d0a,
   });
 
   const canvas = app.canvas;
@@ -27,6 +32,7 @@ export async function createGameApplication(mount: HTMLElement): Promise<Mounted
   mount.append(canvas);
   const scenes = new SceneManager();
   app.stage.addChild(scenes.view);
+  app.stage.scale.set(DEFAULT_TARGET_SCALE);
 
   const resize = (): void => {
     const viewport = calculateIntegerViewport(mount.clientWidth, mount.clientHeight);

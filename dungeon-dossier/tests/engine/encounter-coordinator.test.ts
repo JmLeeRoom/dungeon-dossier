@@ -252,7 +252,8 @@ const BALANCE = BalanceSchema.parse({
   stress: { max: 100 },
   dp: { initial: 5, rewardBattle: 20 },
   dmg: {
-    contradict: 18,
+    // Drives 40 composure into the authored 1-30% sweet spot in one action.
+    contradict: 30,
     pressure: 8,
     requery: 4,
     chainPursuit: 12,
@@ -420,7 +421,7 @@ describe('EncounterCoordinator', () => {
       },
     });
     expect(coordinator.snapshot.resources).toMatchObject({
-      composure: 22,
+      composure: 10,
       commandPoints: 1,
       stress: 100,
       dp: 5,

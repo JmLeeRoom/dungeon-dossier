@@ -16,14 +16,14 @@
       <div class="brand">
         <span class="eyebrow">PLANNER ASSET WORKBENCH</span>
         <h1>던전 수사 조서 <span>심문 화면</span></h1>
-        <p>640×400 구성 위에 PNG를 놓고, 좌표와 파일명을 함께 확정합니다.</p>
+        <p>640×400 내부 좌표를 1280×800 HD로 표시하며 PNG 좌표·회전·크기와 파일명을 확정합니다.</p>
       </div>
 
       <div class="topbar-actions" aria-label="워크벤치 보기 설정">
         <label class="switch-control" for="tweak-mode">
           <span>
             <strong>Tweak Mode</strong>
-            <small>슬롯 선택·좌표 조정</small>
+            <small>드래그로 이동·회전·크기</small>
           </span>
           <input id="tweak-mode" type="checkbox" />
           <i aria-hidden="true"></i>
@@ -33,7 +33,7 @@
           표시 배율
           <select id="stage-zoom">
             <option value="1">1×</option>
-            <option value="2">2×</option>
+            <option value="2" selected>2× HD</option>
           </select>
         </label>
 
@@ -56,13 +56,15 @@
           </div>
         </div>
 
-        <div class="stage-scroll" tabindex="0" aria-label="640 곱하기 400 애셋 구성 스테이지">
-          <div id="stage-shell" class="stage-shell">
+        <div class="stage-scroll" tabindex="0" aria-label="640 곱하기 400 내부 좌표를 1280 곱하기 800으로 표시하는 애셋 구성 스테이지">
+          <div id="stage-shell" class="stage-shell stage-viewport">
             <div id="stage" class="stage">
               <image-slot id="slot-bg-room" data-slot-id="bg-room" slot-label="취조실 배경"></image-slot>
-              <image-slot id="slot-portrait-base" data-slot-id="portrait-base" slot-label="용의자 베이스"></image-slot>
-              <image-slot id="slot-portrait-parts" data-slot-id="portrait-parts" slot-label="표정 파츠"></image-slot>
+              <image-slot id="slot-suspect-base" data-slot-id="suspect-base" slot-label="용의자 베이스"></image-slot>
+              <image-slot id="slot-suspect-state-parts" data-slot-id="suspect-state-parts" slot-label="동요 파츠"></image-slot>
+              <image-slot id="slot-suspect-lose-parts" data-slot-id="suspect-lose-parts" slot-label="패배 파츠"></image-slot>
               <image-slot id="slot-fg-desk" data-slot-id="fg-desk" slot-label="책상 전경"></image-slot>
+              <image-slot id="slot-card-base" data-slot-id="card-base" slot-label="카드 베이스"></image-slot>
               <image-slot id="slot-card-art-1" data-slot-id="card-art-1" slot-label="카드 1"></image-slot>
               <image-slot id="slot-card-art-2" data-slot-id="card-art-2" slot-label="카드 2"></image-slot>
               <image-slot id="slot-card-art-3" data-slot-id="card-art-3" slot-label="카드 3"></image-slot>
@@ -71,13 +73,18 @@
               <image-slot id="slot-ev-3" data-slot-id="ev-3" slot-label="증거 3"></image-slot>
               <image-slot id="slot-icon-composure" data-slot-id="icon-composure" slot-label="평정심"></image-slot>
               <image-slot id="slot-icon-coercion" data-slot-id="icon-coercion" slot-label="강압"></image-slot>
-              <image-slot id="slot-partner" data-slot-id="partner" slot-label="파트너"></image-slot>
+              <image-slot id="slot-partner-base" data-slot-id="partner-base" slot-label="파트너"></image-slot>
+              <image-slot id="slot-partner-used" data-slot-id="partner-used" slot-label="파트너 쿨다운"></image-slot>
 
               <div class="mock-hud mock-guide" aria-hidden="true">
                 <div class="suspect"><b>용의자</b><span>하피</span></div>
                 <div class="meter meter-composure"><span>평정심</span><i></i><i></i><i></i><i></i><i></i></div>
                 <div class="meter meter-coercion"><span>강압 수사</span><i></i><i></i><i></i><i></i><i></i></div>
                 <div class="turn">TURN 03</div>
+              </div>
+
+              <div class="mock-status mock-guide" aria-hidden="true">
+                <span>CP ☕ ☕ ☕</span><span>STRESS 12</span>
               </div>
 
               <div class="mock-tags mock-guide" aria-hidden="true">
@@ -92,8 +99,14 @@
               <div class="mock-card-labels mock-guide" aria-hidden="true">
                 <span>질문</span><span>모순</span><span>압박</span>
               </div>
-              <div class="mock-status mock-guide" aria-hidden="true">
-                <span>☕ ☕ ☕</span><span>STRESS 12</span><span>조서 열기</span>
+            </div>
+
+            <div class="gizmo-layer" aria-hidden="true">
+              <div id="gizmo" class="gizmo" hidden>
+                <span class="gizmo-frame"></span>
+                <span class="gizmo-stem"></span>
+                <button class="gizmo-handle gizmo-rotate" data-gizmo="rotate" type="button" tabindex="-1" aria-label="회전"></button>
+                <button class="gizmo-handle gizmo-scale" data-gizmo="scale" type="button" tabindex="-1" aria-label="크기 조절"></button>
               </div>
             </div>
           </div>
@@ -101,8 +114,8 @@
 
         <div class="stage-note">
           <span><i class="dot dot-gold"></i> 빈 슬롯: 클릭하거나 PNG 드롭</span>
-          <span><i class="dot dot-cyan"></i> Tweak Mode: 클릭해 좌표 선택</span>
-          <span>스테이지 좌표는 항상 640×400 안으로 제한됩니다.</span>
+          <span><i class="dot dot-cyan"></i> Tweak Mode: 드래그 이동 · 상단 핸들 회전 · 우하단 핸들 크기</span>
+          <span>고정된 슬롯은 드래그가 차단됩니다.</span>
         </div>
       </section>
 
@@ -122,6 +135,13 @@
             <button id="choose-selected-image" class="button" type="button">PNG 선택</button>
             <button id="download-selected-image" class="button button-quiet" type="button">PNG 저장</button>
             <button id="clear-selected-image" class="button button-danger" type="button">비우기</button>
+          </div>
+
+          <div class="button-row">
+            <button id="toggle-slot-lock" class="button button-lock" type="button" aria-pressed="false">
+              확정 / 고정
+            </button>
+            <output id="lock-status" class="lock-status">자유 편집</output>
           </div>
 
           <fieldset id="geometry-fieldset" class="control-group" disabled>
@@ -151,6 +171,24 @@
                 <input id="geometry-height" data-geometry-input="height" type="number" min="1" step="1" />
                 <button type="button" data-geometry-field="height" data-delta="1" aria-label="높이 1 증가">+</button>
               </div>
+              <div class="coordinate-control">
+                <label for="geometry-rotation">R°</label>
+                <button type="button" data-rotation-delta="-1" aria-label="회전 1도 감소">−</button>
+                <input id="geometry-rotation" type="number" step="1" />
+                <button type="button" data-rotation-delta="1" aria-label="회전 1도 증가">+</button>
+              </div>
+              <div class="coordinate-control">
+                <label for="geometry-scale-x">SX%</label>
+                <button type="button" data-scale-axis="x" data-scale-delta="-1" aria-label="가로 크기 1퍼센트 감소">−</button>
+                <input id="geometry-scale-x" type="number" min="1" step="1" />
+                <button type="button" data-scale-axis="x" data-scale-delta="1" aria-label="가로 크기 1퍼센트 증가">+</button>
+              </div>
+              <div class="coordinate-control">
+                <label for="geometry-scale-y">SY%</label>
+                <button type="button" data-scale-axis="y" data-scale-delta="-1" aria-label="세로 크기 1퍼센트 감소">−</button>
+                <input id="geometry-scale-y" type="number" min="1" step="1" />
+                <button type="button" data-scale-axis="y" data-scale-delta="1" aria-label="세로 크기 1퍼센트 증가">+</button>
+              </div>
             </div>
             <div class="button-row">
               <button id="clamp-selected-geometry" class="button button-quiet" type="button">스테이지 안으로 맞춤</button>
@@ -162,30 +200,30 @@
         <section class="panel parts-panel" aria-labelledby="parts-heading">
           <div class="panel-heading">
             <span class="section-number">03</span>
-            <h2 id="parts-heading">EXPRESSION PARTS</h2>
+            <h2 id="parts-heading">SUSPECT STATE PARTS</h2>
           </div>
-          <p>용의자 베이스 좌상단을 원점으로 사용합니다.</p>
+          <p>용의자 베이스 좌상단을 원점으로 사용합니다. base · upset · lose 모두 512×512입니다.</p>
 
           <fieldset id="parts-fieldset" class="control-group parts-controls" disabled>
-            <legend>표정 파츠 오프셋</legend>
+            <legend>상태 파츠 오프셋</legend>
             <div class="geometry-grid">
               <div class="coordinate-control">
                 <label for="parts-x">X</label>
-                <button type="button" data-parts-axis="x" data-delta="-1" aria-label="표정 X 1 감소">−</button>
+                <button type="button" data-parts-axis="x" data-delta="-1" aria-label="상태 파츠 X 1 감소">−</button>
                 <input id="parts-x" type="number" min="0" step="1" />
-                <button type="button" data-parts-axis="x" data-delta="1" aria-label="표정 X 1 증가">+</button>
+                <button type="button" data-parts-axis="x" data-delta="1" aria-label="상태 파츠 X 1 증가">+</button>
               </div>
               <div class="coordinate-control">
                 <label for="parts-y">Y</label>
-                <button type="button" data-parts-axis="y" data-delta="-1" aria-label="표정 Y 1 감소">−</button>
+                <button type="button" data-parts-axis="y" data-delta="-1" aria-label="상태 파츠 Y 1 감소">−</button>
                 <input id="parts-y" type="number" min="0" step="1" />
-                <button type="button" data-parts-axis="y" data-delta="1" aria-label="표정 Y 1 증가">+</button>
+                <button type="button" data-parts-axis="y" data-delta="1" aria-label="상태 파츠 Y 1 증가">+</button>
               </div>
             </div>
           </fieldset>
 
           <div class="json-heading">
-            <span>parts JSON 미리보기</span>
+            <span>state-parts JSON 미리보기</span>
             <button id="download-parts-json" class="text-button" type="button">JSON 다운로드</button>
           </div>
           <pre id="parts-json" class="json-preview"></pre>
@@ -194,7 +232,19 @@
         <section class="panel manifest-panel" aria-labelledby="manifest-heading">
           <div class="panel-heading">
             <span class="section-number">04</span>
-            <h2 id="manifest-heading">13 ASSET SLOTS</h2>
+            <h2 id="manifest-heading">ASSET MANIFEST</h2>
+          </div>
+          <div class="json-heading">
+            <span>asset_manifest.json 미리보기</span>
+            <button id="download-asset-manifest" class="text-button" type="button">JSON 다운로드</button>
+          </div>
+          <pre id="manifest-json" class="json-preview"></pre>
+        </section>
+
+        <section class="panel manifest-panel" aria-labelledby="slots-heading">
+          <div class="panel-heading">
+            <span class="section-number">05</span>
+            <h2 id="slots-heading">16 ASSET SLOTS</h2>
           </div>
           <div id="asset-list" class="asset-list"></div>
         </section>

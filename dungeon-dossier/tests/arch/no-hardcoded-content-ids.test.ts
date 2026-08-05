@@ -1,3 +1,5 @@
+import { readFile, readdir } from "node:fs/promises";
+import path from "node:path";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
 import {
@@ -7,6 +9,51 @@ import {
 } from "./source-files";
 
 const CONTENT_ID_PREFIX = /(?:^|[^A-Za-z0-9])(?:case_|clm_|ev_|ent_|enc_)/i;
+const CASES_ROOT = path.resolve("content/cases");
+
+interface AuthoredCaseIdentityProbe {
+  readonly entities?: readonly Readonly<{
+    attributes?: Readonly<Record<string, unknown>>;
+  }>[];
+  readonly dialogue?: Readonly<{
+    speaker_profiles?: Readonly<Record<string, Readonly<{ race?: unknown }>>>;
+  }>;
+}
+
+/**
+ * Case IDs have a stable prefix and are covered below. Directory names and
+ * authored race/archetype labels do not, so collect those identities from the
+ * data itself rather than maintaining another engine-era catalogue in tests.
+ */
+async function authoredIdentityLiterals(): Promise<ReadonlySet<string>> {
+  const identities = new Set<string>();
+  const entries = await readdir(CASES_ROOT, { withFileTypes: true });
+  entries.sort((left, right) => left.name.localeCompare(right.name));
+
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    identities.add(entry.name);
+    let probe: AuthoredCaseIdentityProbe;
+    try {
+      probe = JSON.parse(
+        await readFile(path.join(CASES_ROOT, entry.name, "case.json"), "utf8"),
+      ) as AuthoredCaseIdentityProbe;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") continue;
+      throw error;
+    }
+    for (const entity of probe.entities ?? []) {
+      const archetype = entity.attributes?.archetype;
+      if (typeof archetype === "string" && archetype.length > 0) identities.add(archetype);
+    }
+    for (const profile of Object.values(probe.dialogue?.speaker_profiles ?? {})) {
+      if (typeof profile.race === "string" && profile.race.length > 0) {
+        identities.add(profile.race);
+      }
+    }
+  }
+  return identities;
+}
 
 function isModuleSpecifier(node: ts.Node): boolean {
   const parent = node.parent;
@@ -59,8 +106,9 @@ function staticStringExpression(node: ts.Node): string | undefined {
 }
 
 describe("engine content independence", () => {
-  it("contains no hardcoded content-ID prefixes in string literals", async () => {
+  it("contains no hardcoded content IDs, case directories, or authored archetypes", async () => {
     const violations: string[] = [];
+    const authoredIdentities = await authoredIdentityLiterals();
 
     for (const absolutePath of await engineSourceFiles()) {
       const sourceFile = await parseSourceFile(absolutePath);
@@ -70,7 +118,7 @@ describe("engine content independence", () => {
         if (
           text !== undefined &&
           !isModuleSpecifier(node) &&
-          CONTENT_ID_PREFIX.test(text)
+          (CONTENT_ID_PREFIX.test(text) || authoredIdentities.has(text))
         ) {
           violations.push(`${sourceLocation(sourceFile, node)} -> ${JSON.stringify(text)}`);
         }
@@ -82,7 +130,7 @@ describe("engine content independence", () => {
 
     expect(
       violations,
-      `Hardcoded content IDs found in src/engine:\n${violations.join("\n")}`,
+      `Hardcoded content identities found in src/engine:\n${violations.join("\n")}`,
     ).toEqual([]);
   });
 });

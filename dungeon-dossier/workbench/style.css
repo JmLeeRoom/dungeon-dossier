@@ -16,6 +16,7 @@
   --panel: #151619;
   --panel-raised: #1a1b1e;
   --line: #34332f;
+  --panel-border: #34332f;
   --line-soft: #282824;
   --paper: #e8dfc8;
   --muted: #9a9382;
@@ -271,7 +272,7 @@ input:focus-visible {
 
 .stage-scroll {
   min-height: 456px;
-  padding: 26px;
+  padding: 56px;
   overflow: auto;
   background:
     linear-gradient(45deg, #111215 25%, transparent 25%) 0 0 / 12px 12px,
@@ -279,11 +280,14 @@ input:focus-visible {
     #101114;
 }
 
-.stage-shell {
+.stage-shell.stage-viewport {
   position: relative;
-  width: 640px;
-  height: 400px;
+  width: 1280px;
+  height: 800px;
   margin: 0 auto;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  box-shadow: 0 0 0 2px var(--panel-border), 0 10px 40px rgba(0, 0, 0, 0.85);
 }
 
 .stage {
@@ -293,12 +297,29 @@ input:focus-visible {
   width: 640px;
   height: 400px;
   overflow: hidden;
-  border: 2px solid #030303;
+  border: 0;
+  outline: 2px solid #030303;
   background:
     radial-gradient(circle at 50% 25%, #352c21, transparent 32%),
     linear-gradient(#17130f, #0c0a08);
-  box-shadow: 0 0 0 1px #5b5040, 0 16px 35px rgba(0, 0, 0, 0.68);
   image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  transform: scale(2);
+  transform-origin: top left;
+}
+
+/* Keep transform handles interactive even when a rotated/off-stage asset is
+   clipped by the composition canvas itself. */
+.gizmo-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 80;
+  width: 640px;
+  height: 400px;
+  overflow: visible;
+  pointer-events: none;
+  transform: scale(2);
   transform-origin: top left;
 }
 
@@ -380,7 +401,7 @@ input:focus-visible {
 }
 
 .mock-tags {
-  top: 256px;
+  top: 250px;
   left: 12px;
   display: flex;
   gap: 7px;
@@ -411,10 +432,10 @@ input:focus-visible {
 }
 
 .mock-statement {
-  top: 292px;
-  left: 110px;
-  width: 436px;
-  height: 54px;
+  top: 288px;
+  left: 164px;
+  width: 320px;
+  height: 48px;
   padding: 9px 12px;
   border: 2px solid #c5ad74;
   background: rgba(8, 7, 5, 0.91);
@@ -436,7 +457,7 @@ input:focus-visible {
 }
 
 .mock-evidence-label {
-  top: 350px;
+  top: 294px;
   left: 11px;
   color: #3a2d17;
   font-size: 7px;
@@ -458,12 +479,102 @@ input:focus-visible {
 }
 
 .mock-status {
-  right: 8px;
-  bottom: 3px;
+  top: 26px;
+  left: 0;
   display: flex;
-  gap: 10px;
+  justify-content: space-between;
+  width: 640px;
+  height: 16px;
+  padding: 3px 8px;
+  background: rgba(7, 6, 5, 0.72);
   color: #c0ae82;
   font-size: 7px;
+}
+
+/* Transform gizmo: the frame is decorative, only the handles take pointers. */
+.gizmo {
+  position: absolute;
+  z-index: 70;
+  box-sizing: border-box;
+  pointer-events: none;
+  transform-origin: center;
+  --rotate-gap: 22px;
+}
+
+.gizmo-frame {
+  position: absolute;
+  inset: -2px;
+  border: 1px dashed #68dbe2;
+  box-shadow: 0 0 0 1px rgba(7, 21, 25, 0.75);
+}
+
+.gizmo-stem {
+  position: absolute;
+  top: calc(var(--rotate-gap) * -1);
+  left: 50%;
+  width: 1px;
+  height: var(--rotate-gap);
+  background: #68dbe2;
+}
+
+.gizmo-handle {
+  position: absolute;
+  box-sizing: border-box;
+  width: 9px;
+  height: 9px;
+  margin: 0;
+  padding: 0;
+  border: 1px solid #071519;
+  background: #68dbe2;
+  pointer-events: auto;
+}
+
+.gizmo-rotate {
+  top: calc((var(--rotate-gap) + 4px) * -1);
+  left: calc(50% - 4px);
+  border-radius: 50%;
+  background: #f2d68e;
+  cursor: grab;
+}
+
+.gizmo-scale {
+  right: -5px;
+  bottom: -5px;
+  cursor: nwse-resize;
+}
+
+.gizmo[data-locked] {
+  --rotate-gap: 0px;
+}
+
+.gizmo[data-locked] .gizmo-frame {
+  border-style: solid;
+  border-color: #e0864f;
+}
+
+.gizmo[data-locked] .gizmo-handle,
+.gizmo[data-locked] .gizmo-stem {
+  display: none;
+}
+
+image-slot[data-locked] {
+  cursor: not-allowed;
+}
+
+.button-lock[data-locked] {
+  border-color: #e0864f;
+  background: rgba(224, 134, 79, 0.22);
+  color: #ffd7b3;
+}
+
+.lock-status {
+  align-self: center;
+  color: var(--muted);
+  font-size: 9px;
+}
+
+.asset-row[data-locked] .asset-row-title span::after {
+  content: ' 🔒';
 }
 
 .stage-note {

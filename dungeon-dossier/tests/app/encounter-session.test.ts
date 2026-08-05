@@ -46,6 +46,17 @@ describe('encounter app session', () => {
     expect(model.cards.map((card) => card.cardId)).toEqual(
       session.coordinator.snapshot.deck.hand,
     );
+    expect(model.suspectName).toBe('물컹이');
+    expect(model.backgroundAssetKey).toBe('배경/심문실/시안');
+    expect(model.portraitBaseAssetKey).toBe('portrait/물컹이/base');
+    expect(model.portraitStatePartsAssetKeys).toEqual({
+      base: model.portraitBaseAssetKey,
+      upset: 'portrait/물컹이/upset',
+      lose: 'portrait/물컹이/lose',
+    });
+    expect(model.suspectStatePart).toBe('base');
+    expect(model.partnerCooldown).toEqual({ state: 'base', cooldownTurns: 0 });
+    expect(model.partnerSkillAvailable).toBe(false);
     expect(hasForbiddenPublicKey(model.dto)).toBe(false);
     expect(session.fallbackCatalog.statements.clm_tutorial_when).toHaveLength(1);
     expect(session.fallbackCatalog.reactions.R_DIRECT_CONTRADICTION).toHaveLength(1);
@@ -93,13 +104,115 @@ describe('encounter app session', () => {
       coordinator.beginArgument();
       const second = coordinator.submit(request);
       expect(second.resolution.code).toBe('R_DIRECT_CONTRADICTION');
-      expect(second.outcome.bestResolution.secureStatementEnabled).toBe(true);
+      expect(second.outcome.bestResolution.secureStatementEnabled).toBe(false);
+      coordinator.endTurn();
+      while (!coordinator.snapshot.deck.hand.includes('card_contradict_basic')) {
+        const cardId = coordinator.snapshot.deck.hand[0];
+        if (cardId === undefined) throw new Error('Expected a playable card while cycling the deck.');
+        coordinator.beginArgument();
+        coordinator.submit({ cardId, evidenceIds: [] });
+        coordinator.endTurn();
+      }
+      coordinator.beginArgument();
+      const third = coordinator.submit(request);
+      expect(third.resolution.code).toBe('R_DIRECT_CONTRADICTION');
+      expect(third.outcome.bestResolution.secureStatementEnabled).toBe(true);
       expect(coordinator.secureStatement().terminalOutcome).toBe('BEST_RESOLUTION');
+      expect(session.currentModel().suspectStatePart).toBe('lose');
       expect(hasForbiddenPublicKey(session.currentModel().dto)).toBe(false);
       return serializeJudgmentLog(coordinator.snapshot.log);
     };
 
     expect(await play()).toBe(await play());
+  });
+
+  it('applies validated balance changes to the active encounter without restarting it', async () => {
+    const [caseDefinition, cardsDefinition, balance] = await Promise.all([
+      content('cases/tutorial/case.json').then((value) => CaseSchema.parse(value)),
+      content('common/cards.json').then((value) => CardsSchema.parse(value)),
+      content('common/balance.json').then((value) => BalanceSchema.parse(value)),
+    ]);
+    const session = await createEncounterSession({
+      caseRepository: { load: async () => caseDefinition },
+      cardRepository: { load: async () => cardsDefinition },
+      balanceRepository: { reload: async () => balance },
+      runSeed: 77,
+    });
+    const tuned = structuredClone(balance);
+    tuned.dmg.contradict = 25;
+    tuned.sweetSpot = { min: 10, max: 20 };
+    tuned.overrides.byEncounter.enc_tutorial_slime = {
+      composureMax: 75,
+      coercionLimit: 55,
+    };
+
+    session.applyBalance(tuned);
+
+    expect(session.balance).toBe(tuned);
+    expect(session.coordinator.snapshot.resources.turn).toBe(1);
+    expect(session.currentModel()).toMatchObject({
+      composureMax: 75,
+      coercionMax: 55,
+      sweetSpotMin: 7.5,
+      sweetSpotMax: 15,
+    });
+    session.coordinator.beginArgument();
+    const result = session.coordinator.submit({
+      cardId: 'card_contradict_basic',
+      targetClaimId: 'clm_tutorial_when',
+      evidenceIds: ['ev_tutorial_gate_log'],
+    });
+
+    expect(result.resolution.effects.composureDelta).toBe(-25);
+    expect(session.coordinator.snapshot.resources.composure).toBe(35);
+  });
+
+  it('projects a configured partner cooldown as used until turn-start ticks reach zero', async () => {
+    const [caseDefinition, cardsDefinition, balance] = await Promise.all([
+      content('cases/tutorial/case.json').then((value) => CaseSchema.parse(value)),
+      content('common/cards.json').then((value) => CardsSchema.parse(value)),
+      content('common/balance.json').then((value) => BalanceSchema.parse(value)),
+    ]);
+    const configured = structuredClone(balance);
+    configured.partner.cooldowns.partner_runtime = 2;
+    const session = await createEncounterSession({
+      caseRepository: { load: async () => caseDefinition },
+      cardRepository: { load: async () => cardsDefinition },
+      balanceRepository: { reload: async () => configured },
+      partnerSkillId: 'partner_runtime',
+      runSeed: 77,
+    });
+
+    expect(session.currentModel().partnerSkillAvailable).toBe(true);
+    expect(session.usePartnerSkill()).toEqual({ state: 'used', cooldownTurns: 2 });
+    expect(session.currentModel().partnerCooldown).toEqual({
+      state: 'used',
+      cooldownTurns: 2,
+    });
+
+    session.coordinator.beginArgument();
+    session.coordinator.submit({
+      cardId: 'card_contradict_basic',
+      targetClaimId: 'clm_tutorial_when',
+      evidenceIds: ['ev_tutorial_gate_log'],
+    });
+    session.coordinator.endTurn();
+    expect(session.currentModel().partnerCooldown).toEqual({
+      state: 'used',
+      cooldownTurns: 1,
+    });
+
+    session.coordinator.beginArgument();
+    session.coordinator.submit({
+      cardId: 'card_query_when',
+      targetClaimId: 'clm_tutorial_when',
+      evidenceIds: [],
+    });
+    session.coordinator.endTurn();
+    expect(session.currentModel().partnerCooldown).toEqual({
+      state: 'base',
+      cooldownTurns: 0,
+    });
   });
 
   it('carries run resources, deck, evidence, and consumed flag effects into the next encounter', async () => {

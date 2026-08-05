@@ -22,8 +22,6 @@ import {
   applyResourceDelta,
   beginEncounterTurn,
   createResourceState,
-  ENCOUNTER_COMPOSURE_MAX,
-  type EncounterArchetype,
   type EncounterResourceLimits,
   type EncounterResourceState,
 } from '../../src/engine/encounter/ResourceSystem';
@@ -45,8 +43,11 @@ import { canonicalStringify } from '../../src/engine/log/canonicalStringify';
 import { serializeJudgmentLog } from '../../src/engine/log/JudgmentLog';
 import { createRngState } from '../../src/engine/rng';
 
-/** The runtime values are derived from authored encounter targets below. */
-export type SimulationArchetype = EncounterArchetype;
+/** Open content-owned label derived from each authored encounter target. */
+declare const simulationArchetypeBrand: unique symbol;
+export type SimulationArchetype = string & {
+  readonly [simulationArchetypeBrand]: true;
+};
 
 export const SIMULATION_OUTCOMES = [
   'BEST_RESOLUTION',
@@ -232,10 +233,7 @@ function uniqueStrings(values: readonly string[]): readonly string[] {
 }
 
 function isSimulationArchetype(value: unknown): value is SimulationArchetype {
-  return (
-    typeof value === 'string' &&
-    Object.prototype.hasOwnProperty.call(ENCOUNTER_COMPOSURE_MAX, value)
-  );
+  return typeof value === 'string' && value.trim().length > 0;
 }
 
 function encounterArchetype(
@@ -248,7 +246,7 @@ function encounterArchetype(
   const value = entity?.attributes.archetype;
   if (!isSimulationArchetype(value)) {
     throw new Error(
-      `Encounter ${encounter.encounter_id} target must declare a supported archetype.`,
+      `Encounter ${encounter.encounter_id} target must declare an archetype.`,
     );
   }
   const dialogueRace = definition.dialogue.speaker_profiles[
@@ -499,8 +497,8 @@ function buildCatalogEntry(
     };
   });
   const sweetSpot = {
-    min: objectives.state_conditions.composure_min,
-    max: objectives.state_conditions.composure_max,
+    min: resources.composure_max * BALANCE.sweetSpot.min / 100,
+    max: resources.composure_max * BALANCE.sweetSpot.max / 100,
     ...(objectives.state_conditions.coercion_max === undefined
       ? {}
       : { coercionMax: objectives.state_conditions.coercion_max }),
@@ -597,10 +595,21 @@ export const SIMULATION_CATALOG = Object.freeze(
   ),
 ) as Readonly<Record<SimulationArchetype, SimulationEncounterCatalogEntry>>;
 
+/** Checked access keeps the catalog open-ended without weakening strict indexing. */
+export function getSimulationEncounter(
+  archetype: SimulationArchetype,
+): SimulationEncounterCatalogEntry {
+  const entry = SIMULATION_CATALOG[archetype];
+  if (entry === undefined) {
+    throw new Error(`Unknown simulation archetype: ${archetype}.`);
+  }
+  return entry;
+}
+
 export const SIMULATION_ENCOUNTER_MAP = Object.freeze(
   Object.fromEntries(
     SIMULATION_ARCHETYPES.map((archetype) => {
-      const entry = SIMULATION_CATALOG[archetype];
+      const entry = getSimulationEncounter(archetype);
       return [
         archetype,
         Object.freeze({ caseId: entry.caseId, encounterId: entry.encounterId }),
@@ -613,7 +622,7 @@ export const SIMULATION_ENCOUNTER_MAP = Object.freeze(
 
 export const ROUTE_MATRIX: readonly RouteMatrixCell[] =
   SIMULATION_ARCHETYPES.flatMap((archetype) => {
-    const entry = SIMULATION_CATALOG[archetype];
+    const entry = getSimulationEncounter(archetype);
     return SIMULATION_OUTCOMES.map((intendedOutcome) => ({
       archetype,
       caseId: entry.caseId,
@@ -1183,7 +1192,7 @@ export function simulateRoute(
   intendedOutcome: SimulationOutcome,
   options: SimulationRunOptions = {},
 ): RouteSimulationResult {
-  const encounter = SIMULATION_CATALOG[archetype];
+  const encounter = getSimulationEncounter(archetype);
   const policy = encounter.policies[intendedOutcome];
   const limits = resourceLimits(encounter);
   const maxSteps = encounter.turnLimit * 2 + 1;

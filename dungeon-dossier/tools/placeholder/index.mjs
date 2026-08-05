@@ -15,16 +15,16 @@ const MAX_DIMENSION = 4096;
 const MAX_PIXELS = 16_777_216;
 const FILE_SEGMENT_PATTERN = /^[\p{L}\p{N}-]+$/u;
 const FILE_NAME_PATTERN = /^[\p{L}\p{N}-]+(?:_[\p{L}\p{N}-]+)*$/u;
-export const PORTRAIT_BASE_SIZE = Object.freeze({ width: 196, height: 216 });
-export const PORTRAIT_PARTS_SIZE = Object.freeze({ width: 96, height: 40 });
+export const PORTRAIT_BASE_SIZE = Object.freeze({ width: 512, height: 512 });
+export const PORTRAIT_PARTS_SIZE = Object.freeze({ width: 512, height: 512 });
+/** `base` is the body frame itself; the other two are full-frame overlays. */
+export const PORTRAIT_STATE_PARTS = Object.freeze(["upset", "lose"]);
 export const DEFAULT_PORTRAIT_PARTS_BOUNDS = Object.freeze({
-  origin: "portrait-base",
-  x: 50,
-  y: 44,
+  origin: "suspect-base",
+  x: 0,
+  y: 0,
   width: PORTRAIT_PARTS_SIZE.width,
   height: PORTRAIT_PARTS_SIZE.height,
-  stage_x: 272,
-  stage_y: 84,
 });
 const THEMES = Object.freeze({
   neutral: Object.freeze({
@@ -154,31 +154,33 @@ export function buildPlaceholderFilename(specification) {
   return `${specification.category}_${specification.name}_${specification.state}.png`;
 }
 
-function isPortraitState(specification, state) {
-  return specification.category === "portrait" && specification.state === state;
+function isPortraitStatePart(specification) {
+  return (
+    specification.category === "portrait" &&
+    PORTRAIT_STATE_PARTS.includes(specification.state)
+  );
 }
 
 export function buildPortraitPartsManifest(name) {
-  validateFilenameParts({ category: "portrait", name, state: "parts" });
+  validateFilenameParts({ category: "portrait", name, state: "base" });
   return {
-    schema_version: "1.0",
+    schema_version: "2.0",
     base: {
-      slot: "portrait-base",
+      slot: "suspect-base",
       image: buildPlaceholderFilename({
         category: "portrait",
         name,
         state: "base",
       }),
+      width: PORTRAIT_BASE_SIZE.width,
+      height: PORTRAIT_BASE_SIZE.height,
     },
-    parts: {
-      slot: "portrait-parts",
-      image: buildPlaceholderFilename({
-        category: "portrait",
-        name,
-        state: "parts",
-      }),
+    state_parts: PORTRAIT_STATE_PARTS.map((state) => ({
+      state,
+      slot: "suspect-state-parts",
+      image: buildPlaceholderFilename({ category: "portrait", name, state }),
       ...DEFAULT_PORTRAIT_PARTS_BOUNDS,
-    },
+    })),
   };
 }
 
@@ -187,8 +189,8 @@ export function serializePortraitPartsManifest(name) {
 }
 
 export function buildPortraitPartsManifestFilename(name) {
-  validateFilenameParts({ category: "portrait", name, state: "parts" });
-  return `portrait_${name}.parts.json`;
+  validateFilenameParts({ category: "portrait", name, state: "base" });
+  return `portrait_${name}.state-parts.json`;
 }
 
 export function normalizePlaceholderSpec(specification) {
@@ -201,22 +203,13 @@ export function normalizePlaceholderSpec(specification) {
     throw new RangeError(`placeholder area cannot exceed ${MAX_PIXELS} pixels.`);
   }
 
+  // Suspect bodies, suspect state sheets, and the partner all share one frame.
   if (
     specification.category === "portrait" &&
-    specification.state === "base" &&
     (width !== PORTRAIT_BASE_SIZE.width || height !== PORTRAIT_BASE_SIZE.height)
   ) {
     throw new RangeError(
-      `portrait base must be ${PORTRAIT_BASE_SIZE.width}x${PORTRAIT_BASE_SIZE.height}.`,
-    );
-  }
-  if (
-    specification.category === "portrait" &&
-    specification.state === "parts" &&
-    (width !== PORTRAIT_PARTS_SIZE.width || height !== PORTRAIT_PARTS_SIZE.height)
-  ) {
-    throw new RangeError(
-      `portrait parts must be ${PORTRAIT_PARTS_SIZE.width}x${PORTRAIT_PARTS_SIZE.height}.`,
+      `portrait assets must be ${PORTRAIT_BASE_SIZE.width}x${PORTRAIT_BASE_SIZE.height}.`,
     );
   }
 
@@ -433,6 +426,33 @@ function encodePng(png) {
   });
 }
 
+function drawUpsetStateParts(png, palette) {
+  // Angled brows, a sweat bead, and a shouting mouth.
+  fillRectangle(png, 120, 150, 90, 14, palette.border);
+  fillRectangle(png, 130, 164, 70, 10, palette.highlight);
+  fillRectangle(png, 302, 150, 90, 14, palette.border);
+  fillRectangle(png, 312, 164, 70, 10, palette.highlight);
+  fillRectangle(png, 392, 170, 10, 22, palette.text);
+  fillEllipse(png, 397, 200, 13, 24, palette.highlight);
+  fillEllipse(png, 256, 312, 46, 30, palette.shadow);
+  fillRectangle(png, 214, 296, 84, 8, palette.border);
+}
+
+function drawLoseStateParts(png, palette) {
+  // Drooping brows, tear streaks, and a downturned mouth.
+  fillRectangle(png, 120, 168, 90, 12, palette.shadow);
+  fillRectangle(png, 130, 154, 70, 10, palette.border);
+  fillRectangle(png, 302, 168, 90, 12, palette.shadow);
+  fillRectangle(png, 312, 154, 70, 10, palette.border);
+  fillRectangle(png, 152, 202, 12, 96, palette.highlight);
+  fillRectangle(png, 348, 202, 12, 96, palette.highlight);
+  fillRectangle(png, 214, 322, 84, 10, palette.shadow);
+  fillRectangle(png, 206, 310, 12, 12, palette.shadow);
+  fillRectangle(png, 294, 310, 12, 12, palette.shadow);
+  setPixel(png, 200, 306, palette.text);
+  setPixel(png, 311, 306, palette.text);
+}
+
 function createPortraitPartsPngFromSpec(spec) {
   const palette = THEMES[spec.theme];
   const png = new PNG({
@@ -444,33 +464,30 @@ function createPortraitPartsPngFromSpec(spec) {
   });
   png.data.fill(0);
 
-  // The untouched buffer stays fully transparent. The three compact groups
-  // are deterministic brow, sweat, and mouth overlays for the measured slot.
-  fillRectangle(png, 9, 7, 22, 3, palette.border);
-  fillRectangle(png, 65, 7, 22, 3, palette.border);
-  fillRectangle(png, 11, 10, 18, 1, palette.highlight);
-  fillRectangle(png, 67, 10, 18, 1, palette.highlight);
-  fillEllipse(png, 85, 20, 3, 7, palette.highlight);
-  fillRectangle(png, 83, 18, 2, 5, palette.text);
-  fillRectangle(png, 35, 29, 26, 3, palette.shadow);
-  fillRectangle(png, 39, 32, 18, 2, palette.border);
-  setPixel(png, 34, 28, palette.text);
-  setPixel(png, 61, 28, palette.text);
+  // The untouched buffer stays fully transparent so the 512x512 sheet composites
+  // directly over the same-sized body frame.
+  if (spec.state === "lose") {
+    drawLoseStateParts(png, palette);
+  } else {
+    drawUpsetStateParts(png, palette);
+  }
 
   return encodePng(png);
 }
 
 export function createPortraitPartsPng(specification) {
   const spec = normalizePlaceholderSpec(specification);
-  if (!isPortraitState(spec, "parts")) {
-    throw new TypeError("portrait parts PNG requires category portrait and state parts.");
+  if (!isPortraitStatePart(spec)) {
+    throw new TypeError(
+      `portrait state parts PNG requires category portrait and state ${PORTRAIT_STATE_PARTS.join(" or ")}.`,
+    );
   }
   return createPortraitPartsPngFromSpec(spec);
 }
 
 export function createPlaceholderPng(specification) {
   const spec = normalizePlaceholderSpec(specification);
-  if (isPortraitState(spec, "parts")) {
+  if (isPortraitStatePart(spec)) {
     return createPortraitPartsPngFromSpec(spec);
   }
   const palette = THEMES[spec.theme];
@@ -549,33 +566,36 @@ export async function generatePlaceholders({
     targets.add(normalizedTarget);
     return { asset, directory, filePath };
   });
-  const partsPlan = plan
-    .filter((item) => isPortraitState(item.asset, "parts"))
-    .map((item) => {
-      const manifestPath = path.join(
-        item.directory,
-        buildPortraitPartsManifestFilename(item.asset.name),
-      );
-      const normalizedManifestTarget = path.normalize(manifestPath);
-      if (targets.has(normalizedManifestTarget)) {
-        throw new Error(`duplicate placeholder target: ${normalizedManifestTarget}`);
-      }
-      targets.add(normalizedManifestTarget);
-      return {
-        ...item,
-        baseFilePath: portraitBasePathFor(item),
-        manifestPath,
-      };
-    });
+  const statePartsPlan = plan
+    .filter((item) => isPortraitStatePart(item.asset))
+    .map((item) => ({ ...item, baseFilePath: portraitBasePathFor(item) }));
 
-  for (const item of partsPlan) {
+  // Every state sheet for one suspect shares a single manifest.
+  const manifestPlan = [];
+  const manifestTargets = new Set();
+  for (const item of statePartsPlan) {
+    const manifestPath = path.join(
+      item.directory,
+      buildPortraitPartsManifestFilename(item.asset.name),
+    );
+    const normalizedManifestTarget = path.normalize(manifestPath);
+    if (manifestTargets.has(normalizedManifestTarget)) continue;
+    if (targets.has(normalizedManifestTarget)) {
+      throw new Error(`duplicate placeholder target: ${normalizedManifestTarget}`);
+    }
+    targets.add(normalizedManifestTarget);
+    manifestTargets.add(normalizedManifestTarget);
+    manifestPlan.push({ name: item.asset.name, manifestPath });
+  }
+
+  for (const item of statePartsPlan) {
     const plannedBase = targets.has(path.normalize(item.baseFilePath));
     if (plannedBase) continue;
     try {
       await access(item.baseFilePath);
     } catch {
       throw new Error(
-        `portrait parts ${item.asset.name} requires same-name base ${item.baseFilePath}.`,
+        `portrait state parts ${item.asset.name} requires same-name base ${item.baseFilePath}.`,
       );
     }
   }
@@ -583,12 +603,12 @@ export async function generatePlaceholders({
   const generated = [];
   const skipped = [];
   const orderedPlan = [
-    ...plan.filter((item) => !isPortraitState(item.asset, "parts")),
-    ...plan.filter((item) => isPortraitState(item.asset, "parts")),
+    ...plan.filter((item) => !isPortraitStatePart(item.asset)),
+    ...plan.filter((item) => isPortraitStatePart(item.asset)),
   ];
   for (const item of orderedPlan) {
     await mkdir(item.directory, { recursive: true });
-    if (isPortraitState(item.asset, "parts")) {
+    if (isPortraitStatePart(item.asset)) {
       await access(portraitBasePathFor(item));
     }
     const buffer = createPlaceholderPng(item.asset);
@@ -600,8 +620,8 @@ export async function generatePlaceholders({
     }
   }
 
-  for (const item of partsPlan) {
-    const manifest = serializePortraitPartsManifest(item.asset.name);
+  for (const item of manifestPlan) {
+    const manifest = serializePortraitPartsManifest(item.name);
     const status = await writeDeterministicFile(
       item.manifestPath,
       manifest,

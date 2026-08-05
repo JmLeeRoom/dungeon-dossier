@@ -4,6 +4,7 @@
   "case_id": "case_tutorial",
   "metadata": {
     "title": "황금 엘릭서 믹스커피 절도",
+    "background_asset_key": "배경/심문실/시안",
     "act": 0,
     "estimated_turns": 18,
     "content_version": "1.1"
@@ -14,21 +15,33 @@
       "type": "PERSON",
       "role": "SUSPECT",
       "display_name_key": "entity.tutorial.slime.name",
-      "attributes": { "archetype": "SLIME" }
+      "attributes": {
+        "archetype": "SLIME",
+        "display_name": "물컹이",
+        "portrait_asset_name": "물컹이"
+      }
     },
     {
       "entity_id": "ent_tutorial_harpy",
       "type": "PERSON",
       "role": "WITNESS",
       "display_name_key": "entity.tutorial.harpy.name",
-      "attributes": { "archetype": "HARPY" }
+      "attributes": {
+        "archetype": "HARPY",
+        "display_name": "하피",
+        "portrait_asset_name": "하피"
+      }
     },
     {
       "entity_id": "ent_tutorial_minotaur",
       "type": "PERSON",
       "role": "SUSPECT",
       "display_name_key": "entity.tutorial.minotaur.name",
-      "attributes": { "archetype": "MINOTAUR" }
+      "attributes": {
+        "archetype": "MINOTAUR",
+        "display_name": "미노타우로스",
+        "portrait_asset_name": "미노타우로스"
+      }
     },
     {
       "entity_id": "ent_tutorial_breakroom",

@@ -14,12 +14,23 @@ export interface GaugeDisplayModel {
 export function buildGaugeDisplayModel(
   value: number,
   max: number,
-  options: Readonly<{ cellCount?: number; sweetSpotUnlocked?: boolean }> = {},
+  options: Readonly<{
+    cellCount?: number;
+    sweetSpotUnlocked?: boolean;
+    sweetSpotMin?: number;
+    sweetSpotMax?: number;
+  }> = {},
 ): GaugeDisplayModel {
   const safeMax = Number.isFinite(max) && max > 0 ? max : 1;
   const safeValue = Math.min(safeMax, Math.max(0, Number.isFinite(value) ? value : 0));
   const cellCount = Math.max(1, Math.round(options.cellCount ?? 10));
   const ratio = safeValue / safeMax;
+  const sweetSpotMin = Number.isFinite(options.sweetSpotMin)
+    ? Math.min(safeMax, Math.max(0, options.sweetSpotMin ?? 0))
+    : safeMax * 0.01;
+  const sweetSpotMax = Number.isFinite(options.sweetSpotMax)
+    ? Math.min(safeMax, Math.max(0, options.sweetSpotMax ?? 0))
+    : safeMax * 0.3;
   return {
     value: safeValue,
     max: safeMax,
@@ -28,7 +39,10 @@ export function buildGaugeDisplayModel(
     cellCount,
     sweetSpot:
       options.sweetSpotUnlocked === true
-        ? { fromRatio: 0.01, toRatio: 0.3 }
+        ? {
+            fromRatio: Math.min(sweetSpotMin, sweetSpotMax) / safeMax,
+            toRatio: Math.max(sweetSpotMin, sweetSpotMax) / safeMax,
+          }
         : undefined,
   };
 }
@@ -38,6 +52,8 @@ export interface GaugeOptions {
   readonly height?: number;
   readonly fill?: number;
   readonly sweetSpotUnlocked?: boolean;
+  readonly sweetSpotMin?: number;
+  readonly sweetSpotMax?: number;
   readonly label?: string;
   readonly cellCount?: number;
 }
@@ -50,6 +66,8 @@ export function createGauge(value: number, max: number, options: GaugeOptions = 
     ...(options.sweetSpotUnlocked === undefined
       ? {}
       : { sweetSpotUnlocked: options.sweetSpotUnlocked }),
+    ...(options.sweetSpotMin === undefined ? {} : { sweetSpotMin: options.sweetSpotMin }),
+    ...(options.sweetSpotMax === undefined ? {} : { sweetSpotMax: options.sweetSpotMax }),
   });
   const view = new Container();
   const labelWidth = options.label === undefined ? 0 : 39;

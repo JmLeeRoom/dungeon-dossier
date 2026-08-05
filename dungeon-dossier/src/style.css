@@ -10,6 +10,7 @@
   color-scheme: dark;
   font-family: 'Galmuri11', monospace;
   background: #08090d;
+  --panel-border: #34332f;
 }
 
 * {
@@ -17,16 +18,36 @@
 }
 
 html,
-body,
-#game-root {
+body {
   width: 100%;
   height: 100%;
   margin: 0;
   overflow: hidden;
 }
 
+body {
+  display: grid;
+  place-items: center;
+  background: #08090d;
+}
+
+.stage-viewport {
+  position: relative;
+  width: 1280px;
+  height: 800px;
+  max-width: 100vw;
+  max-height: 100vh;
+  margin: 0 auto;
+  overflow: hidden;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  box-shadow: 0 0 0 2px var(--panel-border), 0 10px 40px rgba(0, 0, 0, 0.85);
+}
+
 #game-root {
   position: relative;
+  width: 100%;
+  height: 100%;
   background: #08090d;
 }
 

@@ -1,0 +1,31 @@
+{
+  "schema_version": "2.0",
+  "base": {
+    "slot": "suspect-base",
+    "image": "portrait_김_인턴_base.png",
+    "width": 512,
+    "height": 512
+  },
+  "state_parts": [
+    {
+      "state": "upset",
+      "slot": "suspect-state-parts",
+      "image": "portrait_김_인턴_upset.png",
+      "origin": "suspect-base",
+      "x": 0,
+      "y": 0,
+      "width": 512,
+      "height": 512
+    },
+    {
+      "state": "lose",
+      "slot": "suspect-state-parts",
+      "image": "portrait_김_인턴_lose.png",
+      "origin": "suspect-base",
+      "x": 0,
+      "y": 0,
+      "width": 512,
+      "height": 512
+    }
+  ]
+}

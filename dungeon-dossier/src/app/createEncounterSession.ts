@@ -9,7 +9,12 @@ import {
   type CaseDefinition,
   type DialogueDefinition,
 } from '../content-io';
-import { toPublicDTO, type PublicDTO } from '../dto';
+import {
+  hasForbiddenPublicKey,
+  toPublicDTO,
+  type PartnerCooldownView,
+  type PublicDTO,
+} from '../dto';
 import type { Facet, FlagDefinition } from '../engine/domain';
 import {
   EncounterCoordinator,
@@ -18,6 +23,7 @@ import {
 import { RESOLUTION_CODES } from '../engine/resolution';
 import { createRngState } from '../engine/rng';
 import { resolveFlagEffects, type RunState } from '../engine/run';
+import { deriveSuspectStatePart } from '../engine/suspectState';
 import type { InterrogationScreenModel } from '../ui/screens/interrogation';
 
 interface CaseLoader {
@@ -48,6 +54,8 @@ export interface CreateEncounterSessionOptions {
   readonly balanceRepository?: BalanceLoader;
   readonly fallbackRepository?: EncounterDialogueLoader;
   readonly partnerName?: string;
+  readonly partnerSkillId?: string;
+  readonly backgroundAssetKey?: string;
   readonly acquiredEvidenceIds?: readonly string[];
   readonly runState?: RunState;
   readonly flagDefinitions?: readonly FlagDefinition[];
@@ -61,21 +69,11 @@ export interface EncounterSession {
   readonly encounterId: string;
   readonly fallbackCatalog: FallbackCatalog;
   readonly speakerProfile: SpeakerProfile;
+  applyBalance(balance: BalanceDefinition): void;
+  usePartnerSkill(skillId?: string): PartnerCooldownView;
   currentModel(): InterrogationScreenModel;
   targetClaimIdForFacet(facet: Facet): string | undefined;
 }
-
-const PORTRAIT_NAME_BY_RACE: Readonly<Record<string, string>> = Object.freeze({
-  SLIME: '물컹이',
-  HARPY: '하피',
-  MINOTAUR: '미노타우로스',
-  GOBLIN: '고블린',
-  ORC: '오크',
-  DWARF: '드워프',
-  CYCLOPS: '사이클롭스',
-  SUCCUBUS: '서큐버스',
-  FALLEN_HERO: '타락한_용사',
-});
 
 function required<T>(value: T | undefined, label: string): T {
   if (value === undefined) throw new Error(`${label} could not be loaded.`);
@@ -148,6 +146,17 @@ function entityDisplayName(definition: CaseDefinition, entityId: string): string
   const entity = definition.entities.find((candidate) => candidate.entity_id === entityId);
   const authored = entity?.attributes.display_name;
   return typeof authored === 'string' ? authored : (entity?.display_name_key ?? entityId);
+}
+
+function entityPortraitAssetName(
+  definition: CaseDefinition,
+  entityId: string,
+): string | undefined {
+  const entity = definition.entities.find((candidate) => candidate.entity_id === entityId);
+  const authored = entity?.attributes.portrait_asset_name ?? entity?.attributes.display_name;
+  return typeof authored === 'string' && authored.trim().length > 0
+    ? authored.trim().replaceAll(/\s+/gu, '_')
+    : undefined;
 }
 
 /** Browser composition boundary: validated repositories in, headless coordinator out. */
@@ -239,16 +248,26 @@ export async function createEncounterSession(
     forbidden_expressions: [],
   };
   const fallbackCatalog = createFallbackCatalog(dialogue);
-  const portraitName = PORTRAIT_NAME_BY_RACE[profile.race];
+  const portraitName = entityPortraitAssetName(loadedCase, encounter.target_entity);
+  let currentBalance = loadedBalance;
 
   const session: EncounterSession = {
     coordinator,
     caseDefinition: loadedCase,
     cardsDefinition: loadedCards,
-    balance: loadedBalance,
+    get balance(): BalanceDefinition {
+      return currentBalance;
+    },
     encounterId,
     fallbackCatalog,
     speakerProfile: profile,
+    applyBalance(balance): void {
+      coordinator.applyBalance(balance);
+      currentBalance = balance;
+    },
+    usePartnerSkill(skillId): PartnerCooldownView {
+      return coordinator.usePartnerSkill(skillId ?? options.partnerSkillId);
+    },
     targetClaimIdForFacet(facet) {
       return loadedCase.claims.find(
         (claim) => encounterClaimIds.has(claim.claim_id) && claim.facet === facet,
@@ -275,13 +294,18 @@ export async function createEncounterSession(
         ...sourceDto,
         statement: sourceDto.statement.filter((claim) => encounterClaimIds.has(claim.claimId)),
       };
+      if (hasForbiddenPublicKey(dto)) {
+        throw new Error('PublicDTO projection contains a forbidden private field.');
+      }
+      const limits = coordinator.resourceLimits;
+      const sweetSpot = coordinator.sweetSpot;
       const stateConditions = encounter.objectives.state_conditions;
       const requiredComplete = snapshot.objectives.required.every(
         (objective) => objective.completed,
       );
       const inSweetSpot =
-        snapshot.resources.composure >= stateConditions.composure_min &&
-        snapshot.resources.composure <= stateConditions.composure_max &&
+        snapshot.resources.composure >= sweetSpot.composureMin &&
+        snapshot.resources.composure <= sweetSpot.composureMax &&
         (stateConditions.coercion_max === undefined ||
           snapshot.resources.coercion <= stateConditions.coercion_max);
       const cards = snapshot.deck.hand.flatMap((cardId) => {
@@ -294,8 +318,35 @@ export async function createEncounterSession(
           intent: definition.intent,
           cpCost: definition.cost.cp ?? 0,
           requiresEvidence: (definition.target.min_evidence ?? 0) > 0,
+          attachments: {
+            ...(definition.card_modifier?.stamp === undefined
+              ? {}
+              : { stampId: definition.card_modifier.stamp }),
+            ...(definition.card_modifier?.postit === undefined &&
+            definition.card_modifier?.clip !== true
+              ? {}
+              : {
+                  postId: definition.card_modifier?.postit ?? 'CLIP',
+                }),
+            evidenceIds: [],
+          },
         }];
       });
+      const confessed =
+        snapshot.outcome === 'BEST_RESOLUTION' ||
+        snapshot.outcome === 'COERCED_CONFESSION';
+      const suspectStatePart = deriveSuspectStatePart({
+        composure: snapshot.resources.composure,
+        composureMax: limits.composureMax,
+        confessed,
+      });
+      const backgroundAssetKey =
+        options.backgroundAssetKey ?? loadedCase.metadata.background_asset_key;
+      const partnerSkillId =
+        options.partnerSkillId ?? Object.keys(currentBalance.partner.cooldowns)[0];
+      const partnerSkillDuration = partnerSkillId === undefined
+        ? undefined
+        : currentBalance.partner.cooldowns[partnerSkillId];
       return {
         dto,
         suspectName: entityDisplayName(loadedCase, encounter.target_entity),
@@ -305,8 +356,10 @@ export async function createEncounterSession(
           limit: loadedCase.metadata.estimated_turns,
         },
         stress: snapshot.resources.stress,
-        composureMax: encounter.resources.composure_max,
-        coercionMax: encounter.resources.coercion_limit,
+        composureMax: limits.composureMax,
+        coercionMax: limits.coercionLimit,
+        sweetSpotMin: sweetSpot.composureMin,
+        sweetSpotMax: sweetSpot.composureMax,
         sweetSpotUnlocked: inSweetSpot,
         cards,
         evidenceCosts: Object.fromEntries(dto.evidence.map((item) => [item.evidenceId, 0])),
@@ -314,9 +367,19 @@ export async function createEncounterSession(
           ? {}
           : {
               portraitBaseAssetKey: `portrait/${portraitName}/base`,
-              portraitPartsAssetKey: `portrait/${portraitName}/parts`,
+              portraitStatePartsAssetKeys: {
+                base: `portrait/${portraitName}/base`,
+                upset: `portrait/${portraitName}/upset`,
+                lose: `portrait/${portraitName}/lose`,
+              },
             }),
-        partnerAssetKey: 'portrait/김_인턴/base',
+        ...(backgroundAssetKey === undefined ? {} : { backgroundAssetKey }),
+        suspectStatePart,
+        partnerBaseAssetKey: 'portrait/김_인턴/base',
+        partnerUsedAssetKey: 'portrait/김_인턴/used',
+        partnerCooldown: coordinator.partnerCooldown(partnerSkillId),
+        partnerSkillAvailable:
+          partnerSkillDuration !== undefined && partnerSkillDuration > 0,
         canSecureStatement:
           snapshot.machine.state === 'CHECK_OUTCOME' && requiredComplete && inSweetSpot,
       };

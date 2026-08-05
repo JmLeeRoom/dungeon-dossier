@@ -3,27 +3,6 @@ import type { ContentId } from '../domain';
 
 export const GLOBAL_COERCION_MAX = 100;
 
-/** Canonical Phase-4 values; content data may reference these by archetype. */
-export const ENCOUNTER_COMPOSURE_MAX = {
-  SLIME: 60,
-  HARPY: 70,
-  MINOTAUR: 120,
-  GOBLIN: 90,
-  ORC: 100,
-  SUCCUBUS: 140,
-  DWARF: 110,
-  CYCLOPS: 120,
-  FALLEN_HERO: 180,
-} as const;
-
-export type EncounterArchetype = keyof typeof ENCOUNTER_COMPOSURE_MAX;
-
-export function getEncounterComposureMax(
-  archetype: EncounterArchetype,
-): number {
-  return ENCOUNTER_COMPOSURE_MAX[archetype];
-}
-
 export interface EncounterResourceState {
   readonly composure: number;
   readonly commandPoints: number;
@@ -44,8 +23,11 @@ export interface EncounterResourceLimits {
 }
 
 export interface CommandPointRestoreContext {
-  readonly encounterArchetype?: EncounterArchetype;
-  readonly witnessProtectionRestored?: boolean;
+  /**
+   * Optional data-driven cap applied by an encounter modifier. The resource
+   * system deliberately does not know which case, suspect, or gimmick set it.
+   */
+  readonly commandPointRestoreCap?: number;
 }
 
 export interface TurnStartDrawRules {
@@ -251,22 +233,19 @@ export function beginEncounterTurn(
   };
 }
 
-/** Cyclops restores only 2 CP until witness protection lifts the cap. */
 export function resolveCommandPointRestore(
   limits: EncounterResourceLimits,
   context: CommandPointRestoreContext = {},
 ): number {
   assertResourceLimits(limits);
-  const encounterCap =
-    context.encounterArchetype === 'CYCLOPS' &&
-    context.witnessProtectionRestored !== true
-      ? 2
-      : limits.commandPointMax;
-  return Math.min(
+  const configuredRestore = Math.min(
     limits.commandPointsPerTurn,
     limits.commandPointMax,
-    encounterCap,
   );
+  if (context.commandPointRestoreCap === undefined) return configuredRestore;
+
+  assertNonNegative('commandPointRestoreCap', context.commandPointRestoreCap);
+  return Math.min(configuredRestore, context.commandPointRestoreCap);
 }
 
 function assertDrawRules(rules: TurnStartDrawRules): void {
