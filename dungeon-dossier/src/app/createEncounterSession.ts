@@ -15,7 +15,13 @@ import {
   type PartnerCooldownView,
   type PublicDTO,
 } from '../dto';
-import type { Facet, FlagDefinition } from '../engine/domain';
+import type {
+  Effect,
+  EnhancementDefinition,
+  Facet,
+  FlagDefinition,
+  RelicDefinition,
+} from '../engine/domain';
 import {
   EncounterCoordinator,
   type EncounterCoordinatorDeps,
@@ -25,6 +31,7 @@ import { createRngState } from '../engine/rng';
 import { resolveFlagEffects, type RunState } from '../engine/run';
 import { deriveSuspectStatePart } from '../engine/suspectState';
 import type { InterrogationScreenModel } from '../ui/screens/interrogation';
+import { t } from './i18n';
 
 interface CaseLoader {
   load(caseDirectory: string): Promise<CaseDefinition | undefined>;
@@ -59,6 +66,10 @@ export interface CreateEncounterSessionOptions {
   readonly acquiredEvidenceIds?: readonly string[];
   readonly runState?: RunState;
   readonly flagDefinitions?: readonly FlagDefinition[];
+  readonly relicDefinitions?: readonly RelicDefinition[];
+  readonly enhancementDefinitions?: readonly EnhancementDefinition[];
+  /** Extra encounter-start effects, e.g. owned relics with ENCOUNTER_START activation. */
+  readonly extraInitialEffects?: readonly Effect[];
 }
 
 export interface EncounterSession {
@@ -145,7 +156,9 @@ function createFallbackCatalog(definition: DialogueDefinition): FallbackCatalog 
 function entityDisplayName(definition: CaseDefinition, entityId: string): string {
   const entity = definition.entities.find((candidate) => candidate.entity_id === entityId);
   const authored = entity?.attributes.display_name;
-  return typeof authored === 'string' ? authored : (entity?.display_name_key ?? entityId);
+  return typeof authored === 'string'
+    ? authored
+    : t(entity?.display_name_key, entityId);
 }
 
 function entityPortraitAssetName(
@@ -202,6 +215,41 @@ export async function createEncounterSession(
         options.flagDefinitions ?? [],
         { encounter: encounterId },
       ).map((resolved) => resolved.apply);
+  const ownedRelics = (options.relicDefinitions ?? []).filter(
+    (relic) =>
+      runState?.acquiredRelicIds.includes(relic.relic_id) === true &&
+      relic.conditions.every((condition) => condition.type === 'ALWAYS'),
+  );
+  const ownedEnhancements = (options.enhancementDefinitions ?? []).filter(
+    (enhancement) =>
+      runState?.acquiredEnhancementIds.includes(enhancement.enhancement_id) === true,
+  );
+  const ownedRelicInitialEffects = ownedRelics
+    .filter((relic) =>
+      relic.activation === 'ENCOUNTER_START' || relic.activation === 'PASSIVE',
+    )
+    .flatMap((relic) => relic.effects);
+  const resolutionEffectSources = [
+    ...ownedRelics
+      .filter((relic) => relic.activation === 'ON_RESOLUTION')
+      .map((relic) => ({
+        sourceId: relic.relic_id,
+        effects: relic.effects,
+        ...(relic.uses_per_encounter === undefined
+          ? {}
+          : { usesPerEncounter: relic.uses_per_encounter }),
+      })),
+    ...ownedEnhancements.map((enhancement) => ({
+      sourceId: enhancement.enhancement_id,
+      effects: enhancement.effects,
+      ...(enhancement.compatible_intents === undefined
+        ? {}
+        : { compatibleIntents: enhancement.compatible_intents }),
+      ...(enhancement.compatible_card_ids === undefined
+        ? {}
+        : { compatibleCardIds: enhancement.compatible_card_ids }),
+    })),
+  ];
 
   const deps: EncounterCoordinatorDeps = {
     caseDefinition: loadedCase,
@@ -209,6 +257,7 @@ export async function createEncounterSession(
     cards: loadedCards.cards,
     balance: loadedBalance,
     rng: createRngState(options.runSeed ?? 2_026_080_3, 'DECK_SHUFFLE'),
+    resolutionEffectSources,
     acquiredEvidenceIds: [
       ...(runState?.acquiredEvidenceIds ?? []),
       ...(options.acquiredEvidenceIds ?? []),
@@ -228,7 +277,11 @@ export async function createEncounterSession(
             dp: runState.dp,
             trust: runState.trust,
           },
-          initialEffects: resolvedInitialEffects,
+          initialEffects: [
+            ...resolvedInitialEffects,
+            ...ownedRelicInitialEffects,
+            ...(options.extraInitialEffects ?? []),
+          ],
         }),
   };
   const coordinator = EncounterCoordinator.begin(deps);
@@ -286,13 +339,17 @@ export async function createEncounterSession(
           ...snapshot.objectives.required,
           ...snapshot.objectives.optional,
         ].map((objective) => ({
-          label: objective.objectiveId,
+          label: t(`objective.${objective.objectiveId}`, objective.objectiveId),
           completed: objective.completed,
         })),
       });
       const dto: PublicDTO = {
         ...sourceDto,
         statement: sourceDto.statement.filter((claim) => encounterClaimIds.has(claim.claimId)),
+        evidence: sourceDto.evidence.map((item) => ({
+          ...item,
+          displayName: t(item.displayName, item.evidenceId),
+        })),
       };
       if (hasForbiddenPublicKey(dto)) {
         throw new Error('PublicDTO projection contains a forbidden private field.');
@@ -313,8 +370,8 @@ export async function createEncounterSession(
         if (definition === undefined) return [];
         return [{
           cardId,
-          title: definition.name_key ?? definition.card_id,
-          description: definition.description_key,
+          title: t(definition.name_key ?? definition.title_key, definition.card_id),
+          description: t(definition.description_key, ''),
           intent: definition.intent,
           cpCost: definition.cost.cp ?? 0,
           requiresEvidence: (definition.target.min_evidence ?? 0) > 0,

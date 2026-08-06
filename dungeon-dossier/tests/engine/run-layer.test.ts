@@ -181,12 +181,16 @@ describe('run layer', () => {
     expect(encounter.state.nodeIndex).toBe(1);
     expect(encounter.state.flags['F-02']).toBe(true);
     expect(encounter.rewardChoices).toHaveLength(3);
-    const stressReward = encounter.rewardChoices.find(
-      (reward) => reward.reward_id === 'reward_stress_recovery',
+    const resourceReward = encounter.rewardChoices.find(
+      (reward) => reward.type === 'RESOURCE',
     );
-    if (stressReward === undefined) throw new Error('Expected the common stress reward.');
-    const claimed = claimRunReward(encounter.state, stressReward);
-    expect(claimed.stress).toBe(85);
+    if (resourceReward === undefined) throw new Error('Expected a common resource reward.');
+    const claimed = claimRunReward(encounter.state, resourceReward);
+    const expectedStress = resourceReward.resource === 'STRESS'
+      ? 70 + (resourceReward.amount ?? 0)
+      : 70;
+    expect(claimed.stress).toBe(expectedStress);
+    expect(claimed.claimedRewardIds).toEqual([resourceReward.reward_id]);
     const choiceEvent = tutorial.events_noncombat.find(
       (candidate) => candidate.event_id === 'event_tutorial_choice',
     );
@@ -200,7 +204,7 @@ describe('run layer', () => {
     expect(event.state.nodeIndex).toBe(2);
     expect(event.state.flags['F-03']).toBe(true);
     expect(event.state.flags['F-07']).toBe(true);
-    expect(event.state.stress).toBe(80);
+    expect(event.state.stress).toBe(expectedStress - 5);
     expect(event.state.acquiredEvidenceIds).toContain('ev_tutorial_receipt');
   });
 

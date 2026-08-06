@@ -9,6 +9,7 @@ import {
   lookupResolutionCode,
   lookupResolutionTableRow,
   type ResolutionTableInput,
+  type ResolutionTableRow,
 } from '../../src/engine/resolution';
 
 const EVIDENCE_INTENTS = ['CONTRADICT', 'CONFIRM'] as const;
@@ -52,16 +53,62 @@ describe('type-safe resolution lookup table', () => {
     },
   );
 
-  it('throws explicitly for a combination absent from the table', () => {
-    expect(() =>
-      lookupResolutionCode({
-        intent: 'CONFIRM',
-        relevance: 'PARTIAL',
-        relation: 'NEUTRAL',
-        sufficiency: 'SUFFICIENT',
-        independence: 'MET',
-        hypotheses: 'NOT_APPLICABLE',
-      }),
-    ).toThrow('Undefined resolution combination');
+  it('resolves every one of the 432 axis combinations without throwing', () => {
+    let combinations = 0;
+    for (const intent of EVIDENCE_INTENTS) {
+      for (const relevance of RELEVANCES) {
+        for (const relation of RELATIONS) {
+          for (const sufficiency of SUFFICIENCIES) {
+            for (const independence of INDEPENDENCE_RESULTS) {
+              for (const hypotheses of HYPOTHESIS_RESULTS) {
+                combinations += 1;
+                const code = lookupResolutionCode({
+                  intent,
+                  relevance,
+                  relation,
+                  sufficiency,
+                  independence,
+                  hypotheses,
+                });
+                expect(code).toMatch(/^R_/);
+              }
+            }
+          }
+        }
+      }
+    }
+    expect(combinations).toBe(432);
+  });
+
+  it('covers the full table explicitly so the runtime fallback row stays cold', () => {
+    for (const intent of EVIDENCE_INTENTS) {
+      for (const relevance of RELEVANCES) {
+        for (const relation of RELATIONS) {
+          for (const sufficiency of SUFFICIENCIES) {
+            for (const independence of INDEPENDENCE_RESULTS) {
+              for (const hypotheses of HYPOTHESIS_RESULTS) {
+                const input = {
+                  intent,
+                  relevance,
+                  relation,
+                  sufficiency,
+                  independence,
+                  hypotheses,
+                } satisfies ResolutionTableInput;
+                const authored = (RESOLUTION_TABLE as readonly ResolutionTableRow[]).some((row) =>
+                  row.intent === input.intent &&
+                  (row.relevance === '*' || row.relevance === input.relevance) &&
+                  (row.relation === '*' || row.relation === input.relation) &&
+                  (row.sufficiency === '*' || row.sufficiency === input.sufficiency) &&
+                  (row.independence === '*' || row.independence === input.independence) &&
+                  (row.hypotheses === '*' || row.hypotheses === input.hypotheses),
+                );
+                expect(authored, JSON.stringify(input)).toBe(true);
+              }
+            }
+          }
+        }
+      }
+    }
   });
 });

@@ -1,0 +1,1 @@
+export { startAutoplay } from './driver';

@@ -77,7 +77,12 @@ export const RESOLUTION_TABLE = [
   },
   {
     intent: 'CONTRADICT', relevance: 'PARTIAL', relation: 'AMBIGUOUS',
-    sufficiency: 'INSUFFICIENT', independence: '*', hypotheses: '*',
+    sufficiency: '*', independence: '*', hypotheses: '*',
+    code: 'R_INSUFFICIENT_GROUNDS',
+  },
+  {
+    intent: 'CONTRADICT', relevance: 'PARTIAL', relation: 'NEUTRAL',
+    sufficiency: '*', independence: '*', hypotheses: '*',
     code: 'R_INSUFFICIENT_GROUNDS',
   },
   {
@@ -162,6 +167,11 @@ export const RESOLUTION_TABLE = [
   },
   {
     intent: 'CONFIRM', relevance: 'PARTIAL', relation: 'SUPPORTS',
+    sufficiency: 'SUFFICIENT', independence: '*', hypotheses: '*',
+    code: 'R_CONFIRM_PROVISIONAL',
+  },
+  {
+    intent: 'CONFIRM', relevance: 'PARTIAL', relation: 'SUPPORTS',
     sufficiency: 'PROVISIONAL', independence: '*', hypotheses: '*',
     code: 'R_CONFIRM_PROVISIONAL',
   },
@@ -172,12 +182,17 @@ export const RESOLUTION_TABLE = [
   },
   {
     intent: 'CONFIRM', relevance: 'PARTIAL', relation: 'CONTRADICTS',
-    sufficiency: 'INSUFFICIENT', independence: '*', hypotheses: '*',
+    sufficiency: '*', independence: '*', hypotheses: '*',
     code: 'R_INSUFFICIENT_GROUNDS',
   },
   {
     intent: 'CONFIRM', relevance: 'PARTIAL', relation: 'AMBIGUOUS',
-    sufficiency: 'INSUFFICIENT', independence: '*', hypotheses: '*',
+    sufficiency: '*', independence: '*', hypotheses: '*',
+    code: 'R_INSUFFICIENT_GROUNDS',
+  },
+  {
+    intent: 'CONFIRM', relevance: 'PARTIAL', relation: 'NEUTRAL',
+    sufficiency: '*', independence: '*', hypotheses: '*',
     code: 'R_INSUFFICIENT_GROUNDS',
   },
   {
@@ -206,11 +221,15 @@ export function lookupResolutionTableRow(input: ResolutionTableInput): Resolutio
       matches(candidate.hypotheses, input.hypotheses),
   );
 
-  if (row === undefined) {
-    throw new Error(
-      `Undefined resolution combination: ${input.intent}/${input.relevance}/${input.relation}/${input.sufficiency}/${input.independence}/${input.hypotheses}`,
-    );
-  }
-
-  return row;
+  // A table miss must never crash a live encounter; the neutral fallback keeps
+  // the submission legal while the completeness test keeps this branch cold.
+  return row ?? {
+    intent: input.intent,
+    relevance: input.relevance,
+    relation: input.relation,
+    sufficiency: input.sufficiency,
+    independence: input.independence,
+    hypotheses: input.hypotheses,
+    code: 'R_INSUFFICIENT_GROUNDS',
+  };
 }

@@ -1059,6 +1059,7 @@
       "event_id": "event_tutorial_choice",
       "node": "node_tutorial_choice",
       "title_key": "event.tutorial.choice.title",
+      "description_key": "event.event_tutorial_choice.description",
       "pattern": "A",
       "choices": [
         {
@@ -1080,6 +1081,7 @@
       "event_id": "event_tutorial_placement",
       "node": "node_tutorial_placement",
       "title_key": "event.tutorial.placement.title",
+      "description_key": "event.event_tutorial_placement.description",
       "pattern": "B",
       "items": [
         { "item_id": "item_tutorial_cleanup", "label_key": "event.tutorial.item.cleanup" },
@@ -1099,6 +1101,7 @@
       "event_id": "event_tutorial_investigation",
       "node": "node_tutorial_investigation",
       "title_key": "event.tutorial.investigation.title",
+      "description_key": "event.event_tutorial_investigation.description",
       "pattern": "C",
       "spots": [
         {

@@ -127,6 +127,14 @@ export class EncounterStateMachine {
     return this.#snapshot;
   }
 
+  /** Rollback-only: restores a snapshot captured before a failed submission. */
+  restore(snapshot: EncounterMachineSnapshot): void {
+    this.#snapshot = Object.freeze({
+      state: snapshot.state,
+      transitionCount: snapshot.transitionCount,
+    });
+  }
+
   dispatch(event: EncounterEvent): EncounterMachineSnapshot {
     const effectiveEvent =
       this.#snapshot.state === 'LOAD_CASE' &&

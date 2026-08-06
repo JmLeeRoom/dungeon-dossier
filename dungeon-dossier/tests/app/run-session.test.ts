@@ -7,7 +7,11 @@ import {
   RewardsSchema,
   RunStripSchema,
 } from '../../src/engine/domain';
-import { createNodeStrip, createRunState } from '../../src/engine/run';
+import {
+  completeEventNode,
+  createNodeStrip,
+  createRunState,
+} from '../../src/engine/run';
 import { createRunSession } from '../../src/app/createRunSession';
 import { SaveRepository } from '../../src/app/save';
 
@@ -87,6 +91,68 @@ describe('app run session', () => {
     });
   });
 
+  it('saves a repeated reward instance without duplicating its claimed ID', () => {
+    const strip = createNodeStrip(RunStripSchema.parse(common('run-strip.json')));
+    const flags = FlagsSchema.parse(common('flags.json'));
+    const rewards = RewardsSchema.parse(common('rewards.json'));
+    const grades = GradesSchema.parse(common('grades.json'));
+    const reward = rewards.rewards.find(
+      (candidate) => candidate.reward_id === 'reward_dp_small',
+    );
+    if (
+      reward?.type !== 'RESOURCE' ||
+      reward.resource !== 'DP' ||
+      reward.amount === undefined
+    ) {
+      throw new Error('Missing DP reward fixture.');
+    }
+
+    const values = new Map<string, string>();
+    const repository = new SaveRepository({
+      getItem: (key) => values.get(key) ?? null,
+      setItem: (key, value) => values.set(key, value),
+      removeItem: (key) => values.delete(key),
+    });
+    const initial = createRunState({
+      runSeed: 17,
+      stress: 100,
+      dp: reward.amount,
+      trust: 0,
+      deck: { drawPile: [], hand: [], discardPile: [], exhaustPile: [] },
+    });
+    const run = createRunSession({
+      initialState: {
+        ...initial,
+        pendingRewardIds: [reward.reward_id],
+        claimedRewardIds: [reward.reward_id],
+      },
+      strip,
+      flags: flags.flags,
+      rewards,
+      grades,
+      saveRepository: repository,
+      caseIdsByDirectory: {
+        tutorial: 'case_tutorial',
+        ep001: 'case_ep001',
+        ep004: 'case_ep004',
+      },
+    });
+
+    expect(() => run.claimReward(reward.reward_id)).not.toThrow();
+    expect(run.snapshot).toMatchObject({
+      dp: reward.amount * 2,
+      pendingRewardIds: [],
+      claimedRewardIds: [reward.reward_id],
+    });
+    expect(repository.load()).toMatchObject({
+      resources: { dp: reward.amount * 2 },
+      run: {
+        pending_reward_ids: [],
+        claimed_reward_ids: [reward.reward_id],
+      },
+    });
+  });
+
   it('completes all 15 authored nodes with rewards, all event patterns, and F-13', () => {
     const strip = createNodeStrip(RunStripSchema.parse(common('run-strip.json')));
     const flags = FlagsSchema.parse(common('flags.json'));
@@ -102,6 +168,14 @@ describe('app run session', () => {
       ep001: 'case_ep001',
       ep004: 'case_ep004',
     } as const;
+    // The save repository must stay attached: the browser always saves at every
+    // boundary, and detaching it here once hid a duplicate-reward soft-lock.
+    const values = new Map<string, string>();
+    const repository = new SaveRepository({
+      getItem: (key) => values.get(key) ?? null,
+      setItem: (key, value) => values.set(key, value),
+      removeItem: (key) => values.delete(key),
+    });
     const run = createRunSession({
       initialState: createRunState({
         runSeed: 2_026_080_3,
@@ -114,6 +188,7 @@ describe('app run session', () => {
       flags: flags.flags,
       rewards,
       grades,
+      saveRepository: repository,
       caseIdsByDirectory: caseIds,
     });
 
@@ -188,5 +263,43 @@ describe('app run session', () => {
     expect(run.snapshot.flags['F-13']).toBe(true);
     expect(run.snapshot.gradeHistory).toHaveLength(9);
     expect(run.snapshot.dp).toBeGreaterThanOrEqual(230);
+  });
+
+  it('makes the ep004 ticket-trade choices set opposite F-12 values', () => {
+    const flags = FlagsSchema.parse(common('flags.json'));
+    const ep004 = caseContent('ep004');
+    const ticketTrade = ep004.events_noncombat.find(
+      (event) => event.event_id === 'event_ep004_ticket_trade',
+    );
+    if (ticketTrade?.pattern !== 'A') throw new Error('Missing ep004 ticket-trade event.');
+    const strip = [{
+      nodeId: 'test_ticket_trade',
+      kind: 'EVENT',
+      ref: 'event_ep004_ticket_trade',
+      caseDirectory: 'ep004',
+    }] as const;
+    const stateFor = () => createRunState({
+      runSeed: 1,
+      stress: 100,
+      dp: 10,
+      trust: 0,
+      deck: { drawPile: [], hand: [], discardPile: [], exhaustPile: [] },
+    });
+
+    const questioned = completeEventNode(stateFor(), {
+      strip,
+      flagDefinitions: flags.flags,
+      eventDefinition: ticketTrade,
+      choiceId: 'choice_ep004_question_broker',
+    });
+    expect(questioned.state.flags['F-12']).toBe(true);
+
+    const bought = completeEventNode(stateFor(), {
+      strip,
+      flagDefinitions: flags.flags,
+      eventDefinition: ticketTrade,
+      choiceId: 'choice_ep004_buy_vip_ticket',
+    });
+    expect(bought.state.flags['F-12']).toBe(false);
   });
 });

@@ -294,6 +294,7 @@ export function completeEncounterNode(
         act: input.act,
         boss: node.kind === 'BOSS',
         seedStream: rewarded.rewardSeedStream,
+        excludeRewardIds: rewarded.claimedRewardIds,
         ...(input.evaluateRewardCondition === undefined
           ? {}
           : { evaluateCondition: input.evaluateRewardCondition }),
@@ -566,6 +567,6 @@ export function claimRunReward(
     acquiredRelicIds,
     acquiredEnhancementIds,
     pendingRewardIds: [],
-    claimedRewardIds: [...state.claimedRewardIds, reward.reward_id],
+    claimedRewardIds: appendUnique(state.claimedRewardIds, reward.reward_id),
   };
 }

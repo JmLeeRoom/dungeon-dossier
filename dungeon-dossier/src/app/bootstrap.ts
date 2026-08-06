@@ -12,12 +12,13 @@ import {
   createJudgmentDirection,
   directionForOutcome,
   directionForResolution,
+  type InterrogationCallbacks,
   type InterrogationScreenController,
   type InterrogationScreenModel,
   type TimedDirectionOverlay,
 } from '../ui/screens/interrogation';
 import { createEndingScreen } from '../ui/screens/ending';
-import { createEventScreen } from '../ui/screens/event';
+import { createEventScreen, type EventScreenCallbacks } from '../ui/screens/event';
 import { createRewardScreen } from '../ui/screens/reward';
 import { createRunStripScreen } from '../ui/screens/strip';
 import {
@@ -27,10 +28,12 @@ import {
   FallbackRepository,
   RunCatalogRepository,
   RunStripRepository,
+  StringsRepository,
   type BalanceDefinition,
   type CaseDefinition,
   type RewardDefinition,
 } from '../content-io';
+import { createErrorBanner, RUN_FLOW_ERROR_MESSAGE } from '../ui/screens/error';
 import { AudioPlayer, RUNTIME_SOUND_DEFINITIONS } from '../audio';
 import {
   toRenderableClaims,
@@ -44,6 +47,14 @@ import {
   type NodeDefinition,
   type RunState,
 } from '../engine/run';
+import {
+  isAutoplayRequested,
+  scaledDirectionDelayMs,
+  type AutoplayOptions,
+  type AutoplayPort,
+  type AutoplayScene,
+} from './autoplayPort';
+import { installStrings } from './i18n';
 import { createEncounterSession, type EncounterSession } from './createEncounterSession';
 import {
   cueOutcome,
@@ -66,6 +77,7 @@ import {
 } from './gameFlowPresentation';
 import {
   createInitialGameRunState,
+  DEFAULT_RUN_SEED,
   encounterGradeMetrics,
   encounterRunProjection,
   ENDING_PRESENTATIONS,
@@ -104,6 +116,7 @@ function encounterSeed(state: RunState): number {
 
 export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplication> {
   mount.dataset.assetCount = runtimeAssetRegistry.size.toString();
+  delete mount.dataset.flowError;
   try {
     await document.fonts.load('11px Galmuri11');
   } catch (error) {
@@ -123,6 +136,9 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
       }
       return resolveAsset(runtimeAssetRegistry, key, fallback).url;
     },
+    resolveOptionalUrl(key: string): string | undefined {
+      return runtimeAssetRegistry.get(key)?.url;
+    },
   };
 
   const balanceRepository = new BalanceRepository();
@@ -131,12 +147,17 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
   const fallbackRepository = new FallbackRepository();
   const runCatalogRepository = new RunCatalogRepository();
   const runStripRepository = new RunStripRepository();
-  const [balanceValue, cardsValue, runCatalogValue, runStripValue] = await Promise.all([
-    balanceRepository.reload(),
-    cardRepository.load(),
-    runCatalogRepository.load(),
-    runStripRepository.load(),
-  ]);
+  const stringsRepository = new StringsRepository();
+  const [balanceValue, cardsValue, runCatalogValue, runStripValue, stringsValue] =
+    await Promise.all([
+      balanceRepository.reload(),
+      cardRepository.load(),
+      runCatalogRepository.load(),
+      runStripRepository.load(),
+      stringsRepository.load(),
+    ]);
+  const strings = required(stringsValue, 'Korean string table');
+  installStrings(strings.strings);
   required(balanceValue, 'Balance catalogue');
   const cards = required(cardsValue, 'Card catalogue');
   const runCatalog = required(runCatalogValue, 'Run catalogue');
@@ -179,11 +200,24 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
     },
   };
 
+  const urlParams = new URLSearchParams(window.location.search);
+  const autoplayParameter = urlParams.get('autoplay');
+  const autoplayRequested = isAutoplayRequested(
+    autoplayParameter,
+    import.meta.env.DEV,
+  );
+  // An autoplay run must be deterministic; stale saves would move the start node.
+  if (autoplayRequested) window.localStorage.clear();
+  const devSeedParam = import.meta.env.DEV ? urlParams.get('seed') : null;
+  const parsedSeed = devSeedParam === null ? Number.NaN : Number(devSeedParam);
+  const runSeedOverride = Number.isFinite(parsedSeed) ? parsedSeed >>> 0 : undefined;
+
   const saveRepository = new SaveRepository(window.localStorage);
   const freshState = (): RunState => createInitialGameRunState(
     cards,
     balanceRepository.current(),
     runCatalog.flags,
+    runSeedOverride,
   );
   let initialState: RunState;
   try {
@@ -240,6 +274,23 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
     ),
   );
 
+  const sceneListeners = new Set<() => void>();
+  let autoplayScene: AutoplayScene | undefined;
+  let directionDepth = 0;
+  let directionTimeScale = 1;
+  const notifySceneChange = (): void => {
+    for (const listener of [...sceneListeners]) listener();
+  };
+  const setAutoplayScene = (scene: AutoplayScene | undefined): void => {
+    autoplayScene = scene;
+    notifySceneChange();
+  };
+  // A stable instance so the driver's identity-based stall watchdog can tell
+  // "same direction still running" apart from a genuinely new scene.
+  const DIRECTION_SCENE: AutoplayScene = { kind: 'DIRECTION' };
+  const currentAutoplayScene = (): AutoplayScene | undefined =>
+    directionDepth > 0 ? DIRECTION_SCENE : autoplayScene;
+
   const activateAudio = (scene: AudioScene): void => {
     if (audioActivated) return;
     audioActivated = true;
@@ -260,8 +311,16 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
     overlay.view.eventMode = 'static';
     let finished = false;
     let completionRan = false;
+    let directionCounted = false;
     let disposeOverlay: (() => void) | undefined;
+    let completionTimer: number | undefined;
     let update = (): void => undefined;
+    const endDirection = (): void => {
+      if (!directionCounted) return;
+      directionCounted = false;
+      directionDepth = Math.max(0, directionDepth - 1);
+      notifySceneChange();
+    };
     const runCompletion = (): void => {
       if (completionRan) return;
       completionRan = true;
@@ -271,13 +330,21 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
       if (finished) return false;
       finished = true;
       mounted.app.ticker.remove(update);
+      if (completionTimer !== undefined) {
+        window.clearTimeout(completionTimer);
+        completionTimer = undefined;
+      }
       return true;
     };
-    update = (): void => {
-      overlay.update(mounted.app.ticker.deltaMS);
-      if (!overlay.complete || !stopTicker()) return;
+    const completePlayback = (): void => {
+      if (!stopTicker()) return;
       disposeOverlay?.();
+      endDirection();
       runCompletion();
+    };
+    update = (): void => {
+      overlay.update(mounted.app.ticker.deltaMS * directionTimeScale);
+      if (overlay.complete) completePlayback();
     };
     const layer: ManagedUiLayer = {
       view: overlay.view,
@@ -286,6 +353,7 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
       onDestroy: (): void => {
         const interrupted = stopTicker();
         overlay.onDestroy?.();
+        endDirection();
         if (interrupted && onComplete !== undefined && !destroyed) {
           queueMicrotask(runCompletion);
         }
@@ -298,6 +366,17 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
       stopTicker();
       throw error;
     }
+    directionCounted = true;
+    directionDepth += 1;
+    notifySceneChange();
+    completionTimer = window.setTimeout(() => {
+      overlay.update(Math.max(0, overlay.durationMs - overlay.elapsedMs));
+      completePlayback();
+    }, scaledDirectionDelayMs(
+      overlay.durationMs,
+      overlay.elapsedMs,
+      directionTimeScale,
+    ));
   };
 
   const syncDevFlags = (): void => {
@@ -306,10 +385,54 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
     }
   };
 
-  const handleFlowError = (error: unknown): void => {
+  let disposeErrorBanner: (() => void) | undefined;
+  const closeErrorBanner = (): void => {
+    const dispose = disposeErrorBanner;
+    disposeErrorBanner = undefined;
+    dispose?.();
+  };
+  const handleFlowError = (error: unknown, retry: () => void): void => {
     const message = error instanceof Error ? error.message : String(error);
     mount.dataset.flowError = message;
     console.error('Game run flow failed.', error);
+    closeErrorBanner();
+    const recover = (action: () => void): void => {
+      closeErrorBanner();
+      delete mount.dataset.flowError;
+      try {
+        action();
+      } catch (recoveryError) {
+        handleFlowError(recoveryError, action);
+      }
+    };
+    const returnToStrip = (): void => {
+      outcomeTransitionPending = false;
+      openingNode = false;
+      if (outcomeBgmMuted) {
+        audio.unmute();
+        outcomeBgmMuted = false;
+      }
+      // The run may already hold an unclaimed reward or a terminal result;
+      // jumping straight to the strip would strand or corrupt that state.
+      if (runSession.snapshot.pendingRewardIds.length > 0) {
+        mountPendingReward();
+        return;
+      }
+      routeAfterBoundary();
+    };
+    try {
+      const banner = createErrorBanner({ message: RUN_FLOW_ERROR_MESSAGE }, {
+        onRetry(): void {
+          recover(retry);
+        },
+        onReturnToStrip(): void {
+          recover(returnToStrip);
+        },
+      });
+      disposeErrorBanner = mounted.scenes.showOverlay({ view: banner });
+    } catch (overlayError) {
+      console.error('Flow-error banner could not be shown.', overlayError);
+    }
   };
 
   const activeModel = (): InterrogationScreenModel => {
@@ -340,35 +463,52 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
     encounterSession = undefined;
     dialogueService = undefined;
     interrogation = undefined;
+    const continueRun = (): void => {
+      activateAudio('AMBIENT');
+      void openCurrentNode().catch((error: unknown) => {
+        handleFlowError(error, continueRun);
+      });
+    };
     const view = createRunStripScreen(
       toRunStripScreenModel(runStripDefinition, runSession.snapshot),
-      {
-        onContinue(): void {
-          activateAudio('AMBIENT');
-          void openCurrentNode().catch(handleFlowError);
-        },
-      },
+      { onContinue: continueRun },
     );
+    const node = currentRunNode(strip, runSession.snapshot.nodeIndex);
+    if (node === null) {
+      throw new Error('Cannot mount the run strip after the terminal node.');
+    }
     setScene({ view }, 'AMBIENT');
+    setAutoplayScene({
+      kind: 'STRIP',
+      nodeIndex: runSession.snapshot.nodeIndex,
+      nodeId: node.nodeId,
+      nodeKind: node.kind,
+      nodeRef: node.ref,
+      continue: continueRun,
+    });
   };
 
   const mountEnding = (): void => {
     encounterSession = undefined;
     dialogueService = undefined;
     interrogation = undefined;
-    const model = toEndingScreenModel(
-      endingIdForRun(runSession.snapshot),
-      ENDING_PRESENTATIONS,
-    );
-    const view = createEndingScreen(model, assets, () => {
-      activateAudio('AMBIENT');
-      saveRepository.clear();
-      runSession = newRunSession(freshState());
-      syncDevFlags();
-      devState.nodeId = strip[0]?.ref ?? 'run-complete';
-      mountStrip();
-    });
+    const endingId = endingIdForRun(runSession.snapshot);
+    const model = toEndingScreenModel(endingId, ENDING_PRESENTATIONS);
+    const restartRun = (): void => {
+      try {
+        activateAudio('AMBIENT');
+        saveRepository.clear();
+        runSession = newRunSession(freshState());
+        syncDevFlags();
+        devState.nodeId = strip[0]?.ref ?? 'run-complete';
+        mountStrip();
+      } catch (error) {
+        handleFlowError(error, restartRun);
+      }
+    };
+    const view = createEndingScreen(model, assets, restartRun);
     setScene({ view }, 'ENDING');
+    setAutoplayScene({ kind: 'ENDING', endingId, restart: restartRun });
   };
 
   const routeAfterBoundary = (): void => {
@@ -388,19 +528,31 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
     dialogueService = undefined;
     interrogation = undefined;
     let selected = false;
-    const view = createRewardScreen(toRewardScreenModel(grade, choices), (rewardId) => {
+    const selectReward = (rewardId: string): void => {
       if (selected) return;
       activateAudio('AMBIENT');
       selected = true;
       try {
         runSession.claimReward(rewardId);
-        routeAfterBoundary();
       } catch (error) {
         selected = false;
-        handleFlowError(error);
+        handleFlowError(error, () => selectReward(rewardId));
+        return;
       }
-    });
+      try {
+        routeAfterBoundary();
+      } catch (error) {
+        handleFlowError(error, routeAfterBoundary);
+      }
+    };
+    const view = createRewardScreen(toRewardScreenModel(grade, choices), selectReward);
     setScene({ view }, 'AMBIENT');
+    setAutoplayScene({
+      kind: 'REWARD',
+      grade,
+      rewardIds: choices.map((choice) => choice.reward_id),
+      select: selectReward,
+    });
   };
 
   const mountPendingReward = (): void => {
@@ -442,23 +594,36 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
       attemptsUsed: discoveredSpotIds.length,
     });
     let completed = false;
-    const view = createEventScreen(model, {
-      onChoice(choiceId): void {
+    const continueAfterResult = (): void => {
+      try {
+        routeAfterBoundary();
+      } catch (error) {
+        handleFlowError(error, continueAfterResult);
+      }
+    };
+    const eventCallbacks: EventScreenCallbacks = {
+      onChoice(choiceId: string): void {
         if (completed) return;
         activateAudio('AMBIENT');
         completed = true;
         try {
           finishEvent(event, { choiceId });
-          routeAfterBoundary();
         } catch (error) {
           completed = false;
-          handleFlowError(error);
+          handleFlowError(error, () => eventCallbacks.onChoice?.(choiceId));
+          return;
+        }
+        try {
+          routeAfterBoundary();
+        } catch (error) {
+          handleFlowError(error, routeAfterBoundary);
         }
       },
-      onPlacementSubmit(placement): void {
+      onPlacementSubmit(placement: Readonly<Record<string, string>>): void {
         if (completed) return;
         activateAudio('AMBIENT');
         completed = true;
+        let placementResult: NonNullable<ReturnType<typeof finishEvent>['placementResult']>;
         try {
           if (model.pattern !== 'B') {
             throw new Error('배치 제출은 패턴 B 이벤트에서만 가능합니다.');
@@ -467,25 +632,39 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
           if (completion.placementResult === undefined) {
             throw new Error('배치 이벤트 결과를 계산하지 못했습니다.');
           }
+          placementResult = completion.placementResult;
+        } catch (error) {
+          completed = false;
+          handleFlowError(error, () => eventCallbacks.onPlacementSubmit?.(placement));
+          return;
+        }
+        const showPlacementResult = (): void => {
           const resultView = createEventScreen(
             {
               ...model,
               placementResult: {
-                correct: completion.placementResult.correct,
-                total: completion.placementResult.total,
-                ratio: completion.placementResult.ratio,
-                result: completion.placementResult.result,
+                correct: placementResult.correct,
+                total: placementResult.total,
+                ratio: placementResult.ratio,
+                result: placementResult.result,
               },
             },
-            { onContinue: routeAfterBoundary },
+            { onContinue: continueAfterResult },
           );
           setScene({ view: resultView }, 'AMBIENT');
+          setAutoplayScene({
+            kind: 'EVENT_RESULT',
+            eventId: event.event_id,
+            continue: continueAfterResult,
+          });
+        };
+        try {
+          showPlacementResult();
         } catch (error) {
-          completed = false;
-          handleFlowError(error);
+          handleFlowError(error, showPlacementResult);
         }
       },
-      onInvestigate(spotId): void {
+      onInvestigate(spotId: string): void {
         if (completed || discoveredSpotIds.includes(spotId)) return;
         activateAudio('AMBIENT');
         const next = [...discoveredSpotIds, spotId];
@@ -496,17 +675,38 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
           completed = true;
           try {
             finishEvent(event, { investigatedSpotIds: next });
-            routeAfterBoundary();
           } catch (error) {
             completed = false;
-            handleFlowError(error);
+            handleFlowError(error, () => eventCallbacks.onInvestigate?.(spotId));
+            return;
+          }
+          try {
+            routeAfterBoundary();
+          } catch (error) {
+            handleFlowError(error, routeAfterBoundary);
           }
           return;
         }
         mountEvent(node, next);
       },
-    });
+    };
+    const view = createEventScreen(model, eventCallbacks);
     setScene({ view }, 'AMBIENT');
+    setAutoplayScene({
+      kind: 'EVENT',
+      eventId: event.event_id,
+      pattern: event.pattern,
+      choiceIds: event.pattern === 'A'
+        ? event.choices.map((choice) => choice.choice_id)
+        : [],
+      answerMapping: event.pattern === 'B' ? { ...event.answer_mapping } : {},
+      spotIds: event.pattern === 'C' ? event.spots.map((spot) => spot.spot_id) : [],
+      discoveredSpotIds,
+      attemptLimit: event.pattern === 'C' ? event.attempt_limit : 0,
+      choose: (choiceId): void => { eventCallbacks.onChoice?.(choiceId); },
+      submitPlacement: (placement): void => { eventCallbacks.onPlacementSubmit?.(placement); },
+      investigate: (spotId): void => { eventCallbacks.onInvestigate?.(spotId); },
+    });
   };
 
   const commitEncounter = (outcome: EncounterOutcome): (() => void) => {
@@ -538,7 +738,6 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
     let routed = false;
     return (): void => {
       if (routed) return;
-      routed = true;
       outcomeTransitionPending = false;
       if (outcomeBgmMuted) {
         audio.unmute();
@@ -546,9 +745,11 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
       }
       if (completion.rewardChoices.length > 0) {
         mountReward(completion.grade, completion.rewardChoices);
+        routed = true;
         return;
       }
       routeAfterBoundary();
+      routed = true;
     };
   };
 
@@ -572,7 +773,7 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
         routeAfterDirection();
       } catch (error) {
         outcomeTransitionPending = false;
-        handleFlowError(error);
+        handleFlowError(error, finishQueuedEncounter);
       }
     };
     const showEndingDirection = (): void => {
@@ -586,24 +787,25 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
           : { assets });
         showTimedDirection(overlay, finishQueuedEncounter);
       } catch (error) {
-        handleFlowError(error);
-        finishQueuedEncounter();
+        handleFlowError(error, showEndingDirection);
       }
     };
     if (resolution === undefined) {
       showEndingDirection();
       return;
     }
-    try {
-      cueResolution(audio, resolution);
-      showTimedDirection(
-        createJudgmentDirection(directionForResolution(resolution), { assets }),
-        showEndingDirection,
-      );
-    } catch (error) {
-      handleFlowError(error);
-      showEndingDirection();
-    }
+    const showResolutionDirection = (): void => {
+      try {
+        cueResolution(audio, resolution);
+        showTimedDirection(
+          createJudgmentDirection(directionForResolution(resolution), { assets }),
+          showEndingDirection,
+        );
+      } catch (error) {
+        handleFlowError(error, showResolutionDirection);
+      }
+    };
+    showResolutionDirection();
   };
 
   const mountInterrogation = (renderInitialStatement = false): void => {
@@ -622,34 +824,55 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
       if (selectedClaim === undefined) return;
       const revision = ++statementRequestRevision;
       const model = active.currentModel();
-      void dialogue.renderStatement(
-        {
-          allowedClaims: [selectedClaim],
-          reactionKey: `statement.${selectedClaim.claimId}`,
-          missingScopes: [],
-          seed: stableDialogueSeed([active.encounterId, selectedClaim.claimId]),
-        },
-        {
-          aiEnabled: devState.aiEnabled,
-          composureBand: toComposureBand(
-            model.dto.resources.composure,
-            model.composureMax,
-          ),
-        },
-      ).then((line) => {
-        if (interrogation === controller && revision === statementRequestRevision) {
-          controller.useFallbackStatement(line);
+      const requestStatement = (): void => {
+        try {
+          void dialogue.renderStatement(
+            {
+              allowedClaims: [selectedClaim],
+              reactionKey: `statement.${selectedClaim.claimId}`,
+              missingScopes: [],
+              seed: stableDialogueSeed([active.encounterId, selectedClaim.claimId]),
+            },
+            {
+              aiEnabled: devState.aiEnabled,
+              composureBand: toComposureBand(
+                model.dto.resources.composure,
+                model.composureMax,
+              ),
+            },
+          ).then((line) => {
+            if (interrogation === controller && revision === statementRequestRevision) {
+              controller.useFallbackStatement(line);
+            }
+          }).catch((error: unknown) => {
+            if (interrogation === controller && revision === statementRequestRevision) {
+              handleFlowError(error, requestStatement);
+            }
+          });
+        } catch (error) {
+          if (interrogation === controller && revision === statementRequestRevision) {
+            handleFlowError(error, requestStatement);
+          }
         }
-      }).catch(() => {
-        if (interrogation === controller && revision === statementRequestRevision) {
-          controller.useFallbackStatement(selectedClaim.canonicalMeaning);
-        }
-      });
+      };
+      requestStatement();
     };
     const screenModel = activeModel();
-    const controller = createInterrogationScreen(
-      screenModel,
-      {
+    const advanceEncounterTurn = (): boolean => {
+      const turnOutcome = active.coordinator.endTurn();
+      if (turnOutcome.terminalOutcome === null) return false;
+      mountInterrogation();
+      queueEncounterOutcome(turnOutcome);
+      return true;
+    };
+    const endTurnForAutoplay = (): void => {
+      try {
+        if (!advanceEncounterTurn()) mountInterrogation();
+      } catch (error) {
+        handleFlowError(error, endTurnForAutoplay);
+      }
+    };
+    const interrogationCallbacks: InterrogationCallbacks = {
         onSelectionChange(selection): void {
           if (outcomeTransitionPending) return;
           audio.play('paper_flip');
@@ -668,12 +891,7 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
           }
           try {
             if (active.coordinator.snapshot.machine.state === 'CHECK_OUTCOME') {
-              const turnOutcome = active.coordinator.endTurn();
-              if (turnOutcome.terminalOutcome !== null) {
-                mountInterrogation();
-                queueEncounterOutcome(turnOutcome);
-                return;
-              }
+              if (advanceEncounterTurn()) return;
             }
             if (active.coordinator.snapshot.machine.state === 'FREE_REVIEW') {
               active.coordinator.beginArgument();
@@ -745,33 +963,44 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
                 ...selection.evidenceIds,
               ]),
             } as const;
-            void dialogue
-              .renderReaction(request, {
-                aiEnabled: devState.aiEnabled,
-                composureBand: toComposureBand(
-                  model.dto.resources.composure,
-                  model.composureMax,
-                ),
-              })
-              .then((line) => {
+            const requestReaction = (): void => {
+              try {
+                void dialogue
+                  .renderReaction(request, {
+                    aiEnabled: devState.aiEnabled,
+                    composureBand: toComposureBand(
+                      model.dto.resources.composure,
+                      model.composureMax,
+                    ),
+                  })
+                  .then((line) => {
+                    if (interrogation === reactionController) {
+                      reactionController.useFallbackStatement(line);
+                    }
+                  })
+                  .catch((error: unknown) => {
+                    if (interrogation === reactionController) {
+                      handleFlowError(error, requestReaction);
+                    }
+                  });
+              } catch (error) {
                 if (interrogation === reactionController) {
-                  reactionController.useFallbackStatement(line);
+                  handleFlowError(error, requestReaction);
                 }
-              })
-              .catch(() => {
-                if (interrogation === reactionController) {
-                  reactionController.useFallbackStatement(selectedClaim.canonicalMeaning);
-                }
-              });
+              }
+            };
+            requestReaction();
           } catch (error) {
-            controller.useFallbackStatement(
-              error instanceof Error ? error.message : '제출을 처리하지 못했습니다.',
-            );
+            handleFlowError(error, mountInterrogation);
           }
         },
         onAdvance(): void {
-          audio.play('typewriter_return');
-          controller.finishStatement();
+          try {
+            audio.play('typewriter_return');
+            controller.finishStatement();
+          } catch (error) {
+            handleFlowError(error, () => interrogationCallbacks.onAdvance?.());
+          }
         },
         onSecureStatement(): void {
           if (outcomeTransitionPending) return;
@@ -787,9 +1016,7 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
             mountInterrogation();
             queueEncounterOutcome(outcome);
           } catch (error) {
-            controller.useFallbackStatement(
-              error instanceof Error ? error.message : '진술을 확보하지 못했습니다.',
-            );
+            handleFlowError(error, mountInterrogation);
           }
         },
         ...(screenModel.partnerSkillAvailable
@@ -800,11 +1027,7 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
                   active.usePartnerSkill();
                   mountInterrogation();
                 } catch (error) {
-                  controller.useFallbackStatement(
-                    error instanceof Error
-                      ? error.message
-                      : 'Partner skill could not be used.',
-                  );
+                  handleFlowError(error, mountInterrogation);
                 }
               },
             }
@@ -812,7 +1035,10 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
         onKeystroke(): void {
           audio.play('typewriter');
         },
-      },
+    };
+    const controller = createInterrogationScreen(
+      screenModel,
+      interrogationCallbacks,
       { assets },
     );
     interrogation = controller;
@@ -827,6 +1053,63 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
         controller.destroy();
       },
     }, runNode?.kind === 'BOSS' ? 'BOSS' : 'INTERROGATION');
+    const coordinatorSnapshot = active.coordinator.snapshot;
+    const cardPlayability = Object.fromEntries(screenModel.cards.map((card) => {
+      const definition = active.cardsDefinition.cards.find(
+        (candidate) => candidate.card_id === card.cardId,
+      );
+      const effectiveCpCost = definition === undefined
+        ? card.cpCost
+        : Math.max(
+            0,
+            (definition.cost.cp ?? 0) +
+              (coordinatorSnapshot.actionCostDeltas[definition.intent] ?? 0),
+          );
+      const cardLocked =
+        (coordinatorSnapshot.cards[card.cardId]?.lockedUntilTurn ?? -1) >=
+        coordinatorSnapshot.resources.turn;
+      const actionLocked =
+        definition === undefined ||
+        (coordinatorSnapshot.actionLocks[definition.intent] ?? -1) >=
+          coordinatorSnapshot.resources.turn;
+      return [card.cardId, {
+        effectiveCpCost,
+        playable:
+          definition !== undefined &&
+          !cardLocked &&
+          !actionLocked &&
+          effectiveCpCost <= coordinatorSnapshot.resources.commandPoints,
+      }] as const;
+    }));
+    setAutoplayScene({
+      kind: 'INTERROGATION',
+      encounterId: active.encounterId,
+      machineState: coordinatorSnapshot.machine.state,
+      turn: coordinatorSnapshot.resources.turn,
+      turnLimit: active.caseDefinition.metadata.estimated_turns,
+      secureStatementEnabled: screenModel.canSecureStatement === true,
+      model: screenModel,
+      caseDefinition: active.caseDefinition,
+      cardPlayability,
+      requiredObjectives: coordinatorSnapshot.objectives.required.map((objective) => ({
+        objectiveId: objective.objectiveId,
+        completed: objective.completed,
+      })),
+      submit: (submission): void => {
+        interrogationCallbacks.onSubmit?.({
+          cardId: submission.cardId,
+          facet: submission.facet,
+          evidenceIds: submission.evidenceIds,
+        });
+      },
+      endTurn: endTurnForAutoplay,
+      secureStatement: (): void => {
+        interrogationCallbacks.onSecureStatement?.();
+      },
+      skipTypewriter: (): void => {
+        controller.finishStatement();
+      },
+    });
     if (renderInitialStatement) {
       const initialFacet = active.currentModel().dto.statement.find(
         (claim) => claim.presentation !== 'HIDDEN',
@@ -887,6 +1170,8 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
         cardRepository: cachedCardRepository,
         balanceRepository: cachedBalanceRepository,
         fallbackRepository,
+        relicDefinitions: runCatalog.relics.relics,
+        enhancementDefinitions: runCatalog.enhancements.enhancements,
       });
       if (destroyed) return;
       encounterSession = active;
@@ -971,6 +1256,60 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
     });
     recordDevJudgment = (input, result): void => devConsole.recordJudgment(input, result);
     destroyDevConsole = (): void => devConsole.destroy();
+
+    if (autoplayRequested) {
+      const { startAutoplay } = await import('../dev/autoplay');
+      const port: AutoplayPort = {
+        scene: currentAutoplayScene,
+        runSnapshot: () => ({
+          nodeIndex: runSession.snapshot.nodeIndex,
+          flags: runSession.snapshot.flags,
+          dp: runSession.snapshot.dp,
+          stress: runSession.snapshot.stress,
+          trust: runSession.snapshot.trust,
+          claimedRewardIds: runSession.snapshot.claimedRewardIds,
+          pendingRewardIds: runSession.snapshot.pendingRewardIds,
+          acquiredRelicIds: runSession.snapshot.acquiredRelicIds,
+          completedNodeIds: runSession.snapshot.completedNodeIds,
+          gradeHistory: runSession.snapshot.gradeHistory,
+          outcomeHistory: runSession.snapshot.outcomeHistory,
+          terminal: runSession.snapshot.terminal,
+        }),
+        lastFlowError: () => mount.dataset.flowError,
+        setDirectionTimeScale(scale): void {
+          if (!Number.isFinite(scale) || scale <= 0) {
+            throw new RangeError('Direction time scale must be a positive finite number.');
+          }
+          directionTimeScale = scale;
+        },
+        onSceneChange(listener): () => void {
+          sceneListeners.add(listener);
+          return (): void => {
+            sceneListeners.delete(listener);
+          };
+        },
+      };
+      const modeParam = urlParams.get('mode');
+      const policyParam = urlParams.get('policy');
+      const autoplayModes: readonly AutoplayOptions['mode'][] =
+        ['watch', 'turbo', 'record'];
+      const autoplayPolicies: readonly AutoplayOptions['policy'][] =
+        ['best', 'partial', 'coerced', 'greedy', 'fuzz'];
+      // A typo in a URL parameter must degrade to defaults, never crash boot.
+      const mode = autoplayModes.find((known) => known === modeParam) ?? 'turbo';
+      const policy = autoplayPolicies.find((known) => known === policyParam) ?? 'best';
+      if (modeParam !== null && mode !== modeParam) {
+        console.warn(`Unknown autoplay mode "${modeParam}"; falling back to "${mode}".`);
+      }
+      if (policyParam !== null && policy !== policyParam) {
+        console.warn(`Unknown autoplay policy "${policyParam}"; falling back to "${policy}".`);
+      }
+      startAutoplay(port, {
+        mode,
+        policy,
+        seed: runSeedOverride ?? DEFAULT_RUN_SEED,
+      });
+    }
   }
 
   return {

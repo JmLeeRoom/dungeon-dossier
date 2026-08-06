@@ -10,11 +10,13 @@ async function fixture(relativePath: string): Promise<unknown> {
 }
 
 describe('run catalogue repository', () => {
-  it('loads flags, grades, and rewards as one validated boundary', async () => {
+  it('loads flags, grades, rewards, relics, and enhancements as one validated boundary', async () => {
     const entries: Readonly<Record<string, unknown>> = {
       '/content/common/flags.json': await fixture('common/flags.json'),
       '/content/common/grades.json': await fixture('common/grades.json'),
       '/content/common/rewards.json': await fixture('common/rewards.json'),
+      '/content/common/relics.json': await fixture('common/relics.json'),
+      '/content/common/enhancements.json': await fixture('common/enhancements.json'),
     };
     const fetcher: FetchLike = async (input) => {
       const path = typeof input === 'string'
@@ -41,5 +43,13 @@ describe('run catalogue repository', () => {
       battle_choices: 3,
       boss_choices: 2,
     });
+    expect(catalogue?.relics.relics.map((relic) => relic.relic_id)).toContain(
+      'relic_clean_notebook',
+    );
+    expect(
+      catalogue?.enhancements.enhancements.map(
+        (enhancement) => enhancement.enhancement_id,
+      ),
+    ).toContain('enh_stamp_blue');
   });
 });

@@ -88,10 +88,39 @@ export async function validateSchemaAndContentTiers(context) {
     const aiCacheFiles = context.files.filter((file) =>
       file.relativePath.replaceAll("\\", "/").startsWith("ai-cache/"),
     );
-    const regularFiles = context.files.filter((file) => !aiCacheFiles.includes(file));
+    const stringsFiles = context.files.filter((file) =>
+      /^common\/strings\.[a-z0-9-]+\.json$/u.test(
+        file.relativePath.replaceAll("\\", "/"),
+      ),
+    );
+    const regularFiles = context.files.filter(
+      (file) => !aiCacheFiles.includes(file) && !stringsFiles.includes(file),
+    );
     const problems = [
       ...await validatorModule.validateContentFiles(regularFiles),
     ];
+
+    if (stringsFiles.length > 0) {
+      const schemasModule = await server.ssrLoadModule(
+        "/src/content-io/schemas/index.ts",
+      );
+      const stringsSchema = schemasModule.StringsSchema;
+      if (typeof stringsSchema?.safeParse !== "function") {
+        throw new TypeError("Content schema module must export StringsSchema.");
+      }
+      for (const file of stringsFiles) {
+        const result = stringsSchema.safeParse(file.value);
+        if (result.success) continue;
+        for (const issue of result.error.issues) {
+          const location = issue.path.length === 0 ? "$" : `$.${issue.path.join(".")}`;
+          problems.push({
+            kind: "schema",
+            relativePath: file.relativePath,
+            message: `[SCHEMA_INVALID] ${location}: ${issue.message}`,
+          });
+        }
+      }
+    }
 
     if (aiCacheFiles.length > 0) {
       const cacheModule = await server.ssrLoadModule("/src/ai/Cache.ts");

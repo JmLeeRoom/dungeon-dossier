@@ -10,6 +10,8 @@ import type {
 
 export interface DirectionAssetLookup {
   resolveUrl(key: string): string | undefined;
+  /** Exact lookup with no fallback; missing decorative art must stay invisible. */
+  resolveOptionalUrl?(key: string): string | undefined;
 }
 
 /** Structural boundary: callers can adapt AudioPlayer, Howler, or a test spy. */
@@ -127,7 +129,9 @@ function addOptionalSprite(
   key: string,
   bounds: Readonly<{ x: number; y: number; width: number; height: number }>,
 ): void {
-  const url = assets?.resolveUrl(key);
+  const url = assets?.resolveOptionalUrl !== undefined
+    ? assets.resolveOptionalUrl(key)
+    : assets?.resolveUrl(key);
   if (url === undefined) return;
   const sprite = Sprite.from(url);
   sprite.position.set(bounds.x, bounds.y);

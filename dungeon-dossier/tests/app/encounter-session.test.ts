@@ -6,17 +6,21 @@ import {
   CaseSchema,
   FlagsSchema,
   RunStripSchema,
+  StringsSchema,
 } from '../../src/content-io';
 import { hasForbiddenPublicKey } from '../../src/dto';
 import { serializeJudgmentLog } from '../../src/engine/log';
 import { createRunState } from '../../src/engine/run';
 import { createEncounterSession } from '../../src/app/createEncounterSession';
+import { clearStrings, installStrings } from '../../src/app/i18n';
 
 async function content(relativePath: string): Promise<unknown> {
   return JSON.parse(
     await readFile(new URL(`../../content/${relativePath}`, import.meta.url), 'utf8'),
   ) as unknown;
 }
+
+const RAW_KEY_PATTERN = /^[a-z0-9_]+\.[a-z0-9_.]+$/u;
 
 describe('encounter app session', () => {
   it('loads validated real content and derives the interrogation model from coordinator state', async () => {
@@ -56,11 +60,48 @@ describe('encounter app session', () => {
     });
     expect(model.suspectStatePart).toBe('base');
     expect(model.partnerCooldown).toEqual({ state: 'base', cooldownTurns: 0 });
-    expect(model.partnerSkillAvailable).toBe(false);
+    // Partner skill is live now that balance.json ships a configured cooldown (U-1).
+    expect(model.partnerSkillAvailable).toBe(true);
     expect(hasForbiddenPublicKey(model.dto)).toBe(false);
     expect(session.fallbackCatalog.statements.clm_tutorial_when).toHaveLength(1);
     expect(session.fallbackCatalog.reactions.R_DIRECT_CONTRADICTION).toHaveLength(1);
     expect(session.fallbackCatalog.reactions.MISSING_PROOF_RULE).toHaveLength(1);
+  });
+
+  it('localizes every player-facing interrogation model field', async () => {
+    const [caseDefinition, cardsDefinition, balance, strings] = await Promise.all([
+      content('cases/tutorial/case.json').then((value) => CaseSchema.parse(value)),
+      content('common/cards.json').then((value) => CardsSchema.parse(value)),
+      content('common/balance.json').then((value) => BalanceSchema.parse(value)),
+      content('common/strings.ko.json').then((value) => StringsSchema.parse(value)),
+    ]);
+    installStrings(strings.strings);
+    try {
+      const session = await createEncounterSession({
+        caseRepository: { load: async () => caseDefinition },
+        cardRepository: { load: async () => cardsDefinition },
+        balanceRepository: { reload: async () => balance },
+        runSeed: 2_026_080_3,
+      });
+      const model = session.currentModel();
+
+      expect(model.cards.every((card) => !RAW_KEY_PATTERN.test(card.title))).toBe(true);
+      expect(model.cards.every((card) => !RAW_KEY_PATTERN.test(card.description))).toBe(true);
+      expect(model.dto.objectives[0]?.label).toBe('퇴근 시각 진술의 모순을 입증한다.');
+      expect(model.dto.evidence.every((item) => !RAW_KEY_PATTERN.test(item.displayName)))
+        .toBe(true);
+      const displayedStrings = [
+        model.suspectName,
+        model.partnerName,
+        ...model.cards.flatMap((card) => [card.title, card.description]),
+        ...model.dto.statement.map((statement) => statement.text),
+        ...model.dto.evidence.map((item) => item.displayName),
+        ...model.dto.objectives.map((objective) => objective.label),
+      ];
+      expect(displayedStrings.filter((value) => RAW_KEY_PATTERN.test(value))).toEqual([]);
+    } finally {
+      clearStrings();
+    }
   });
 
   it('G-C1/G-C2 completes the authored tutorial encounter and replays byte-identically', async () => {

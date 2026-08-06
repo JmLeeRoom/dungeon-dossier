@@ -28,7 +28,7 @@
   },
   "committedMultiplier": 1.4,
   "independence": { "partialWeight": 0.5 },
-  "partner": { "cooldowns": {} },
+  "partner": { "cooldowns": { "skill_kim_intern_note": 3 } },
   "trust": { "max": 3, "thresholds": [1, 2] },
   "composure": { "regen": {} },
   "overrides": { "byEncounter": {} },

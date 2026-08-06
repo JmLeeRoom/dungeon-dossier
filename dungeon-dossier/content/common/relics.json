@@ -31,7 +31,7 @@
       "acquisition": "CASE_CLEAR",
       "activation": "PASSIVE",
       "conditions": [{ "type": "ALWAYS" }],
-      "effects": [{ "type": "OPEN_ROUTE", "target": "runtime-bonus-route" }],
+      "effects": [{ "type": "OPEN_ROUTE", "target": "route_ep004_fallen_hero_how" }],
       "linked_flag_id": "F-13"
     }
   ]

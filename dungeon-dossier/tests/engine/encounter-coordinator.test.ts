@@ -509,6 +509,57 @@ describe('EncounterCoordinator', () => {
     expect(coordinator.snapshot).toEqual(before);
   });
 
+  it('restores BUILD_ARGUMENT when resolution fails after entering RESOLVE', () => {
+    const encounter = CASE.encounters[0]!;
+    const flowFailureCase: CaseDefinition = {
+      ...CASE,
+      encounters: [
+        {
+          ...encounter,
+          flow_nodes: [
+            ...encounter.flow_nodes,
+            {
+              node_id: 'node_coordinator_broken_revision',
+              enter_conditions: [
+                {
+                  type: 'CLAIM_EPISTEMIC',
+                  claim_id: 'clm_coordinator_main',
+                  state: 'REFUTED',
+                },
+              ],
+              reveal_claim_ids: [],
+              revise_claim_ids: ['clm_coordinator_missing'],
+              open_route_ids: [],
+              activate_modifiers: [],
+              deactivate_modifiers: [],
+              reaction_key: 'reaction.coordinator.broken_revision',
+              resource_delta: {},
+              is_terminal: true,
+            },
+          ],
+        },
+      ],
+    };
+    const coordinator = begin(flowFailureCase);
+    coordinator.beginArgument();
+    const before = coordinator.snapshot;
+
+    const submit = () => coordinator.submit(VALID_SUBMISSION);
+    expect(submit).toThrow(
+      'FlowNode node_coordinator_broken_revision revises unknown claim clm_coordinator_missing.',
+    );
+    expect(coordinator.snapshot).toEqual(before);
+    expect(coordinator.snapshot.machine.state).toBe('BUILD_ARGUMENT');
+    expect(coordinator.snapshot.resources.commandPoints).toBe(3);
+    expect(coordinator.snapshot.deck.hand).toContain(
+      'card_coordinator_contradict',
+    );
+
+    // A second attempt reaches resolution again instead of being stranded in RESOLVE.
+    expect(submit).toThrow('revises unknown claim clm_coordinator_missing');
+    expect(coordinator.snapshot).toEqual(before);
+  });
+
   it('mergeResolutionResources preserves the non-resolver canonical fields', () => {
     const coordinator = begin();
     const canonical = coordinator.snapshot.resources;

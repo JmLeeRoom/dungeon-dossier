@@ -15,3 +15,4 @@ export * from './relics';
 export * from './rewards';
 export * from './runStrip';
 export * from './save';
+export * from './strings';

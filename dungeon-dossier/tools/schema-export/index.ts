@@ -15,6 +15,7 @@ import {
   RewardsSchema,
   RunStripSchema,
   SaveSchema,
+  StringsSchema,
 } from '../../src/content-io/schemas';
 
 export const JSON_SCHEMA_EXPORTS = [
@@ -29,6 +30,7 @@ export const JSON_SCHEMA_EXPORTS = [
   ['judgment-ui-map.schema.json', JudgmentUiMapSchema],
   ['run-strip.schema.json', RunStripSchema],
   ['save.schema.json', SaveSchema],
+  ['strings.schema.json', StringsSchema],
 ] as const;
 
 export const JSON_SCHEMA_MANIFEST = JSON_SCHEMA_EXPORTS.map(([fileName]) => fileName);

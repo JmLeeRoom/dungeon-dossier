@@ -1253,6 +1253,7 @@
       "event_id": "event_ep001_links",
       "node": "node_ep001_links",
       "title_key": "event.ep001.links.title",
+      "description_key": "event.event_ep001_links.description",
       "pattern": "B",
       "items": [
         { "item_id": "item_ep001_ledger_edit", "label_key": "event.ep001.links.ledger_edit" },
@@ -1272,6 +1273,7 @@
       "event_id": "event_ep001_warehouse",
       "node": "node_ep001_warehouse",
       "title_key": "event.ep001.warehouse.title",
+      "description_key": "event.event_ep001_warehouse.description",
       "pattern": "C",
       "spots": [
         {

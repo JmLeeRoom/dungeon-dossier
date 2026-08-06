@@ -129,7 +129,9 @@ export function rewardRarityForOutcome(
   if (act >= 1) {
     return boss && outcome === 'BEST_RESOLUTION' ? 'CASE' : 'UNCOMMON';
   }
-  return 'COMMON';
+  // The tutorial boss draws from the untouched UNCOMMON pool so its two-choice
+  // offer can never be forced into duplicates of the drained COMMON pool.
+  return boss && outcome === 'BEST_RESOLUTION' ? 'UNCOMMON' : 'COMMON';
 }
 
 const ENDING_FAILED_FLAG = 'APP-RUN-FAILED';

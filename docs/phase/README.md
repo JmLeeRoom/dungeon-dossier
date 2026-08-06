@@ -22,6 +22,7 @@
 | 📄 [prompt_resolution_1280x800.md](file:///d:/NHNhackerton/docs/phase/prompt_resolution_1280x800.md) | **HD Upgrade** | **게임해상도 1280×800 (2배 정수배 업스케일 뷰포트) 전환 프롬프트** |
 | 📄 [prompt_refactor_specs.md](file:///d:/NHNhackerton/docs/phase/prompt_refactor_specs.md) | **Refactor Spec** | **에셋 규격·워크벤치 변형·캐릭터 상태·5계층 카드 종합 리팩토링 프롬프트** |
 | 📄 [prompt_verification_and_update.md](file:///d:/NHNhackerton/docs/phase/prompt_verification_and_update.md) | **Audit & Update** | **설계 문서 대비 전수 검증, 갭 스캔, 결함 수정 및 자동 테스트 프롬프트** |
+| 📄 [prompt_codex_gap_audit_v2_fix_and_autoplay.md](file:///d:/NHNhackerton/docs/phase/prompt_codex_gap_audit_v2_fix_and_autoplay.md) | **Codex Gap v2** | **Codex 전용 v2.0 4대 BLOCKER 수정, 15노드 자동 플레이 구축 마스터 프롬프트** |
 
 ---
 

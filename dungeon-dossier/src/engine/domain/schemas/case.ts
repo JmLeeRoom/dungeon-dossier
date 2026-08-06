@@ -107,6 +107,7 @@ const NonCombatBaseShape = {
   event_id: ContentIdSchema,
   node: ContentIdSchema,
   title_key: LocalizationKeySchema,
+  description_key: LocalizationKeySchema,
 };
 
 export const ChoiceEventSchema = z.strictObject({

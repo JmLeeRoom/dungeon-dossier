@@ -1190,6 +1190,7 @@
       "event_id": "event_ep004_machine_room",
       "node": "node_ep004_machine_room",
       "title_key": "event.ep004.machine_room.title",
+      "description_key": "event.event_ep004_machine_room.description",
       "pattern": "C",
       "spots": [
         {
@@ -1215,6 +1216,7 @@
       "event_id": "event_ep004_ticket_trade",
       "node": "node_ep004_ticket_trade",
       "title_key": "event.ep004.ticket_trade.title",
+      "description_key": "event.event_ep004_ticket_trade.description",
       "pattern": "A",
       "choices": [
         {
@@ -1222,14 +1224,14 @@
           "label_key": "event.ep004.ticket_trade.buy",
           "costs": { "dp": 5 },
           "gains": [{ "type": "GRANT_EVIDENCE", "target": "ev_ep004_vip_ticket_trace" }],
-          "sets_flags": { "F-12": true }
+          "sets_flags": { "F-12": false }
         },
         {
           "choice_id": "choice_ep004_question_broker",
           "label_key": "event.ep004.ticket_trade.question",
           "costs": { "stress": 3 },
           "gains": [{ "type": "GRANT_EVIDENCE", "target": "ev_ep004_diversion_contract" }],
-          "sets_flags": { "F-12": false }
+          "sets_flags": { "F-12": true }
         }
       ]
     }

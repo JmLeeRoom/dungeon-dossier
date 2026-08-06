@@ -8,6 +8,7 @@ import {
   ContentValidationError,
   FallbackRepository,
   RunStripRepository,
+  StringsRepository,
   type FetchLike,
   type InvalidValidationReport,
 } from '../../src/content-io';
@@ -38,18 +39,20 @@ function fetchFixtures(entries: Readonly<Record<string, unknown>>): FetchLike {
 }
 
 describe('content repositories', () => {
-  it('loads case, card, balance, run-strip, and fallback JSON through the fetch boundary', async () => {
+  it('loads case, card, balance, run-strip, strings, and fallback JSON through the fetch boundary', async () => {
     const caseData = await fixture('cases/tutorial/case.json');
     const cards = await fixture('common/cards.json');
     const balance = await fixture('common/balance.json');
     const dialogue = await fixture('cases/tutorial/dialogue.json');
     const runStrip = await fixture('common/run-strip.json');
+    const strings = await fixture('common/strings.ko.json');
     const fetcher = fetchFixtures({
       '/content/cases/tutorial/case.json': caseData,
       '/content/common/cards.json': cards,
       '/content/common/balance.json': balance,
       '/content/cases/tutorial/dialogue.json': dialogue,
       '/content/common/run-strip.json': runStrip,
+      '/content/common/strings.ko.json': strings,
     });
 
     const loadedCase = await new CaseRepository({
@@ -61,6 +64,7 @@ describe('content repositories', () => {
     const loadedBalance = await balanceRepository.reload();
     const loadedDialogue = await new FallbackRepository({ fetcher }).load('tutorial');
     const loadedRunStrip = await new RunStripRepository({ fetcher }).load();
+    const loadedStrings = await new StringsRepository({ fetcher }).load();
 
     expect(loadedCase?.case_id).toBe('case_tutorial');
     expect(loadedCards?.cards).toHaveLength(14);
@@ -68,6 +72,7 @@ describe('content repositories', () => {
     expect(balanceRepository.current()).toBe(loadedBalance);
     expect(loadedDialogue?.statements.clm_tutorial_who?.fallback).toHaveLength(1);
     expect(loadedRunStrip?.nodes).toHaveLength(15);
+    expect(loadedStrings?.strings['event.tutorial.choice.title']).toBe('탕비실 야근');
   });
 
   it('applies validated balance edits immediately without another fetch', async () => {

@@ -27,7 +27,7 @@ describe('JSON Schema export', () => {
     expect(paths.map((path) => path.split(/[\\/]/u).at(-1))).toEqual(
       JSON_SCHEMA_MANIFEST,
     );
-    expect(JSON_SCHEMA_MANIFEST).toHaveLength(11);
+    expect(JSON_SCHEMA_MANIFEST).toHaveLength(12);
 
     for (const fileName of JSON_SCHEMA_MANIFEST) {
       const document = JSON.parse(

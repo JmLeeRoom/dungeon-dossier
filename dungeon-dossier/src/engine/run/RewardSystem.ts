@@ -16,6 +16,8 @@ export interface RewardSelectionInput {
   readonly boss: boolean;
   /** Explicit serializable stream state derived from run_seed. */
   readonly seedStream: number;
+  /** Rewards already claimed this run; deprioritized so choices stay fresh. */
+  readonly excludeRewardIds?: readonly string[];
   readonly evaluateCondition?: RewardConditionEvaluator;
 }
 
@@ -98,7 +100,23 @@ export function selectRewardChoices(
   const choiceCount = input.boss
     ? catalogue.selection.boss_choices
     : catalogue.selection.battle_choices;
-  const candidates = catalogue.rewards.filter((reward) => eligibleReward(reward, input));
+  const eligible = catalogue.rewards.filter((reward) => eligibleReward(reward, input));
+  const excluded = new Set(input.excludeRewardIds ?? []);
+  const fresh = eligible.filter((reward) => !excluded.has(reward.reward_id));
+  // A drained pool backfills with repeatable rewards first: re-claiming a
+  // RESOURCE or CARD grants again, while an owned ENHANCEMENT/RELIC would be
+  // a silent no-op pick. Only fall back to the full pool as a last resort.
+  const repeatable = eligible.filter(
+    (reward) =>
+      !excluded.has(reward.reward_id) ||
+      reward.type === 'RESOURCE' ||
+      reward.type === 'CARD',
+  );
+  const candidates = fresh.length >= choiceCount
+    ? fresh
+    : repeatable.length >= choiceCount
+      ? repeatable
+      : eligible;
   if (candidates.length < choiceCount) {
     throw new Error(
       `Reward pool has ${candidates.length.toString()} eligible entries for ${choiceCount.toString()} choices.`,

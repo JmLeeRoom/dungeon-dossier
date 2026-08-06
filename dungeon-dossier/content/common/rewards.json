@@ -31,6 +31,30 @@
       "weight": 4
     },
     {
+      "reward_id": "reward_dp_medium",
+      "type": "RESOURCE",
+      "resource": "DP",
+      "amount": 20,
+      "rarity": "COMMON",
+      "weight": 5
+    },
+    {
+      "reward_id": "reward_stress_recovery_small",
+      "type": "RESOURCE",
+      "resource": "STRESS",
+      "amount": 8,
+      "rarity": "COMMON",
+      "weight": 6
+    },
+    {
+      "reward_id": "reward_dp_tiny",
+      "type": "RESOURCE",
+      "resource": "DP",
+      "amount": 5,
+      "rarity": "COMMON",
+      "weight": 7
+    },
+    {
       "reward_id": "reward_card_precise",
       "type": "CARD",
       "reference_id": "card_contradict_precise",

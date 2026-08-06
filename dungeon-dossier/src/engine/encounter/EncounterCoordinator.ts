@@ -4,19 +4,23 @@ import {
   type CardDefinition,
   type DeckState,
 } from '../cards';
+import { COMMITMENT_STATES } from '../domain';
 import type {
   ActionIntent,
   BalanceDefinition,
   CaseDefinition,
+  CommitmentState,
   ContentId,
   EncounterDefinition,
   Effect,
   Grade,
   ProofScope,
 } from '../domain';
-import type {
-  ClaimKnowledge,
-  KnowledgeState,
+import {
+  assertAxisTransition,
+  assertClaimStateInvariants,
+  type ClaimKnowledge,
+  type KnowledgeState,
 } from '../knowledge';
 import { appendJudgmentLog, type JudgmentLog } from '../log';
 import {
@@ -96,6 +100,7 @@ export interface EncounterRuntimeState {
   readonly usedRouteIds: readonly ContentId[];
   readonly activeModifierIds: readonly ContentId[];
   readonly modifierActivations: Readonly<Record<ContentId, number>>;
+  readonly resolutionEffectActivations: Readonly<Record<ContentId, number>>;
   readonly durations: TurnDurationMap;
   readonly cooldowns: TurnDurationMap;
   readonly actionLocks: Readonly<Partial<Record<ActionIntent, number>>>;
@@ -121,7 +126,21 @@ export interface EncounterCoordinatorDeps {
   >>>;
   /** Long-term flag effects resolved by the run layer for this encounter. */
   readonly initialEffects?: readonly Effect[];
+  /** Owned, data-authored bonuses that fire after a compatible card resolves. */
+  readonly resolutionEffectSources?: readonly ResolutionEffectSource[];
   readonly validationMode?: ContentValidationMode;
+}
+
+/**
+ * Generic encounter boundary for relics, enhancements, and future run-owned
+ * bonuses. The coordinator knows compatibility and effects, not acquisition.
+ */
+export interface ResolutionEffectSource {
+  readonly sourceId: ContentId;
+  readonly effects: readonly Effect[];
+  readonly compatibleIntents?: readonly ActionIntent[];
+  readonly compatibleCardIds?: readonly ContentId[];
+  readonly usesPerEncounter?: number;
 }
 
 export interface SubmissionRequest {
@@ -288,6 +307,7 @@ export class EncounterCoordinator {
   readonly #definition: CaseDefinition;
   readonly #encounter: EncounterDefinition;
   readonly #cardDefinitions: readonly CardDefinition[];
+  readonly #resolutionEffectSources: readonly ResolutionEffectSource[];
   #balance: BalanceDefinition;
   #limits: EncounterResourceLimits;
   readonly #machine: EncounterStateMachine;
@@ -303,6 +323,7 @@ export class EncounterCoordinator {
     this.#definition = deps.caseDefinition;
     this.#encounter = encounter;
     this.#cardDefinitions = deps.cards;
+    this.#resolutionEffectSources = deps.resolutionEffectSources ?? [];
     this.#balance = deps.balance;
     this.#limits = limits;
     this.#machine = machine;
@@ -319,6 +340,20 @@ export class EncounterCoordinator {
     const cardIds = deps.cards.map((card) => card.card_id);
     if (new Set(cardIds).size !== cardIds.length) {
       throw new Error('Encounter cards must have unique definitions.');
+    }
+    const effectSourceIds = (deps.resolutionEffectSources ?? []).map(
+      (source) => source.sourceId,
+    );
+    if (new Set(effectSourceIds).size !== effectSourceIds.length) {
+      throw new Error('Resolution effect sources must have unique IDs.');
+    }
+    for (const source of deps.resolutionEffectSources ?? []) {
+      if (
+        source.usesPerEncounter !== undefined &&
+        (!Number.isInteger(source.usesPerEncounter) || source.usesPerEncounter <= 0)
+      ) {
+        throw new Error(`Resolution effect source ${source.sourceId} has an invalid use limit.`);
+      }
     }
 
     const limits = encounterResourceLimits(encounter, deps.encounterId, deps.balance);
@@ -376,6 +411,7 @@ export class EncounterCoordinator {
           (modifier) => modifier.modifier_id,
         ),
         modifierActivations: {},
+        resolutionEffectActivations: {},
         durations: {},
         // balance.partner.cooldowns stores durations, not already-active timers.
         cooldowns: {},
@@ -405,6 +441,23 @@ export class EncounterCoordinator {
     coordinator.#dispatch('STATEMENT_RENDERED');
     coordinator.#dispatch('DTO_EMITTED');
     coordinator.#startTurn(false);
+    // The first turn refills CP to the cap before initial effects run, so an
+    // encounter-start CP bonus (relic, flag hook) must widen the cap or the
+    // clamp silently swallows it.
+    const initialCommandPointBonus = (deps.initialEffects ?? [])
+      .filter((effect) =>
+        effect.type === 'ADJUST_RESOURCE' &&
+        effect.resource === 'cp' &&
+        (effect.delta ?? 0) > 0,
+      )
+      .reduce((total, effect) => total + (effect.delta ?? 0), 0);
+    if (initialCommandPointBonus > 0) {
+      coordinator.#limits = {
+        ...coordinator.#limits,
+        commandPointMax:
+          coordinator.#limits.commandPointMax + initialCommandPointBonus,
+      };
+    }
     coordinator.#applyInitialEffects(deps.initialEffects ?? []);
     coordinator.#dispatch('TURN_READY');
     coordinator.#refreshObjectives();
@@ -446,9 +499,21 @@ export class EncounterCoordinator {
     }
     const current = this.partnerCooldown(selectedId);
     if (current.state === 'used' || duration === 0) return current;
+    // 김 인턴's breather: the skill trades its cooldown for the authored
+    // coercion relief so using it always has a real gameplay effect.
     this.#state = {
       ...this.#state,
       cooldowns: { ...this.#state.cooldowns, [selectedId]: duration },
+      resources: clampResourceState(
+        {
+          ...this.#state.resources,
+          coercion: Math.max(
+            0,
+            this.#state.resources.coercion - this.#balance.coercion.breathReduce,
+          ),
+        },
+        this.#limits,
+      ),
     };
     return this.partnerCooldown(selectedId);
   }
@@ -552,6 +617,25 @@ export class EncounterCoordinator {
       this.#limits,
     );
 
+    // Any failure past this point must roll the machine back to BUILD_ARGUMENT
+    // and leave resources untouched, or the encounter soft-locks in RESOLVE.
+    const stateBeforeSubmission = this.#state;
+    const machineBeforeSubmission = this.#machine.snapshot;
+    try {
+      return this.#resolveSubmission(request, card, commandPointCost, provisionallySpent);
+    } catch (error) {
+      this.#state = stateBeforeSubmission;
+      this.#machine.restore(machineBeforeSubmission);
+      throw error;
+    }
+  }
+
+  #resolveSubmission(
+    request: SubmissionRequest,
+    card: CardDefinition,
+    commandPointCost: number,
+    provisionallySpent: EncounterResourceState,
+  ): SubmissionResult {
     this.#dispatch('ARGUMENT_BUILT');
     this.#dispatch('ACTION_SUBMITTED');
     const targetDefinition = this.#definition.claims.find(
@@ -692,6 +776,9 @@ export class EncounterCoordinator {
           ...inquiryRoute.unlocks_routes,
         ]),
       };
+    }
+    if (resolution.effects.consumeCommandPoints) {
+      this.#applyResolutionEffectSources(card, request);
     }
     this.#dispatch('EFFECTS_APPLIED');
     this.#dispatch('REACTION_RENDERED');
@@ -861,11 +948,74 @@ export class EncounterCoordinator {
     this.#state = applyModifierEffects(
       this.#state,
       effects.map((effect) => ({ type: effect.type, payload: effect })),
-      (state, wrapped) => this.#applyInitialEffect(state, wrapped.payload),
+      (state, wrapped) => this.#applyEncounterEffect(state, wrapped.payload),
     );
   }
 
-  #applyInitialEffect(
+  #applyResolutionEffectSources(
+    card: CardDefinition,
+    request: SubmissionRequest,
+  ): void {
+    for (const source of this.#resolutionEffectSources) {
+      const previousActivations =
+        this.#state.resolutionEffectActivations[source.sourceId] ?? 0;
+      if (
+        source.usesPerEncounter !== undefined &&
+        previousActivations >= source.usesPerEncounter
+      ) {
+        continue;
+      }
+      if (
+        source.compatibleCardIds !== undefined &&
+        !source.compatibleCardIds.includes(card.card_id)
+      ) {
+        continue;
+      }
+      if (
+        source.compatibleIntents !== undefined &&
+        !source.compatibleIntents.includes(card.intent)
+      ) {
+        continue;
+      }
+
+      const effects = source.effects.map((effect) =>
+        this.#bindSelectedClaim(effect, request.targetClaimId),
+      );
+      this.#state = applyModifierEffects(
+        this.#state,
+        effects.map((effect) => ({ type: effect.type, payload: effect })),
+        (state, wrapped) => this.#applyEncounterEffect(state, wrapped.payload),
+      );
+      this.#state = {
+        ...this.#state,
+        resolutionEffectActivations: {
+          ...this.#state.resolutionEffectActivations,
+          [source.sourceId]: previousActivations + 1,
+        },
+      };
+    }
+  }
+
+  #bindSelectedClaim(effect: Effect, targetClaimId?: ContentId): Effect {
+    if (targetClaimId === undefined) return effect;
+    const bind = (target: ContentId): ContentId =>
+      target === 'runtime-selected-claim' ? targetClaimId : target;
+    const targets = effect.targets?.map(bind);
+    return {
+      ...effect,
+      ...(effect.target === undefined ? {} : { target: bind(effect.target) }),
+      ...(targets === undefined ? {} : { targets }),
+      ...(
+        effect.type === 'SET_CLAIM_STATE' &&
+        effect.target === undefined &&
+        effect.targets === undefined
+          ? { target: targetClaimId }
+          : {}
+      ),
+    };
+  }
+
+  #applyEncounterEffect(
     state: EncounterRuntimeState,
     effect: Effect,
   ): EncounterRuntimeState {
@@ -974,7 +1124,52 @@ export class EncounterCoordinator {
       };
     }
 
-    throw new Error(`Unsupported encounter-start effect: ${effect.type}.`);
+    if (effect.type === 'REVEAL_CLAIMS') {
+      const claims = { ...state.claims };
+      for (const claimId of targets) {
+        const previous = claims[claimId];
+        if (previous === undefined) continue;
+        const next: EncounterClaimRuntime = previous.presentation === 'HIDDEN'
+          ? {
+              ...previous,
+              presentation: 'NORMAL',
+              commitment:
+                previous.commitment === 'UNSTATED'
+                  ? 'ASSERTED'
+                  : previous.commitment,
+            }
+          : previous;
+        assertClaimStateInvariants(next);
+        claims[claimId] = next;
+      }
+      return {
+        ...state,
+        claims,
+        revealedIds: unique([...state.revealedIds, ...targets]),
+      };
+    }
+
+    if (effect.type === 'SET_CLAIM_STATE') {
+      if (
+        typeof effect.value !== 'string' ||
+        !COMMITMENT_STATES.includes(effect.value as CommitmentState)
+      ) {
+        throw new Error('SET_CLAIM_STATE requires a supported commitment state.');
+      }
+      const commitment = effect.value as CommitmentState;
+      const claims = { ...state.claims };
+      for (const claimId of targets) {
+        const previous = claims[claimId];
+        if (previous === undefined) continue;
+        const next = { ...previous, commitment };
+        assertAxisTransition(previous, next, 'COMMITMENT');
+        assertClaimStateInvariants(next);
+        claims[claimId] = next;
+      }
+      return { ...state, claims };
+    }
+
+    throw new Error(`Unsupported encounter runtime effect: ${effect.type}.`);
   }
 
   #startTurn(drawPerTurn = true): void {

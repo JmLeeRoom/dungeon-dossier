@@ -57,13 +57,30 @@ export function createEventScreen(model: EventSceneModel, callbacks: EventScreen
 
   if (model.pattern === 'A') {
     model.choices.forEach((choice, index) => {
+      const y = 152 + index * 62;
       view.addChild(action(
         choice.label,
         70,
-        160 + index * 54,
+        y,
         500,
         () => callbacks.onChoice?.(choice.choiceId),
       ).view);
+      const costLabels = choice.costs.map((cost) => cost.label).join(' · ');
+      const gainLabels = choice.gains.map((gain) => gain.label).join(' · ');
+      const parts = [
+        ...(costLabels === '' ? [] : [`비용 ${costLabels}`]),
+        ...(gainLabels === '' ? [] : [`획득 ${gainLabels}`]),
+      ];
+      if (parts.length > 0) {
+        const detail = createPixelText(parts.join('   |   '), {
+          fontSize: 8,
+          fill: UI_PALETTE.amber,
+          wordWrap: true,
+          wordWrapWidth: 500,
+        });
+        detail.position.set(76, y + 38);
+        view.addChild(detail);
+      }
     });
   } else if (model.pattern === 'B' && model.placementResult !== undefined) {
     const resultLabel = placementResultLabel(model.placementResult.result);
@@ -83,7 +100,9 @@ export function createEventScreen(model: EventSceneModel, callbacks: EventScreen
   } else if (model.pattern === 'B') {
     const placement: Record<string, string> = {};
     model.items.forEach((item, itemIndex) => {
-      const slot = model.slots[itemIndex % model.slots.length];
+      // Offset start so the initial layout never mirrors the answer mapping;
+      // the player must actively arrange the links before submitting.
+      const slot = model.slots[(itemIndex + 1) % model.slots.length];
       if (slot !== undefined) placement[item.itemId] = slot.slotId;
       const slotLabel = slot?.label ?? '미배치';
       const control = action(`${item.label}  →  ${slotLabel}`, 70, 150 + itemIndex * 46, 500, () => {
