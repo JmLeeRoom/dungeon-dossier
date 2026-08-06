@@ -16,6 +16,7 @@ import {
   SLOT_IDS,
   STAGE_HEIGHT,
   STAGE_WIDTH,
+  applyWorkbenchDrag,
   canonicalDownloadName,
   clampRect,
   createInitialWorkbenchState,
@@ -31,7 +32,6 @@ import {
   resetAllGeometry,
   resetSlotGeometry,
   saveWorkbenchState,
-  scaleRotatedRectFromHandle,
   serializeAssetManifest,
   serializePortraitPartsManifest,
   toggleSlotLock,
@@ -43,6 +43,7 @@ import {
   withoutSlotImage,
   type Rect,
   type SlotId,
+  type WorkbenchDragMode,
   type WorkbenchState,
 } from './model.mts';
 
@@ -132,16 +133,13 @@ let selectedId: SlotId = 'bg-room';
 let tweakMode = false;
 let zoom = zoomSelect.value === '2' ? 2 : 1;
 
-type GizmoMode = 'move' | 'rotate' | 'scale';
-
 interface DragSession {
-  readonly mode: GizmoMode;
+  readonly mode: WorkbenchDragMode;
   readonly slotId: SlotId;
   readonly pointerId: number;
   readonly startPoint: Readonly<{ x: number; y: number }>;
   readonly startRect: Rect;
   readonly startRotation: number;
-  readonly startAngle: number;
 }
 
 let drag: DragSession | undefined;
@@ -228,15 +226,10 @@ function stagePoint(event: PointerEvent): Readonly<{ x: number; y: number }> {
   };
 }
 
-function rectCentre(rect: Rect): Readonly<{ x: number; y: number }> {
-  return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
-}
-
-function beginDrag(mode: GizmoMode, event: PointerEvent): void {
+function beginDrag(mode: WorkbenchDragMode, event: PointerEvent): void {
   if (!tweakMode || isSlotLocked(state, selectedId)) return;
   const rect = state.geometry[selectedId];
   const point = stagePoint(event);
-  const centre = rectCentre(rect);
   drag = {
     mode,
     slotId: selectedId,
@@ -244,7 +237,6 @@ function beginDrag(mode: GizmoMode, event: PointerEvent): void {
     startPoint: point,
     startRect: rect,
     startRotation: state.rotation[selectedId],
-    startAngle: Math.atan2(point.y - centre.y, point.x - centre.x),
   };
   event.preventDefault();
   window.addEventListener('pointermove', onDragMove);
@@ -253,27 +245,16 @@ function beginDrag(mode: GizmoMode, event: PointerEvent): void {
 }
 
 function applyDrag(session: DragSession, event: PointerEvent): WorkbenchState {
-  const point = stagePoint(event);
-  if (session.mode === 'move') {
-    return withSlotRect(state, session.slotId, {
-      ...session.startRect,
-      x: session.startRect.x + (point.x - session.startPoint.x),
-      y: session.startRect.y + (point.y - session.startPoint.y),
-    });
-  }
-  if (session.mode === 'rotate') {
-    const centre = rectCentre(session.startRect);
-    const angle = Math.atan2(point.y - centre.y, point.x - centre.x);
-    return withSlotRotation(
-      state,
-      session.slotId,
-      session.startRotation + (angle - session.startAngle),
-    );
-  }
-  return withSlotRect(
+  return applyWorkbenchDrag(
     state,
     session.slotId,
-    scaleRotatedRectFromHandle(session.startRect, session.startRotation, point),
+    {
+      mode: session.mode,
+      startPoint: session.startPoint,
+      currentPoint: stagePoint(event),
+      startRect: session.startRect,
+      startRotation: session.startRotation,
+    },
   );
 }
 

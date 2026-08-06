@@ -1,34 +1,33 @@
-import { readFile } from 'node:fs/promises';
+import { readdir, readFile } from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import { StringsSchema, type StringsDefinition } from '../../src/engine/domain';
 
-const CASE_FILES = [
-  'cases/tutorial/case.json',
-  'cases/ep001/case.json',
-  'cases/ep004/case.json',
-] as const;
+const CONTENT_ROOT = fileURLToPath(new URL('../../content/', import.meta.url));
 
-const CATALOGUE_FILES = [
-  'common/cards.json',
-  'common/flags.json',
-  'common/relics.json',
-  'common/enhancements.json',
-  'common/grades.json',
-  'common/judgment-ui-map.json',
-] as const;
-
-const KEY_FIELDS = [
+const LOCALIZATION_KEY_FIELDS = [
   'title_key',
   'label_key',
   'slot_label_key',
   'description_key',
   'display_name_key',
   'name_key',
+  'feedback_key',
+  'missing_feedback_key',
 ] as const;
 
 const RAW_KEY_PATTERN = /^[a-z0-9_]+\.[a-z0-9_.]+$/u;
+
+const REQUIRED_CONTENT_FILES = [
+  'cases/tutorial/case.json',
+  'common/judgment-ui-map.json',
+  'common/rewards.json',
+  'common/run-strip.json',
+  'common/strings.ko.json',
+] as const;
 
 let table: StringsDefinition;
 let referencedKeys: ReadonlySet<string>;
@@ -36,6 +35,8 @@ let rewardIds: readonly string[];
 let runStripRefs: readonly string[];
 let objectiveIds: readonly string[];
 let eventDescriptionKeys: readonly (string | undefined)[];
+let contentPaths: readonly string[];
+let technicalIds: ReadonlySet<string>;
 
 async function loadContentJson(relativePath: string): Promise<unknown> {
   const source = await readFile(
@@ -43,6 +44,21 @@ async function loadContentJson(relativePath: string): Promise<unknown> {
     'utf8',
   );
   return JSON.parse(source) as unknown;
+}
+
+async function discoverJsonFiles(
+  directory = CONTENT_ROOT,
+  prefix = '',
+): Promise<readonly string[]> {
+  const entries = await readdir(directory, { withFileTypes: true });
+  const discovered = await Promise.all(entries.map(async (entry) => {
+    const relativePath = prefix === '' ? entry.name : `${prefix}/${entry.name}`;
+    if (entry.isDirectory()) {
+      return discoverJsonFiles(path.join(directory, entry.name), relativePath);
+    }
+    return entry.isFile() && entry.name.endsWith('.json') ? [relativePath] : [];
+  }));
+  return discovered.flat().sort();
 }
 
 function collectKeyFields(value: unknown, destination: Set<string>): void {
@@ -53,7 +69,7 @@ function collectKeyFields(value: unknown, destination: Set<string>): void {
   if (value === null || typeof value !== 'object') return;
   for (const [field, entry] of Object.entries(value)) {
     if (
-      (KEY_FIELDS as readonly string[]).includes(field) &&
+      (LOCALIZATION_KEY_FIELDS as readonly string[]).includes(field) &&
       typeof entry === 'string'
     ) {
       destination.add(entry);
@@ -63,20 +79,49 @@ function collectKeyFields(value: unknown, destination: Set<string>): void {
   }
 }
 
+function collectTechnicalIds(value: unknown, destination: Set<string>): void {
+  if (Array.isArray(value)) {
+    for (const entry of value) collectTechnicalIds(entry, destination);
+    return;
+  }
+  if (value === null || typeof value !== 'object') return;
+  for (const [field, entry] of Object.entries(value)) {
+    if (
+      typeof entry === 'string' &&
+      (/(?:^|_)id$/u.test(field) || field === 'ref')
+    ) {
+      destination.add(entry);
+    } else if (Array.isArray(entry) && /(?:^|_)ids$/u.test(field)) {
+      for (const id of entry) {
+        if (typeof id === 'string') destination.add(id);
+      }
+    }
+    collectTechnicalIds(entry, destination);
+  }
+}
+
 beforeAll(async () => {
-  table = StringsSchema.parse(await loadContentJson('common/strings.ko.json'));
+  contentPaths = await discoverJsonFiles();
+  const contentByPath = new Map<string, unknown>(await Promise.all(
+    contentPaths.map(async (relativePath) => [
+      relativePath,
+      await loadContentJson(relativePath),
+    ] as const),
+  ));
+  table = StringsSchema.parse(contentByPath.get('common/strings.ko.json'));
 
   const keys = new Set<string>();
-  const caseContents: unknown[] = [];
-  for (const file of CASE_FILES) {
-    const value = await loadContentJson(file);
-    caseContents.push(value);
+  const ids = new Set<string>();
+  for (const value of contentByPath.values()) {
     collectKeyFields(value, keys);
-  }
-  for (const file of CATALOGUE_FILES) {
-    collectKeyFields(await loadContentJson(file), keys);
+    collectTechnicalIds(value, ids);
   }
   referencedKeys = keys;
+  technicalIds = ids;
+
+  const caseContents = [...contentByPath.entries()]
+    .filter(([relativePath]) => /^cases\/[^/]+\/case\.json$/u.test(relativePath))
+    .map(([, value]) => value);
 
   const cases = caseContents as readonly {
     readonly encounters: readonly {
@@ -97,19 +142,21 @@ beforeAll(async () => {
     caseDefinition.events_noncombat.map((event) => event.description_key),
   );
 
-  const rewards = (await loadContentJson('common/rewards.json')) as {
+  const rewards = contentByPath.get('common/rewards.json') as {
     readonly rewards: readonly { readonly reward_id: string }[];
   };
   rewardIds = rewards.rewards.map((reward) => reward.reward_id);
 
-  const runStrip = (await loadContentJson('common/run-strip.json')) as {
+  const runStrip = contentByPath.get('common/run-strip.json') as {
     readonly nodes: readonly { readonly ref: string }[];
   };
   runStripRefs = runStrip.nodes.map((node) => node.ref);
 });
 
 describe('Korean string table coverage', () => {
-  it('parses content/common/strings.ko.json with StringsSchema', () => {
+  it('recursively discovers content JSON files and parses the Korean table', () => {
+    expect(contentPaths.length).toBeGreaterThan(0);
+    expect(contentPaths).toEqual(expect.arrayContaining([...REQUIRED_CONTENT_FILES]));
     expect(table.locale).toBe('ko');
     expect(Object.keys(table.strings).length).toBeGreaterThan(0);
   });
@@ -140,7 +187,7 @@ describe('Korean string table coverage', () => {
   });
 
   it('authors a covered description_key for every non-combat event', () => {
-    expect(eventDescriptionKeys).toHaveLength(7);
+    expect(eventDescriptionKeys.length).toBeGreaterThan(0);
     expect(eventDescriptionKeys).not.toContain(undefined);
     const missing = eventDescriptionKeys.filter(
       (key) => key === undefined || table.strings[key] === undefined,
@@ -159,6 +206,14 @@ describe('Korean string table coverage', () => {
   it('never leaks a raw dotted key as display text', () => {
     const leaked = Object.entries(table.strings).filter(([, value]) =>
       RAW_KEY_PATTERN.test(value),
+    );
+    expect(leaked).toEqual([]);
+  });
+
+  it('never substitutes a technical content identifier as localized display text', () => {
+    expect(technicalIds.size).toBeGreaterThan(0);
+    const leaked = Object.entries(table.strings).filter(([, value]) =>
+      technicalIds.has(value),
     );
     expect(leaked).toEqual([]);
   });

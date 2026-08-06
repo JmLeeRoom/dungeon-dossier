@@ -98,11 +98,31 @@ export interface TypewriterOptions {
   readonly onKeystroke?: () => void;
 }
 
+let intervalOverrideMs: number | undefined;
+
+/**
+ * DEV automation hook: overrides the per-character delay for typewriters
+ * created afterwards (e.g. cinematic recording pace). Pass undefined to reset.
+ */
+export function setTypewriterIntervalOverride(intervalMs?: number): void {
+  intervalOverrideMs =
+    intervalMs !== undefined && Number.isFinite(intervalMs) && intervalMs > 0
+      ? intervalMs
+      : undefined;
+}
+
+/** Purely exposes the effective interval calculation for lifecycle regression tests. */
+export function resolveTypewriterIntervalMs(intervalMs = 32): number {
+  return intervalOverrideMs ?? intervalMs;
+}
+
 export function createTypewriter(options: TypewriterOptions = {}): TypewriterController {
   const width = options.width ?? 436;
   const height = options.height ?? 56;
   const view = new Container();
-  const stream = new TypewriterStream(options.intervalMs ?? 32);
+  const stream = new TypewriterStream(
+    resolveTypewriterIntervalMs(options.intervalMs ?? 32),
+  );
   const frame = new Graphics()
     .rect(0, 0, width, height)
     .fill({ color: UI_PALETTE.deepInk, alpha: 0.94 })

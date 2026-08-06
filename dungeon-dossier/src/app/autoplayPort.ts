@@ -3,6 +3,27 @@ import type { EncounterOutcome } from '../engine/encounter';
 import type { CaseGrade } from '../engine/run';
 import type { InterrogationScreenModel } from '../ui/screens/interrogation';
 
+export const MAX_AUTOPLAY_SEED = 0xffff_ffff;
+
+/** Shared L1/L2 seed contract: an unsigned 32-bit integer written in decimal. */
+export function isAutoplaySeed(value: number): boolean {
+  return Number.isSafeInteger(value) && value >= 0 && value <= MAX_AUTOPLAY_SEED;
+}
+
+/**
+ * Parses the optional DEV query seed without JavaScript's lossy numeric
+ * coercions (`-1 >>> 0`, fractions, exponent notation, or an empty string).
+ */
+export function parseAutoplaySeedParameter(
+  parameter: string | null,
+): number | undefined {
+  if (parameter === null) return undefined;
+  const normalized = parameter.trim();
+  if (!/^(?:0|[1-9][0-9]*)$/u.test(normalized)) return undefined;
+  const value = Number(normalized);
+  return isAutoplaySeed(value) ? value : undefined;
+}
+
 /** Present query values launch L2; only explicit false/0 values opt out. */
 export function isAutoplayRequested(
   parameter: string | null,
@@ -44,7 +65,56 @@ export interface AutoplayCardPlayability {
   readonly effectiveCpCost: number;
 }
 
-export type AutoplayScene =
+const AUTOPLAY_VISIBLE_STRING_FIELDS = new Set([
+  'body',
+  'description',
+  'displayName',
+  'heading',
+  'label',
+  'message',
+  'name',
+  'partnerName',
+  'script',
+  'suspectName',
+  'text',
+  'title',
+]);
+
+/**
+ * Collects player-visible text fields from a plain UI view model. Structural
+ * IDs remain available to callbacks but are deliberately excluded, so a raw
+ * ID is reported only when it leaks into a title/label/description/etc.
+ * Cycles are tolerated for defensive callers.
+ */
+export function collectAutoplaySceneStrings(value: unknown): readonly string[] {
+  const strings: string[] = [];
+  const visited = new WeakSet<object>();
+  const visit = (current: unknown, visible: boolean): void => {
+    if (typeof current === 'string') {
+      if (visible) strings.push(current);
+      return;
+    }
+    if (current === null || typeof current !== 'object') return;
+    if (visited.has(current)) return;
+    visited.add(current);
+    if (Array.isArray(current)) {
+      for (const entry of current) visit(entry, visible);
+      return;
+    }
+    for (const [key, entry] of Object.entries(current)) {
+      visit(entry, AUTOPLAY_VISIBLE_STRING_FIELDS.has(key));
+    }
+  };
+  visit(value, false);
+  return strings;
+}
+
+interface AutoplayScenePresentation {
+  /** Player-visible strings captured from the exact model rendered on screen. */
+  readonly displayStrings?: readonly string[];
+}
+
+export type AutoplayScene = AutoplayScenePresentation & (
   | {
       readonly kind: 'STRIP';
       readonly nodeIndex: number;
@@ -101,7 +171,8 @@ export type AutoplayScene =
       readonly kind: 'ENDING';
       readonly endingId: string;
       restart(): void;
-    };
+    }
+);
 
 export interface AutoplayRunSnapshot {
   readonly nodeIndex: number;

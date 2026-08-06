@@ -83,6 +83,9 @@ const CURSOR_STYLE = [
   'text-shadow: 0 0 10px rgba(87, 230, 230, 0.9), 0 0 22px rgba(87, 230, 230, 0.6)',
 ].join('; ');
 
+/** Cursor movement starts before the staged game action is allowed to fire. */
+export const AUTOPLAY_CURSOR_DOCK_START_MS = 0;
+
 const TRAIL_STYLE = [
   'position: fixed',
   'z-index: 2147483646',
@@ -215,6 +218,9 @@ export function createAutoplayHud(): AutoplayHud {
       cursor.style.left = `${startX.toString()}px`;
       cursor.style.top = `${startY.toString()}px`;
       cursor.style.opacity = '1';
+      // Commit the starting position so the next task begins a real CSS
+      // transition instead of coalescing both positions into one paint.
+      void cursor.getBoundingClientRect();
       window.setTimeout(() => {
         cursor.style.transition = CURSOR_STYLE
           .split('; ')
@@ -222,7 +228,7 @@ export function createAutoplayHud(): AutoplayHud {
           ?.slice('transition: '.length) ?? '';
         cursor.style.left = `${endX.toString()}px`;
         cursor.style.top = `${endY.toString()}px`;
-      }, 60);
+      }, AUTOPLAY_CURSOR_DOCK_START_MS);
       if (cursorTimer !== undefined) window.clearTimeout(cursorTimer);
       cursorTimer = window.setTimeout(() => {
         cursor.style.opacity = '0';

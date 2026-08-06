@@ -53,6 +53,8 @@ const CASE_BY_ID: ReadonlyMap<string, CaseDefinition> = new Map(
 );
 
 const FUZZ_SEEDS = [11, 29, 47, 83, 131] as const;
+const LEGAL_FUZZ_ATTEMPT_TARGET = 1_000;
+const EXPECTED_VALIDATION_ERROR = /^(?:Unknown card:|Card .+ is not in hand\.|Card .+ is locked this turn\.|Action .+ is locked this turn\.|Insufficient command points\.|Unknown inquiry route:|Inquiry route .+ does not allow |Inquiry route .+ targets a different claim\.)/u;
 /** Machine states in which the encounter still accepts player actions. */
 const OPEN_MACHINE_STATES = [
   'BUILD_ARGUMENT',
@@ -78,6 +80,15 @@ function createFuzzRng(seed: number): Rng {
 function pick<T>(rng: Rng, values: readonly T[]): T | undefined {
   if (values.length === 0) return undefined;
   return values[Math.floor(rng() * values.length) % values.length];
+}
+
+function shuffled<T>(rng: Rng, values: readonly T[]): T[] {
+  const result = [...values];
+  for (let index = result.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(rng() * (index + 1));
+    [result[index], result[swapIndex]] = [result[swapIndex]!, result[index]!];
+  }
+  return result;
 }
 
 function playableHandCards(
@@ -150,6 +161,87 @@ function fuzzSubmission(
   };
 }
 
+/** Generates only requests accepted by the current live-hand/runtime contract. */
+function legalFuzzSubmission(
+  rng: Rng,
+  definition: CaseDefinition,
+  state: EncounterRuntimeState,
+): SubmissionRequest | undefined {
+  const cards = shuffled(rng, playableHandCards(state));
+  const acquiredEvidenceIds = definition.evidence
+    .map((evidence) => evidence.evidence_id)
+    .filter((evidenceId) => {
+      const runtime = state.evidence[evidenceId];
+      return runtime?.acquired === true &&
+        (runtime.sealedUntilTurn ?? -1) < state.resources.turn;
+    });
+
+  for (const card of cards) {
+    if (card.target.kind === 'ROUTE') {
+      const routes = definition.inquiry_routes.filter((route) => {
+        const claim = definition.claims.find(
+          (candidate) => candidate.claim_id === route.target_slot,
+        );
+        return state.openRouteIds.includes(route.route_id) &&
+          (!route.single_use || !state.usedRouteIds.includes(route.route_id)) &&
+          route.allowed_intents.includes(card.intent) &&
+          (card.target.facets === undefined ||
+            (claim !== undefined && card.target.facets.includes(claim.facet)));
+      });
+      const route = pick(rng, routes);
+      if (route !== undefined) {
+        return {
+          cardId: card.card_id,
+          targetClaimId: route.target_slot,
+          routeId: route.route_id,
+          evidenceIds: [],
+        };
+      }
+      continue;
+    }
+
+    if (card.target.kind === 'CLAIM') {
+      const claims = definition.claims.filter((claim) =>
+        state.revealedIds.includes(claim.claim_id) &&
+        (card.target.facets === undefined || card.target.facets.includes(claim.facet)),
+      );
+      const claim = pick(rng, claims);
+      const minimumEvidence = card.target.min_evidence ?? 0;
+      if (claim === undefined || acquiredEvidenceIds.length < minimumEvidence) continue;
+      const maximumEvidence = Math.min(
+        acquiredEvidenceIds.length,
+        card.target.max_evidence ?? acquiredEvidenceIds.length,
+      );
+      const evidenceCount = minimumEvidence === maximumEvidence
+        ? minimumEvidence
+        : minimumEvidence + Math.floor(rng() * (maximumEvidence - minimumEvidence + 1));
+      return {
+        cardId: card.card_id,
+        targetClaimId: claim.claim_id,
+        evidenceIds: acquiredEvidenceIds.slice(0, evidenceCount),
+      };
+    }
+
+    if (card.target.kind === 'EVIDENCE') {
+      const minimumEvidence = card.target.min_evidence ?? 0;
+      if (acquiredEvidenceIds.length < minimumEvidence) continue;
+      const maximumEvidence = card.target.max_evidence ?? acquiredEvidenceIds.length;
+      const evidenceCount = Math.min(
+        acquiredEvidenceIds.length,
+        maximumEvidence,
+        Math.max(1, minimumEvidence),
+      );
+      return {
+        cardId: card.card_id,
+        evidenceIds: acquiredEvidenceIds.slice(0, evidenceCount),
+      };
+    }
+
+    return { cardId: card.card_id, evidenceIds: [] };
+  }
+  return undefined;
+}
+
 interface FuzzRunResult {
   readonly submissions: number;
   readonly failedSubmissions: number;
@@ -193,13 +285,17 @@ function driveFuzzEncounter(
     if (machineState === 'BUILD_ARGUMENT') {
       submissions += 1;
       const request = fuzzSubmission(rng, definition, snapshot);
+      const beforeSubmission = coordinator.snapshot;
       try {
         const submission = coordinator.submit(request);
         expect(RESOLUTION_CODES).toContain(submission.resolution.code);
       } catch (error) {
         failedSubmissions += 1;
         expect(error).toBeInstanceOf(Error);
-        // Expected validation errors must roll back to BUILD_ARGUMENT.
+        expect((error as Error).message).toMatch(EXPECTED_VALIDATION_ERROR);
+        // Expected validation errors must be a full rollback, not merely a
+        // machine-state repair that silently consumes CP/cards/evidence.
+        expect(coordinator.snapshot).toEqual(beforeSubmission);
         expect(coordinator.snapshot.machine.state).toBe('BUILD_ARGUMENT');
       }
       continue;
@@ -219,7 +315,7 @@ function driveFuzzEncounter(
   };
 }
 
-describe('L1 fuzz runs (wrong-but-legal submissions across every encounter)', () => {
+describe('L1 resolution, legal-action, and adversarial fuzz runs', () => {
   it('probes all 432 resolution-table combinations without a single throw', () => {
     let combinations = 0;
     for (const intent of ['CONTRADICT', 'CONFIRM'] as const) {
@@ -247,9 +343,132 @@ describe('L1 fuzz runs (wrong-but-legal submissions across every encounter)', ()
     expect(combinations).toBe(432);
   });
 
+  it('executes at least 1000 legal live-hand submissions with zero throws', () => {
+    const unexpectedErrors: string[] = [];
+    let attempts = 0;
+    let candidateSeed = 10_000;
+
+    while (attempts < LEGAL_FUZZ_ATTEMPT_TARGET && candidateSeed < 20_000) {
+      const archetype = SIMULATION_ARCHETYPES[
+        (candidateSeed - 10_000) % SIMULATION_ARCHETYPES.length
+      ];
+      if (archetype === undefined) throw new Error('Fuzz catalog is empty.');
+      const entry = getSimulationEncounter(archetype);
+      const definition = CASE_BY_ID.get(entry.caseId);
+      if (definition === undefined) {
+        throw new Error(`Missing case definition ${entry.caseId}.`);
+      }
+      const coordinator = EncounterCoordinator.begin({
+        caseDefinition: definition,
+        encounterId: entry.encounterId,
+        cards: CARDS.cards,
+        balance: BALANCE,
+        rng: createRngState(candidateSeed, 'DECK_SHUFFLE'),
+        ...(CARDS.initial_deck === undefined
+          ? {}
+          : { initialDeckCardIds: CARDS.initial_deck }),
+      });
+      const rng = createFuzzRng(candidateSeed ^ 0xa5a5_a5a5);
+      const submissionCap = entry.turnLimit * 2 + 1;
+      const iterationCap = submissionCap * 4 + 8;
+      candidateSeed += 1;
+
+      for (
+        let iteration = 0;
+        iteration < iterationCap && attempts < LEGAL_FUZZ_ATTEMPT_TARGET;
+        iteration += 1
+      ) {
+        const snapshot = coordinator.snapshot;
+        if (snapshot.outcome !== null) break;
+        if (snapshot.machine.state === 'FREE_REVIEW') {
+          coordinator.review();
+          coordinator.beginArgument();
+          continue;
+        }
+        if (snapshot.machine.state === 'CHECK_OUTCOME') {
+          coordinator.endTurn();
+          continue;
+        }
+        if (snapshot.machine.state !== 'BUILD_ARGUMENT') {
+          unexpectedErrors.push(`legal fuzz reached ${snapshot.machine.state}`);
+          break;
+        }
+        const request = legalFuzzSubmission(rng, definition, snapshot);
+        if (request === undefined) {
+          unexpectedErrors.push(
+            `no legal live-hand action in ${entry.encounterId} on turn ` +
+            snapshot.resources.turn.toString(),
+          );
+          break;
+        }
+        attempts += 1;
+        try {
+          const submission = coordinator.submit(request);
+          if (!RESOLUTION_CODES.includes(submission.resolution.code)) {
+            unexpectedErrors.push(`unknown resolution ${submission.resolution.code}`);
+          }
+        } catch (error) {
+          unexpectedErrors.push(error instanceof Error ? error.message : String(error));
+          break;
+        }
+      }
+    }
+
+    expect(attempts).toBeGreaterThanOrEqual(LEGAL_FUZZ_ATTEMPT_TARGET);
+    expect(unexpectedErrors).toEqual([]);
+  });
+
   describe.each([...SIMULATION_ARCHETYPES])('%s', (archetype) => {
+    it('allowlists an adversarial validation error and fully rolls back', () => {
+      const entry = getSimulationEncounter(archetype);
+      const definition = CASE_BY_ID.get(entry.caseId);
+      if (definition === undefined) {
+        throw new Error(`Missing case definition ${entry.caseId}.`);
+      }
+      const coordinator = EncounterCoordinator.begin({
+        caseDefinition: definition,
+        encounterId: entry.encounterId,
+        cards: CARDS.cards,
+        balance: BALANCE,
+        rng: createRngState(20_260_805, 'DECK_SHUFFLE'),
+        ...(CARDS.initial_deck === undefined
+          ? {}
+          : { initialDeckCardIds: CARDS.initial_deck }),
+      });
+      if (coordinator.snapshot.machine.state === 'FREE_REVIEW') {
+        coordinator.review();
+        coordinator.beginArgument();
+      }
+      const playable = playableHandCards(coordinator.snapshot)[0];
+      expect(playable).toBeDefined();
+      if (playable === undefined) return;
+      const before = coordinator.snapshot;
+
+      expect(() => coordinator.submit({
+        cardId: playable.card_id,
+        routeId: 'route_fuzz_missing',
+        evidenceIds: [],
+      })).toThrow(/^Unknown inquiry route: route_fuzz_missing\.$/u);
+      expect(coordinator.snapshot).toEqual(before);
+      expect(coordinator.snapshot.resources.commandPoints).toBe(
+        before.resources.commandPoints,
+      );
+      expect(coordinator.snapshot.deck).toEqual(before.deck);
+      expect(coordinator.snapshot.machine.state).toBe('BUILD_ARGUMENT');
+
+      const legal = legalFuzzSubmission(
+        createFuzzRng(20_260_805),
+        definition,
+        coordinator.snapshot,
+      );
+      expect(legal).toBeDefined();
+      if (legal === undefined) return;
+      expect(() => coordinator.submit(legal)).not.toThrow();
+      expect(coordinator.snapshot.machine.state).not.toBe('RESOLVE');
+    });
+
     it.each([...FUZZ_SEEDS])(
-      'seed %d always ends in a defined condition and never sticks in RESOLVE',
+      'adversarial seed %d accepts only allowlisted errors and never sticks in RESOLVE',
       (seed) => {
         const entry = getSimulationEncounter(archetype);
         const definition = CASE_BY_ID.get(entry.caseId);

@@ -78,8 +78,7 @@ export class RunSession {
         ? {}
         : { outcomeRewards: input.outcomeRewards }),
     });
-    this.#state = completion.state;
-    this.#save();
+    this.#commit(completion.state);
     return completion;
   }
 
@@ -89,8 +88,7 @@ export class RunSession {
       flagDefinitions: this.#options.flags,
       ...input,
     });
-    this.#state = completion.state;
-    this.#save();
+    this.#commit(completion.state);
     return completion;
   }
 
@@ -99,16 +97,20 @@ export class RunSession {
       (candidate) => candidate.reward_id === rewardId,
     );
     if (reward === undefined) throw new Error(`Unknown reward ${rewardId}.`);
-    this.#state = claimRunReward(this.#state, reward);
-    this.#save();
+    const nextState = claimRunReward(this.#state, reward);
+    this.#commit(nextState);
     return this.#state;
   }
 
-  #save(): void {
+  /** Persist first so a storage failure leaves the retryable in-memory state intact. */
+  #commit(nextState: RunState): void {
     const repository = this.#options.saveRepository;
-    if (repository === undefined) return;
+    if (repository === undefined) {
+      this.#state = nextState;
+      return;
+    }
     const nodeIndex = Math.min(
-      this.#state.nodeIndex,
+      nextState.nodeIndex,
       this.#options.strip.length - 1,
     );
     const directory = this.#options.strip[nodeIndex]?.caseDirectory;
@@ -117,11 +119,12 @@ export class RunSession {
     if (caseId === undefined) {
       throw new Error(`Missing case ID metadata for ${directory}.`);
     }
-    saveRunAtNodeBoundary(repository, this.#state, {
+    saveRunAtNodeBoundary(repository, nextState, {
       caseId,
       contentVersion:
         this.#options.contentVersionsByDirectory?.[directory] ?? '1.0',
     });
+    this.#state = nextState;
   }
 }
 

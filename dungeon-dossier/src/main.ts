@@ -1,4 +1,5 @@
 import { bootstrap } from './app/bootstrap';
+import { parseAutoplaySeedParameter } from './app/autoplayPort';
 import './style.css';
 
 const mountElement = document.querySelector<HTMLElement>('#game-root');
@@ -10,14 +11,11 @@ const mount: HTMLElement = mountElement;
 async function start(): Promise<void> {
   if (import.meta.env.DEV) {
     const params = new URLSearchParams(window.location.search);
-    const rawSeed = params.get('seed');
-    const parsedSeed = rawSeed === null ? Number.NaN : Number(rawSeed);
+    const parsedSeed = parseAutoplaySeedParameter(params.get('seed'));
     const { installAutoPlayGlobal } = await import('./dev/autoPlayHarness');
     installAutoPlayGlobal(
       window,
-      Number.isSafeInteger(parsedSeed) && parsedSeed >= 0
-        ? { seed: parsedSeed }
-        : {},
+      parsedSeed === undefined ? {} : { seed: parsedSeed },
     );
   }
   await bootstrap(mount);

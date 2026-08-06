@@ -4,7 +4,7 @@ TypeScript, Vite, PixiJS로 구축하는 데이터 기반 추리 카드 게임�
 
 ## 개발 환경
 
-- Node.js 20.19 이상, 20.x 고정
+- Node.js 22.13 이상, 22.x 고정
 - pnpm 11.18.0
 - Chrome 최신 버전
 

@@ -8,6 +8,7 @@ import type {
 } from '../../app/autoplayPort';
 import { BalanceSchema, CardsSchema } from '../../engine/domain';
 import { t } from '../../app/i18n';
+import { setTypewriterIntervalOverride } from '../../ui/widgets/typewriter';
 import { createAutoplayHud } from './hud';
 import {
   chooseEventChoice,
@@ -30,6 +31,7 @@ import {
   findAutoplayInvariantFailures,
   findRawI18nKeys,
   publishReport,
+  VIDEO_DURATION_ACCEPTANCE,
   type AutoplayNodeReport,
   type AutoplayReport,
   type AutoplayReportEvidence,
@@ -45,6 +47,8 @@ interface ModeConfig {
   readonly skipTypewriter: boolean;
   /** Cinematic pacing target: the run is stretched to land on this length. */
   readonly targetDurationSec?: number;
+  /** Per-character typewriter delay override while this mode drives the run. */
+  readonly typewriterIntervalMs?: number;
 }
 
 export const MODE_CONFIGS: Readonly<Record<AutoplayOptions['mode'], ModeConfig>> = {
@@ -69,22 +73,32 @@ export const MODE_CONFIGS: Readonly<Record<AutoplayOptions['mode'], ModeConfig>>
     runTimeoutMs: 600_000,
     skipTypewriter: false,
   },
-  // 2m30s promo/demo recording: realtime directions, readable 1.8s action
-  // cadence, full typewriter, and a per-node schedule that lands on 150s.
+  // 2m30s promo/demo recording. Field-measured: 1.8s cadence + stock 32ms
+  // typewriter ran ~25s/node and timed out at node 8, so the cadence is 950ms,
+  // directions play at 1.15x, dialogue types at 20ms/char, and the timeout is
+  // a 6-minute cushion. The node gate only paces the run; report invariants
+  // decide whether the measured wall-clock duration meets the 150s target.
   video: {
-    timeScale: 1,
-    actionDelayMs: 1_800,
+    timeScale: 1.15,
+    actionDelayMs: 950,
     sceneStallMs: 90_000,
-    runTimeoutMs: 200_000,
+    runTimeoutMs: 360_000,
     skipTypewriter: false,
     targetDurationSec: 150,
+    typewriterIntervalMs: 20,
   },
 };
 
 const POLL_INTERVAL_MS = 150;
 const NODE_COUNT = 15;
-/** Hover → dotted docking → submit beat before a staged cinematic action fires. */
-export const CINEMATIC_LEAD_MS = 1_500;
+/**
+ * Visible hover/docking lead before a staged cinematic action fires.
+ *
+ * The DOM cursor/trail animation owns its own 1.45s lifetime, so this only
+ * yields one frame before the action. Longer blocking leads compound across
+ * the canonical run's 90 submissions and make a 150s capture impossible.
+ */
+export const CINEMATIC_LEAD_MS = 16;
 
 /** Earliest run offset (ms) at which node `nodeIndex` may leave the strip. */
 export function videoNodeGateMs(
@@ -94,6 +108,36 @@ export function videoNodeGateMs(
 ): number {
   if (!Number.isFinite(nodeIndex) || nodeIndex < 0) return 0;
   return Math.max(0, Math.floor((targetDurationSec * 1000 * nodeIndex) / nodeCount));
+}
+
+/**
+ * Only player-visible decisions consume the configured action cadence.
+ * Mechanical strip/result continuation and a non-terminal CHECK_OUTCOME
+ * transition must not add another 950ms between every proof submission.
+ */
+export function usesAutoplayActionCadence(scene: {
+  readonly kind: AutoplayScene['kind'];
+  readonly machineState?: string;
+  readonly secureStatementEnabled?: boolean;
+}, mode: AutoplayOptions['mode']): boolean {
+  // The abbreviated mechanical transitions are part of the measured video
+  // pacing only. Watch/record retain their original readable scene holds.
+  if (mode !== 'video') return true;
+  if (scene.kind === 'EVENT' || scene.kind === 'REWARD') return true;
+  if (scene.kind !== 'INTERROGATION') return false;
+  return scene.machineState !== 'CHECK_OUTCOME' || scene.secureStatementEnabled === true;
+}
+
+export type NonBestCheckOutcomeAction = 'SECURE' | 'END_TURN';
+
+/** Prevents non-BEST L2 policies from submitting while CHECK_OUTCOME is active. */
+export function resolveNonBestCheckOutcomeAction(
+  policy: AutoplayOptions['policy'],
+  secureStatementEnabled: boolean,
+  secureRequested: boolean,
+): NonBestCheckOutcomeAction | undefined {
+  if (policy === 'best') return undefined;
+  return secureStatementEnabled && secureRequested ? 'SECURE' : 'END_TURN';
 }
 
 interface NodeProgress {
@@ -159,6 +203,7 @@ export function startAutoplay(port: AutoplayPort, options: AutoplayOptions): voi
   let encounterSubmissions = 0;
   let encounterTurnLimit = 0;
   let proofPaths: readonly ProofPathStep[] = [];
+  let typewriterOverrideActive = false;
 
   const originalConsoleError = console.error.bind(console);
   const originalConsoleWarn = console.warn.bind(console);
@@ -285,14 +330,23 @@ export function startAutoplay(port: AutoplayPort, options: AutoplayOptions): voi
     unsubscribe();
     console.error = originalConsoleError;
     console.warn = originalConsoleWarn;
+    if (typewriterOverrideActive) {
+      setTypewriterIntervalOverride(undefined);
+      typewriterOverrideActive = false;
+    }
+    port.setDirectionTimeScale(1);
     finalizeNode();
     const snapshot = port.runSnapshot();
+    const durationMs = Math.round(Date.now() - startedAt);
     const evidence: AutoplayReportEvidence = {
       schemaVersion: AUTOPLAY_REPORT_SCHEMA_VERSION,
       seed: options.seed,
       mode: options.mode,
       policy: options.policy,
-      durationMs: Math.round(Date.now() - startedAt),
+      durationMs,
+      ...(options.mode === 'video'
+        ? { durationAcceptance: { ...VIDEO_DURATION_ACCEPTANCE } }
+        : {}),
       nodes: [...nodes],
       ...(endingId === undefined ? {} : { ending: { endingId } }),
       ...(snapshot.terminal ? { terminalMarker: 'RUN_COMPLETED' as const } : {}),
@@ -350,16 +404,10 @@ export function startAutoplay(port: AutoplayPort, options: AutoplayOptions): voi
     if (currentNode !== undefined) currentNode.submissions += 1;
   };
 
-  const scanInterrogationStrings = (scene: InterrogationScene): void => {
-    const strings = [
-      scene.model.suspectName,
-      scene.model.partnerName,
-      ...scene.model.cards.flatMap((card) => [card.title, card.description]),
-      ...scene.model.dto.statement.map((token) => token.text),
-      ...scene.model.dto.evidence.map((evidence) => evidence.displayName),
-      ...scene.model.dto.objectives.map((objective) => objective.label),
-    ];
-    for (const key of findRawI18nKeys(strings)) rawI18nKeys.add(key);
+  const scanSceneStrings = (scene: AutoplayScene): void => {
+    for (const key of findRawI18nKeys(scene.displayStrings ?? [])) {
+      rawI18nKeys.add(key);
+    }
   };
 
   const submissionContext = (scene: InterrogationScene): LegalSubmissionContext => ({
@@ -412,7 +460,6 @@ export function startAutoplay(port: AutoplayPort, options: AutoplayOptions): voi
     if (currentNode !== undefined) {
       currentNode.turns = Math.max(currentNode.turns, scene.turn);
     }
-    scanInterrogationStrings(scene);
     if (config.skipTypewriter) scene.skipTypewriter();
     const submissionCap = encounterTurnLimit * 2 + 1;
     if (encounterSubmissions >= submissionCap) {
@@ -475,6 +522,20 @@ export function startAutoplay(port: AutoplayPort, options: AutoplayOptions): voi
       scene.submit(action.submission);
       return;
     }
+    if (scene.machineState === 'CHECK_OUTCOME') {
+      const checkOutcomeAction = resolveNonBestCheckOutcomeAction(
+        options.policy,
+        scene.secureStatementEnabled,
+        shouldSecure(),
+      );
+      if (checkOutcomeAction === 'SECURE') {
+        registerSubmission();
+        scene.secureStatement();
+      } else {
+        scene.endTurn();
+      }
+      return;
+    }
     if (scene.secureStatementEnabled && shouldSecure()) {
       registerSubmission();
       scene.secureStatement();
@@ -495,7 +556,7 @@ export function startAutoplay(port: AutoplayPort, options: AutoplayOptions): voi
 
   const act = (scene: AutoplayScene): void => {
     lastActedScene = scene;
-    lastActionAt = Date.now();
+    if (usesAutoplayActionCadence(scene, options.mode)) lastActionAt = Date.now();
     lastProgressAt = Date.now();
     try {
       switch (scene.kind) {
@@ -582,6 +643,7 @@ export function startAutoplay(port: AutoplayPort, options: AutoplayOptions): voi
       return;
     }
     const scene = port.scene();
+    if (scene !== undefined) scanSceneStrings(scene);
     updateHud(scene?.kind ?? 'NONE', 'running');
     if (scene !== undefined && scene !== lastScene) {
       lastScene = scene;
@@ -614,7 +676,10 @@ export function startAutoplay(port: AutoplayPort, options: AutoplayOptions): voi
       // Hold fast nodes on the strip so the full run lands on the video budget.
       return;
     }
-    if (now - lastActionAt < config.actionDelayMs) return;
+    if (
+      usesAutoplayActionCadence(scene, options.mode) &&
+      now - lastActionAt < config.actionDelayMs
+    ) return;
     act(scene);
   };
 
@@ -625,5 +690,7 @@ export function startAutoplay(port: AutoplayPort, options: AutoplayOptions): voi
     window.setTimeout(tick, 0);
   });
   port.setDirectionTimeScale(config.timeScale);
+  setTypewriterIntervalOverride(config.typewriterIntervalMs);
+  typewriterOverrideActive = true;
   window.setTimeout(tick, 0);
 }

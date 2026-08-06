@@ -32,6 +32,16 @@ export interface Point {
   readonly y: number;
 }
 
+export type WorkbenchDragMode = 'move' | 'rotate' | 'scale';
+
+export interface WorkbenchDragInput {
+  readonly mode: WorkbenchDragMode;
+  readonly startPoint: Point;
+  readonly currentPoint: Point;
+  readonly startRect: Rect;
+  readonly startRotation: number;
+}
+
 export const SLOT_IDS = [
   'bg-room',
   'suspect-base',
@@ -479,6 +489,51 @@ export function getSlotScale(
   const source = getSlotSourceDimension(id);
   const rect = state.geometry[id];
   return { scaleX: rect.width / source.width, scaleY: rect.height / source.height };
+}
+
+/**
+ * Pure transform used by the workbench pointer controller. Keeping all three
+ * gizmo modes here makes the exact browser interaction contract reproducible
+ * in the Node test suite, including the lock guard owned by the state reducers.
+ */
+export function applyWorkbenchDrag(
+  state: WorkbenchState,
+  id: SlotId,
+  input: WorkbenchDragInput,
+): WorkbenchState {
+  if (input.mode === 'move') {
+    return withSlotRect(state, id, {
+      ...input.startRect,
+      x: input.startRect.x + (input.currentPoint.x - input.startPoint.x),
+      y: input.startRect.y + (input.currentPoint.y - input.startPoint.y),
+    });
+  }
+  if (input.mode === 'rotate') {
+    const centreX = input.startRect.x + input.startRect.width / 2;
+    const centreY = input.startRect.y + input.startRect.height / 2;
+    const startAngle = Math.atan2(
+      input.startPoint.y - centreY,
+      input.startPoint.x - centreX,
+    );
+    const currentAngle = Math.atan2(
+      input.currentPoint.y - centreY,
+      input.currentPoint.x - centreX,
+    );
+    return withSlotRotation(
+      state,
+      id,
+      input.startRotation + (currentAngle - startAngle),
+    );
+  }
+  return withSlotRect(
+    state,
+    id,
+    scaleRotatedRectFromHandle(
+      input.startRect,
+      input.startRotation,
+      input.currentPoint,
+    ),
+  );
 }
 
 export function withSlotLock(

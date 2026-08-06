@@ -1,28 +1,23 @@
 import { describe, expect, it } from 'vitest';
+import runStripJson from '../../content/common/run-strip.json';
 
 import {
   AUTO_PLAY_NODE_COUNT,
   createAutoPlayHarness,
   installAutoPlayGlobal,
 } from '../../src/dev/autoPlayHarness';
+import { MAX_AUTOPLAY_SEED } from '../../src/app/autoplayPort';
+import { RunStripSchema } from '../../src/engine/domain';
 
-const EXPECTED_NODE_IDS = [
-  'run_tutorial_01',
-  'run_tutorial_02',
-  'run_tutorial_03',
-  'run_tutorial_04',
-  'run_tutorial_05',
-  'run_ep001_01',
-  'run_ep001_02',
-  'run_ep001_03',
-  'run_ep001_04',
-  'run_ep001_05',
-  'run_ep004_01',
-  'run_ep004_02',
-  'run_ep004_03',
-  'run_ep004_04',
-  'run_ep004_05',
-] as const;
+const EXPECTED_NODES = RunStripSchema.parse(runStripJson).nodes.map(
+  (node, index) => ({
+    index,
+    nodeId: node.node_id,
+    kind: node.kind,
+    ref: node.ref,
+  }),
+);
+const EXPECTED_NODE_IDS = EXPECTED_NODES.map((node) => node.nodeId);
 
 describe('15-node unattended autoplay', () => {
   it('visits the canonical strip and reaches RUN_COMPLETED without a throw', async () => {
@@ -36,10 +31,12 @@ describe('15-node unattended autoplay', () => {
     expect(result.errorCount).toBe(0);
     expect(result.errors).toEqual([]);
     expect(result.endingId).toBe('ending-true');
-    expect(result.nodes.map(({ nodeId }) => nodeId)).toEqual(EXPECTED_NODE_IDS);
-    expect(result.nodes.map(({ index }) => index)).toEqual(
-      Array.from({ length: AUTO_PLAY_NODE_COUNT }, (_, index) => index),
-    );
+    expect(result.nodes.map(({ index, nodeId, kind, ref }) => ({
+      index,
+      nodeId,
+      kind,
+      ref,
+    }))).toEqual(EXPECTED_NODES);
     const encounterNodes = result.nodes.filter(({ kind }) => kind !== 'EVENT');
     expect(encounterNodes).toHaveLength(9);
     expect(encounterNodes.every(({ outcome }) => outcome === 'BEST_RESOLUTION')).toBe(true);
@@ -84,5 +81,17 @@ describe('15-node unattended autoplay', () => {
     expect(typeof binding.stop).toBe('function');
     expect(typeof binding.getProgress).toBe('function');
     expect(binding.getProgress().status).toBe('IDLE');
+  });
+
+  it('enforces the same uint32 seed boundary for the programmatic L1 API', () => {
+    expect(createAutoPlayHarness({ seed: 0 }).getProgress().seed).toBe(0);
+    expect(
+      createAutoPlayHarness({ seed: MAX_AUTOPLAY_SEED }).getProgress().seed,
+    ).toBe(MAX_AUTOPLAY_SEED);
+    expect(() => createAutoPlayHarness({ seed: -1 })).toThrow(/0 through/u);
+    expect(() => createAutoPlayHarness({ seed: 1.5 })).toThrow(/0 through/u);
+    expect(() => createAutoPlayHarness({ seed: MAX_AUTOPLAY_SEED + 1 })).toThrow(
+      /0 through/u,
+    );
   });
 });

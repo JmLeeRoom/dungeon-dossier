@@ -1,25 +1,88 @@
-import type { AutoplayOptions } from '../../app/autoplayPort';
+import runStripJson from '../../../content/common/run-strip.json';
+import {
+  isAutoplaySeed,
+  type AutoplayOptions,
+} from '../../app/autoplayPort';
+import { RunStripSchema } from '../../engine/domain';
 
 export const AUTOPLAY_REPORT_SCHEMA_VERSION = '1.0';
 export const AUTOPLAY_REPORT_ELEMENT_ID = 'dd-autoplay-report';
 
-export const AUTOPLAY_EXPECTED_NODES = [
-  { index: 0, nodeId: 'run_tutorial_01', kind: 'ENCOUNTER', ref: 'enc_tutorial_slime' },
-  { index: 1, nodeId: 'run_tutorial_02', kind: 'EVENT', ref: 'event_tutorial_choice' },
-  { index: 2, nodeId: 'run_tutorial_03', kind: 'ENCOUNTER', ref: 'enc_tutorial_harpy' },
-  { index: 3, nodeId: 'run_tutorial_04', kind: 'EVENT', ref: 'event_tutorial_placement' },
-  { index: 4, nodeId: 'run_tutorial_05', kind: 'BOSS', ref: 'enc_tutorial_minotaur' },
-  { index: 5, nodeId: 'run_ep001_01', kind: 'ENCOUNTER', ref: 'enc_ep001_goblin' },
-  { index: 6, nodeId: 'run_ep001_02', kind: 'EVENT', ref: 'event_ep001_links' },
-  { index: 7, nodeId: 'run_ep001_03', kind: 'ENCOUNTER', ref: 'enc_ep001_orc' },
-  { index: 8, nodeId: 'run_ep001_04', kind: 'EVENT', ref: 'event_ep001_warehouse' },
-  { index: 9, nodeId: 'run_ep001_05', kind: 'BOSS', ref: 'enc_ep001_succubus' },
-  { index: 10, nodeId: 'run_ep004_01', kind: 'ENCOUNTER', ref: 'enc_ep004_dwarf' },
-  { index: 11, nodeId: 'run_ep004_02', kind: 'EVENT', ref: 'event_ep004_machine_room' },
-  { index: 12, nodeId: 'run_ep004_03', kind: 'ENCOUNTER', ref: 'enc_ep004_cyclops' },
-  { index: 13, nodeId: 'run_ep004_04', kind: 'EVENT', ref: 'event_ep004_ticket_trade' },
-  { index: 14, nodeId: 'run_ep004_05', kind: 'BOSS', ref: 'enc_ep004_fallen_hero' },
-] as const;
+/** Default product acceptance: a 150s cinematic run with a +/-15s tolerance. */
+export const VIDEO_DURATION_ACCEPTANCE = Object.freeze({
+  targetDurationMs: 150_000,
+  minimumDurationMs: 135_000,
+  maximumDurationMs: 165_000,
+  measurement: 'L2_WALL_CLOCK' as const,
+});
+
+export interface AutoplayDurationAcceptance {
+  readonly targetDurationMs: number;
+  readonly minimumDurationMs: number;
+  readonly maximumDurationMs: number;
+  /** Distinguishes real driver timing from a simulated/fake-clock duration. */
+  readonly measurement: 'L2_WALL_CLOCK';
+}
+
+const TECHNICAL_ID_FIELD = /(?:^|_)id$/u;
+const TECHNICAL_IDS_FIELD = /(?:^|_)ids$/u;
+
+const ALL_CONTENT_JSON = import.meta.glob('../../../content/**/*.json', {
+  eager: true,
+  import: 'default',
+}) as Readonly<Record<string, unknown>>;
+
+function collectTechnicalContentIds(
+  value: unknown,
+  ids: Set<string>,
+): void {
+  if (value === null || typeof value !== 'object') return;
+  if (Array.isArray(value)) {
+    for (const entry of value) collectTechnicalContentIds(entry, ids);
+    return;
+  }
+  for (const [key, entry] of Object.entries(value)) {
+    if (
+      typeof entry === 'string' &&
+      (TECHNICAL_ID_FIELD.test(key) || key === 'ref')
+    ) {
+      ids.add(entry);
+    } else if (Array.isArray(entry) && TECHNICAL_IDS_FIELD.test(key)) {
+      for (const id of entry) {
+        if (typeof id === 'string') ids.add(id);
+      }
+    }
+    collectTechnicalContentIds(entry, ids);
+  }
+}
+
+const technicalContentIds = new Set<string>();
+for (const content of Object.values(ALL_CONTENT_JSON)) {
+  collectTechnicalContentIds(content, technicalContentIds);
+}
+
+/** Data-owned denylist for IDs that must never be rendered as player text. */
+export const AUTOPLAY_TECHNICAL_CONTENT_IDS: readonly string[] = Object.freeze(
+  [...technicalContentIds].sort(),
+);
+const AUTOPLAY_TECHNICAL_CONTENT_ID_SET = new Set(AUTOPLAY_TECHNICAL_CONTENT_IDS);
+
+const canonicalStrip = RunStripSchema.parse(runStripJson);
+if (canonicalStrip.nodes.length !== 15) {
+  throw new Error(
+    `Autoplay report requires the canonical 15-node strip; found ${canonicalStrip.nodes.length.toString()}.`,
+  );
+}
+
+/** Data-owned expectation shared by report validation and its regression tests. */
+export const AUTOPLAY_EXPECTED_NODES = Object.freeze(
+  canonicalStrip.nodes.map((node, index) => Object.freeze({
+    index,
+    nodeId: node.node_id,
+    kind: node.kind,
+    ref: node.ref,
+  })),
+);
 
 export type AutoplayNodeKind = (typeof AUTOPLAY_EXPECTED_NODES)[number]['kind'];
 
@@ -52,6 +115,7 @@ export interface AutoplayReportEvidence {
   readonly mode: AutoplayOptions['mode'];
   readonly policy: AutoplayOptions['policy'];
   readonly durationMs: number;
+  readonly durationAcceptance?: AutoplayDurationAcceptance;
   readonly nodes: readonly AutoplayNodeReport[];
   readonly ending?: Readonly<{ endingId: string }>;
   readonly terminalMarker?: 'RUN_COMPLETED';
@@ -78,11 +142,15 @@ export interface AutoplayReport extends AutoplayReportEvidence {
   readonly result: 'PASS' | 'FAIL';
 }
 
-/** Raw developer i18n keys look like `event.title` / `resource.dp` (BLK-2). */
+/** Raw developer keys or data-owned content IDs visible to a player (BLK-2). */
 export const RAW_I18N_KEY_PATTERN = /^[a-z0-9_]+\.[a-z0-9_.]+$/;
 
 export function findRawI18nKeys(values: readonly string[]): readonly string[] {
-  return values.filter((value) => RAW_I18N_KEY_PATTERN.test(value));
+  return values.filter(
+    (value) =>
+      RAW_I18N_KEY_PATTERN.test(value) ||
+      AUTOPLAY_TECHNICAL_CONTENT_ID_SET.has(value),
+  );
 }
 
 function sameValues(left: readonly string[], right: readonly string[]): boolean {
@@ -100,6 +168,44 @@ export function findAutoplayInvariantFailures(
   const failures: string[] = [];
   const expectedIds = AUTOPLAY_EXPECTED_NODES.map((node) => node.nodeId);
   const actualIds = report.nodes.map((node) => node.nodeId);
+
+  if (report.schemaVersion !== AUTOPLAY_REPORT_SCHEMA_VERSION) {
+    failures.push(
+      `report schema must be ${AUTOPLAY_REPORT_SCHEMA_VERSION}, got ${report.schemaVersion}`,
+    );
+  }
+  if (!isAutoplaySeed(report.seed)) {
+    failures.push(`report seed is outside uint32: ${report.seed.toString()}`);
+  }
+  if (!Number.isFinite(report.durationMs) || report.durationMs < 0) {
+    failures.push(`report duration must be finite and non-negative: ${report.durationMs.toString()}`);
+  }
+  if (report.mode === 'video') {
+    const acceptance = report.durationAcceptance;
+    if (acceptance === undefined) {
+      failures.push('video report is missing its wall-clock duration acceptance');
+    } else {
+      if (
+        acceptance.targetDurationMs !== VIDEO_DURATION_ACCEPTANCE.targetDurationMs ||
+        acceptance.minimumDurationMs !== VIDEO_DURATION_ACCEPTANCE.minimumDurationMs ||
+        acceptance.maximumDurationMs !== VIDEO_DURATION_ACCEPTANCE.maximumDurationMs ||
+        acceptance.measurement !== VIDEO_DURATION_ACCEPTANCE.measurement
+      ) {
+        failures.push('video report duration acceptance does not match the declared product gate');
+      }
+      if (
+        report.durationMs < acceptance.minimumDurationMs ||
+        report.durationMs > acceptance.maximumDurationMs
+      ) {
+        failures.push(
+          `video duration ${report.durationMs.toString()}ms is outside ` +
+          `${acceptance.minimumDurationMs.toString()}..${acceptance.maximumDurationMs.toString()}ms`,
+        );
+      }
+    }
+  } else if (report.durationAcceptance !== undefined) {
+    failures.push(`non-video mode ${report.mode} declared a video duration acceptance`);
+  }
 
   if (report.nodes.length !== AUTOPLAY_EXPECTED_NODES.length) {
     failures.push(
@@ -120,6 +226,12 @@ export function findAutoplayInvariantFailures(
       failures.push(
         `node ${expected.nodeId} metadata mismatch (index=${actual.index.toString()}, kind=${actual.kind}, ref=${actual.ref})`,
       );
+    }
+    if (!Number.isFinite(actual.durationMs) || actual.durationMs < 0) {
+      failures.push(`${expected.nodeId} has an invalid duration`);
+    }
+    for (const warning of actual.warnings) {
+      failures.push(`${expected.nodeId} warning: ${warning}`);
     }
   });
   if (report.finalState.nodeIndex !== AUTOPLAY_EXPECTED_NODES.length) {
@@ -148,6 +260,9 @@ export function findAutoplayInvariantFailures(
   }
 
   const encounterNodes = report.nodes.filter((node) => node.kind !== 'EVENT');
+  const expectedEncounterIds = AUTOPLAY_EXPECTED_NODES
+    .filter((node) => node.kind !== 'EVENT')
+    .map((node) => node.nodeId);
   if (encounterNodes.length !== 9) {
     failures.push(`expected 9 graded encounter nodes, got ${encounterNodes.length.toString()}`);
   }
@@ -155,6 +270,12 @@ export function findAutoplayInvariantFailures(
     failures.push(
       `expected 9 grade-history records, got ${report.finalState.gradeHistory.length.toString()}`,
     );
+  }
+  if (!sameValues(
+    report.finalState.gradeHistory.map((record) => record.nodeId),
+    expectedEncounterIds,
+  )) {
+    failures.push('grade-history node IDs do not match the canonical encounter order');
   }
 
   if (report.policy === 'best') {
@@ -164,9 +285,24 @@ export function findAutoplayInvariantFailures(
     if (report.finalState.flags['F-13'] !== true) {
       failures.push('BEST final state did not set F-13');
     }
+    if (report.finalState.flags['F-12'] !== true) {
+      failures.push('BEST final state did not preserve the F-12 branch');
+    }
+    if (report.finalState.flags['F-01'] !== false) {
+      failures.push('BEST final state unexpectedly set coerced-confession flag F-01');
+    }
     const finalBoss = encounterNodes.at(-1);
     if (finalBoss?.nodeId !== 'run_ep004_05' || !finalBoss.flagsSet.includes('F-13')) {
       failures.push('final boss report did not set F-13');
+    }
+    const rewardClaimEvents = encounterNodes.filter(
+      (node) => node.rewardClaimed !== undefined,
+    );
+    if (rewardClaimEvents.length !== encounterNodes.length) {
+      failures.push(
+        `BEST report must record ${encounterNodes.length.toString()} node-level reward claims, got ` +
+        rewardClaimEvents.length.toString(),
+      );
     }
     for (const node of encounterNodes) {
       if (node.outcome !== 'BEST_RESOLUTION') {
@@ -178,13 +314,24 @@ export function findAutoplayInvariantFailures(
       }
       if (node.rewardClaimed === undefined) {
         failures.push(`${node.nodeId} has no claimed reward`);
+      } else if (!node.rewardOffered?.includes(node.rewardClaimed)) {
+        failures.push(`${node.nodeId} claimed a reward that was not offered`);
       } else if (!report.finalState.claimedRewardIds.includes(node.rewardClaimed)) {
         failures.push(`${node.nodeId} claimed reward is absent from final state`);
       }
     }
-    for (const record of report.finalState.gradeHistory) {
+    for (const [index, record] of report.finalState.gradeHistory.entries()) {
       if (record.outcome !== 'BEST_RESOLUTION') {
         failures.push(`${record.nodeId} grade-history outcome is ${record.outcome}`);
+      }
+      const node = encounterNodes[index];
+      if (
+        node !== undefined &&
+        (record.nodeId !== node.nodeId ||
+          record.outcome !== node.outcome ||
+          record.grade !== node.grade)
+      ) {
+        failures.push(`${record.nodeId} grade-history does not match its node report`);
       }
     }
   }

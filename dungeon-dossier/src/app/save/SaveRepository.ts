@@ -39,7 +39,22 @@ export class SaveRepository {
 
   save(input: unknown): SaveData {
     const data = migrateSave(input);
-    this.#storage.setItem(this.#key, JSON.stringify(data));
+    const previous = this.#storage.getItem(this.#key);
+    try {
+      this.#storage.setItem(this.#key, JSON.stringify(data));
+    } catch (writeError) {
+      try {
+        if (previous === null) this.#storage.removeItem(this.#key);
+        else this.#storage.setItem(this.#key, previous);
+      } catch (rollbackError) {
+        throw new AggregateError(
+          [writeError, rollbackError],
+          'Save write failed and the previous value could not be restored.',
+          { cause: rollbackError },
+        );
+      }
+      throw writeError;
+    }
     return data;
   }
 

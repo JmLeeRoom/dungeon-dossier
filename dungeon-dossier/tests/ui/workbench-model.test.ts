@@ -8,6 +8,7 @@ import {
   STAGE_WIDTH,
   WORKBENCH_STATE_VERSION,
   WORKBENCH_STORAGE_KEY,
+  applyWorkbenchDrag,
   buildAssetManifest,
   buildPortraitPartsManifest,
   buildSlotTransform,
@@ -280,6 +281,71 @@ describe('workbench geometry and state-parts export', () => {
 });
 
 describe('workbench transform controller', () => {
+  it('applies the same move, rotate, and local-axis scale transforms used by browser drags', () => {
+    const initial = createInitialWorkbenchState();
+    const startRect = initial.geometry['ev-1'];
+
+    const moved = applyWorkbenchDrag(initial, 'ev-1', {
+      mode: 'move',
+      startPoint: { x: 20, y: 320 },
+      currentPoint: { x: 45, y: 330 },
+      startRect,
+      startRotation: 0,
+    });
+    expect(moved.geometry['ev-1']).toEqual({ x: 37, y: 316, width: 36, height: 36 });
+
+    const rotated = applyWorkbenchDrag(initial, 'ev-1', {
+      mode: 'rotate',
+      startPoint: { x: 48, y: 324 },
+      currentPoint: { x: 30, y: 342 },
+      startRect,
+      startRotation: 0,
+    });
+    expect(rotated.rotation['ev-1']).toBeCloseTo(Math.PI / 2, 10);
+
+    const scaled = applyWorkbenchDrag(initial, 'ev-1', {
+      mode: 'scale',
+      startPoint: { x: 48, y: 342 },
+      currentPoint: { x: 60, y: 354 },
+      startRect,
+      startRotation: 0,
+    });
+    expect(scaled.geometry['ev-1']).toEqual({ x: 12, y: 306, width: 48, height: 48 });
+  });
+
+  it('persists a completed drag and rejects all later drag modes while locked', () => {
+    const storage = new MemoryStorage();
+    const initial = createInitialWorkbenchState();
+    const dragged = applyWorkbenchDrag(initial, 'card-base', {
+      mode: 'move',
+      startPoint: { x: 300, y: 380 },
+      currentPoint: { x: 320, y: 370 },
+      startRect: initial.geometry['card-base'],
+      startRotation: initial.rotation['card-base'],
+    });
+    const locked = withSlotLock(dragged, 'card-base', true);
+    saveWorkbenchState(storage, locked);
+    const reloaded = loadWorkbenchState(storage);
+
+    expect(reloaded.geometry['card-base']).toEqual({
+      x: 276,
+      y: 361,
+      width: 128,
+      height: 145,
+    });
+    expect(reloaded.locks['card-base']).toBe(true);
+
+    for (const mode of ['move', 'rotate', 'scale'] as const) {
+      expect(applyWorkbenchDrag(reloaded, 'card-base', {
+        mode,
+        startPoint: { x: 300, y: 380 },
+        currentPoint: { x: 340, y: 340 },
+        startRect: reloaded.geometry['card-base'],
+        startRotation: reloaded.rotation['card-base'],
+      })).toBe(reloaded);
+    }
+  });
+
   it('scales along rotated local axes while keeping the opposite corner fixed', () => {
     const rect = { x: 100, y: 100, width: 80, height: 40 };
 

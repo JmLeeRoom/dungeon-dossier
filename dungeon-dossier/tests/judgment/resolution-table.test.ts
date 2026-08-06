@@ -111,4 +111,22 @@ describe('type-safe resolution lookup table', () => {
       }
     }
   });
+
+  it('returns the neutral fallback for an unexpected runtime table miss', () => {
+    const hostileInput = {
+      intent: 'CONTRADICT',
+      relevance: 'UNRECOGNIZED_RUNTIME_VALUE',
+      relation: 'NEUTRAL',
+      sufficiency: 'INSUFFICIENT',
+      independence: 'UNMET',
+      hypotheses: 'NOT_APPLICABLE',
+    } as unknown as ResolutionTableInput;
+
+    expect(() => lookupResolutionTableRow(hostileInput)).not.toThrow();
+    expect(lookupResolutionTableRow(hostileInput)).toMatchObject({
+      relevance: 'UNRECOGNIZED_RUNTIME_VALUE',
+      code: 'R_INSUFFICIENT_GROUNDS',
+    });
+    expect(lookupResolutionCode(hostileInput)).toBe('R_INSUFFICIENT_GROUNDS');
+  });
 });

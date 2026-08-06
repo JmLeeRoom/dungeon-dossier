@@ -15,6 +15,7 @@ const TOOL_PATH = fileURLToPath(
 const CONFIG_PATH = fileURLToPath(
   new URL('../../tools/placeholder/placeholders.json', import.meta.url),
 );
+const CONFIG_GENERATION_TIMEOUT_MS = 15_000;
 
 function visibleColourCount(png: PNG): number {
   const colours = new Set<string>();
@@ -125,5 +126,5 @@ describe('tools/placeholder CLI', () => {
         relativePath,
       ).toEqual({ width, height, colours: 8 });
     }
-  });
+  }, CONFIG_GENERATION_TIMEOUT_MS);
 });

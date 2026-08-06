@@ -153,6 +153,214 @@ describe('app run session', () => {
     });
   });
 
+  it('keeps a reward pending when storage fails and applies it exactly once on retry', () => {
+    const strip = createNodeStrip(RunStripSchema.parse(common('run-strip.json')));
+    const flags = FlagsSchema.parse(common('flags.json'));
+    const rewards = RewardsSchema.parse(common('rewards.json'));
+    const grades = GradesSchema.parse(common('grades.json'));
+    const reward = rewards.rewards.find(
+      (candidate) => candidate.reward_id === 'reward_dp_small',
+    );
+    if (
+      reward?.type !== 'RESOURCE' ||
+      reward.resource !== 'DP' ||
+      reward.amount === undefined
+    ) {
+      throw new Error('Missing DP reward fixture.');
+    }
+
+    const values = new Map<string, string>();
+    let failNextWrite = true;
+    const repository = new SaveRepository({
+      getItem: (key) => values.get(key) ?? null,
+      setItem: (key, value) => {
+        if (failNextWrite) {
+          failNextWrite = false;
+          throw new Error('simulated storage failure');
+        }
+        values.set(key, value);
+      },
+      removeItem: (key) => values.delete(key),
+    });
+    const initial = createRunState({
+      runSeed: 23,
+      stress: 100,
+      dp: 0,
+      trust: 0,
+      deck: { drawPile: [], hand: [], discardPile: [], exhaustPile: [] },
+    });
+    const run = createRunSession({
+      initialState: { ...initial, pendingRewardIds: [reward.reward_id] },
+      strip,
+      flags: flags.flags,
+      rewards,
+      grades,
+      saveRepository: repository,
+      caseIdsByDirectory: {
+        tutorial: 'case_tutorial',
+        ep001: 'case_ep001',
+        ep004: 'case_ep004',
+      },
+    });
+    const before = run.snapshot;
+
+    expect(() => run.claimReward(reward.reward_id)).toThrow('simulated storage failure');
+    expect(run.snapshot).toEqual(before);
+    expect(repository.load()).toBeUndefined();
+
+    expect(() => run.claimReward(reward.reward_id)).not.toThrow();
+    expect(run.snapshot).toMatchObject({
+      dp: reward.amount,
+      pendingRewardIds: [],
+      claimedRewardIds: [reward.reward_id],
+    });
+    expect(repository.load()).toMatchObject({
+      resources: { dp: reward.amount },
+      run: {
+        pending_reward_ids: [],
+        claimed_reward_ids: [reward.reward_id],
+      },
+    });
+  });
+
+  it('does not advance or apply an event twice when its boundary save is retried', () => {
+    const strip = createNodeStrip(RunStripSchema.parse(common('run-strip.json')));
+    const flags = FlagsSchema.parse(common('flags.json'));
+    const rewards = RewardsSchema.parse(common('rewards.json'));
+    const grades = GradesSchema.parse(common('grades.json'));
+    const tutorial = caseContent('tutorial');
+    const choiceEvent = tutorial.events_noncombat.find(
+      (event) => event.event_id === 'event_tutorial_choice',
+    );
+    if (choiceEvent?.pattern !== 'A') throw new Error('Missing tutorial choice event.');
+
+    const values = new Map<string, string>();
+    let failNextWrite = true;
+    const repository = new SaveRepository({
+      getItem: (key) => values.get(key) ?? null,
+      setItem: (key, value) => {
+        if (failNextWrite) {
+          failNextWrite = false;
+          throw new Error('simulated storage failure');
+        }
+        values.set(key, value);
+      },
+      removeItem: (key) => values.delete(key),
+    });
+    const initial = createRunState({
+      runSeed: 29,
+      stress: 100,
+      dp: 0,
+      trust: 0,
+      deck: { drawPile: [], hand: [], discardPile: [], exhaustPile: [] },
+    });
+    const run = createRunSession({
+      initialState: {
+        ...initial,
+        nodeIndex: 1,
+        completedNodeIds: ['run_tutorial_01'],
+      },
+      strip,
+      flags: flags.flags,
+      rewards,
+      grades,
+      saveRepository: repository,
+      caseIdsByDirectory: {
+        tutorial: 'case_tutorial',
+        ep001: 'case_ep001',
+        ep004: 'case_ep004',
+      },
+    });
+    const before = run.snapshot;
+    const finish = () => run.finishEvent({
+      eventDefinition: choiceEvent,
+      choiceId: 'choice_tutorial_search',
+    });
+
+    expect(finish).toThrow('simulated storage failure');
+    expect(run.snapshot).toEqual(before);
+    expect(repository.load()).toBeUndefined();
+
+    expect(finish).not.toThrow();
+    expect(run.snapshot.nodeIndex).toBe(2);
+    expect(run.snapshot.completedNodeIds).toEqual([
+      'run_tutorial_01',
+      'run_tutorial_02',
+    ]);
+    expect(run.snapshot.stress).toBe(95);
+    expect(run.snapshot.acquiredEvidenceIds).toEqual(['ev_tutorial_receipt']);
+    expect(repository.load()?.run?.node_index).toBe(2);
+  });
+
+  it('does not duplicate encounter history or reward choices after a failed save', () => {
+    const strip = createNodeStrip(RunStripSchema.parse(common('run-strip.json')));
+    const flags = FlagsSchema.parse(common('flags.json'));
+    const rewards = RewardsSchema.parse(common('rewards.json'));
+    const grades = GradesSchema.parse(common('grades.json'));
+    const values = new Map<string, string>();
+    let failNextWrite = true;
+    const repository = new SaveRepository({
+      getItem: (key) => values.get(key) ?? null,
+      setItem: (key, value) => {
+        if (failNextWrite) {
+          failNextWrite = false;
+          throw new Error('simulated storage failure');
+        }
+        values.set(key, value);
+      },
+      removeItem: (key) => values.delete(key),
+    });
+    const initial = createRunState({
+      runSeed: 31,
+      stress: 100,
+      dp: 0,
+      trust: 0,
+      deck: { drawPile: [], hand: [], discardPile: [], exhaustPile: [] },
+    });
+    const run = createRunSession({
+      initialState: initial,
+      strip,
+      flags: flags.flags,
+      rewards,
+      grades,
+      saveRepository: repository,
+      caseIdsByDirectory: {
+        tutorial: 'case_tutorial',
+        ep001: 'case_ep001',
+        ep004: 'case_ep004',
+      },
+    });
+    const finish = () => run.finishEncounter({
+      outcome: 'BEST_RESOLUTION',
+      rewardRarity: 'COMMON',
+      episodeId: 'case_tutorial',
+      act: 0,
+      gradeMetrics: {
+        requiredClaimResolutionRatio: 1,
+        optionalObjectiveRatio: 1,
+        sweetSpotFinish: true,
+        originalsPreserved: true,
+        coercion: 0,
+      },
+    });
+
+    expect(finish).toThrow('simulated storage failure');
+    expect(run.snapshot).toEqual(initial);
+
+    const completion = finish();
+    expect(run.snapshot.nodeIndex).toBe(1);
+    expect(run.snapshot.gradeHistory).toHaveLength(1);
+    expect(run.snapshot.outcomeHistory).toHaveLength(1);
+    expect(run.snapshot.pendingRewardIds).toEqual(
+      completion.rewardChoices.map((reward) => reward.reward_id),
+    );
+    expect(repository.load()?.run).toMatchObject({
+      node_index: 1,
+      grade_history: [{ node_id: 'run_tutorial_01' }],
+      outcome_history: [{ node_id: 'run_tutorial_01' }],
+    });
+  });
+
   it('completes all 15 authored nodes with rewards, all event patterns, and F-13', () => {
     const strip = createNodeStrip(RunStripSchema.parse(common('run-strip.json')));
     const flags = FlagsSchema.parse(common('flags.json'));

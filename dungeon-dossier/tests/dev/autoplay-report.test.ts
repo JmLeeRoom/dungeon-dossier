@@ -3,9 +3,41 @@ import { describe, expect, it } from 'vitest';
 import {
   AUTOPLAY_EXPECTED_NODES,
   AUTOPLAY_REPORT_SCHEMA_VERSION,
+  AUTOPLAY_TECHNICAL_CONTENT_IDS,
   findAutoplayInvariantFailures,
+  findRawI18nKeys,
+  VIDEO_DURATION_ACCEPTANCE,
   type AutoplayReportEvidence,
 } from '../../src/dev/autoplay/report';
+
+const ALL_CONTENT_JSON = import.meta.glob('../../content/**/*.json', {
+  eager: true,
+  import: 'default',
+}) as Readonly<Record<string, unknown>>;
+
+const TECHNICAL_ID_FIELD = /(?:^|_)id$/u;
+const TECHNICAL_IDS_FIELD = /(?:^|_)ids$/u;
+
+function independentlyCollectTechnicalIds(value: unknown, ids: Set<string>): void {
+  if (value === null || typeof value !== 'object') return;
+  if (Array.isArray(value)) {
+    for (const entry of value) independentlyCollectTechnicalIds(entry, ids);
+    return;
+  }
+  for (const [key, entry] of Object.entries(value)) {
+    if (
+      typeof entry === 'string' &&
+      (TECHNICAL_ID_FIELD.test(key) || key === 'ref')
+    ) {
+      ids.add(entry);
+    } else if (Array.isArray(entry) && TECHNICAL_IDS_FIELD.test(key)) {
+      for (const id of entry) {
+        if (typeof id === 'string') ids.add(id);
+      }
+    }
+    independentlyCollectTechnicalIds(entry, ids);
+  }
+}
 
 function validBestEvidence(): AutoplayReportEvidence {
   const encounterNodes = AUTOPLAY_EXPECTED_NODES.filter((node) => node.kind !== 'EVENT');
@@ -45,7 +77,7 @@ function validBestEvidence(): AutoplayReportEvidence {
       dp: 100,
       stress: 0,
       trust: 3,
-      flags: { 'F-13': true },
+      flags: { 'F-01': false, 'F-12': true, 'F-13': true },
       completedNodeIds: AUTOPLAY_EXPECTED_NODES.map((node) => node.nodeId),
       claimedRewardIds: rewards,
       pendingRewardIds: [],
@@ -62,8 +94,73 @@ function validBestEvidence(): AutoplayReportEvidence {
 }
 
 describe('autoplay report invariants', () => {
+  it('derives its raw-ID denylist from every content JSON file', () => {
+    const expected = new Set<string>();
+    for (const content of Object.values(ALL_CONTENT_JSON)) {
+      independentlyCollectTechnicalIds(content, expected);
+    }
+
+    expect(expected.size).toBe(387);
+    expect(new Set(AUTOPLAY_TECHNICAL_CONTENT_IDS)).toEqual(expected);
+    expect(AUTOPLAY_TECHNICAL_CONTENT_IDS).toEqual(expect.arrayContaining([
+      'cache-preverified',
+      'cache-tutorial-slime-full-v1',
+      'tutorial-slime-who',
+    ]));
+  });
+
+  it('detects dotted i18n keys and underscore-only technical IDs', () => {
+    expect(findRawI18nKeys([
+      '정상 한국어',
+      'event.raw.title',
+      'reward_dp_small',
+      'cache-preverified',
+    ])).toEqual([
+      'event.raw.title',
+      'reward_dp_small',
+      'cache-preverified',
+    ]);
+  });
+
   it('accepts only complete canonical BEST evidence', () => {
     expect(findAutoplayInvariantFailures(validBestEvidence())).toEqual([]);
+  });
+
+  it('accepts one repeatable reward claimed at every encounter', () => {
+    const valid = validBestEvidence();
+    const repeatableRewardId = 'reward_dp_small';
+    const nodes = valid.nodes.map((node) =>
+      node.kind === 'EVENT'
+        ? node
+        : {
+            ...node,
+            rewardOffered: [repeatableRewardId],
+            rewardClaimed: repeatableRewardId,
+          },
+    );
+
+    expect(findAutoplayInvariantFailures({
+      ...valid,
+      nodes,
+      finalState: {
+        ...valid.finalState,
+        claimedRewardIds: [repeatableRewardId],
+      },
+    })).toEqual([]);
+  });
+
+  it('rejects a missing node-level reward claim independently of final-set cardinality', () => {
+    const valid = validBestEvidence();
+    const nodes = valid.nodes.map((node) => {
+      if (node.kind === 'EVENT' || node.nodeId !== 'run_tutorial_01') return node;
+      const withoutClaim = { ...node };
+      Reflect.deleteProperty(withoutClaim, 'rewardClaimed');
+      return withoutClaim;
+    });
+    const failures = findAutoplayInvariantFailures({ ...valid, nodes });
+
+    expect(failures).toContain('BEST report must record 9 node-level reward claims, got 8');
+    expect(failures).toContain('run_tutorial_01 has no claimed reward');
   });
 
   it('rejects the formerly false-positive NORMAL ending', () => {
@@ -71,7 +168,10 @@ describe('autoplay report invariants', () => {
     const failures = findAutoplayInvariantFailures({
       ...valid,
       ending: { endingId: 'ending-normal' },
-      finalState: { ...valid.finalState, flags: { 'F-13': false } },
+      finalState: {
+        ...valid.finalState,
+        flags: { ...valid.finalState.flags, 'F-13': false },
+      },
     });
     expect(failures).toContain('BEST ending must be ending-true, got ending-normal');
     expect(failures).toContain('BEST final state did not set F-13');
@@ -104,5 +204,73 @@ describe('autoplay report invariants', () => {
     expect(findAutoplayInvariantFailures({ ...valid, nodes })).toEqual(
       expect.arrayContaining([expect.stringContaining('node order mismatch')]),
     );
+  });
+
+  it('applies the declared video wall-clock range to report evidence', () => {
+    const valid = validBestEvidence();
+    const atLowerBound: AutoplayReportEvidence = {
+      ...valid,
+      mode: 'video',
+      durationMs: VIDEO_DURATION_ACCEPTANCE.minimumDurationMs,
+      durationAcceptance: { ...VIDEO_DURATION_ACCEPTANCE },
+    };
+    expect(findAutoplayInvariantFailures(atLowerBound)).toEqual([]);
+    expect(findAutoplayInvariantFailures({
+      ...atLowerBound,
+      durationMs: VIDEO_DURATION_ACCEPTANCE.maximumDurationMs,
+    })).toEqual([]);
+
+    const tooFast = findAutoplayInvariantFailures({
+      ...atLowerBound,
+      durationMs: VIDEO_DURATION_ACCEPTANCE.minimumDurationMs - 1,
+    });
+    const tooSlow = findAutoplayInvariantFailures({
+      ...atLowerBound,
+      durationMs: VIDEO_DURATION_ACCEPTANCE.maximumDurationMs + 1,
+    });
+    expect(tooFast).toContainEqual(expect.stringContaining('outside'));
+    expect(tooSlow).toContainEqual(expect.stringContaining('outside'));
+  });
+
+  it('does not let static evidence omit or forge the video measurement contract', () => {
+    const valid = validBestEvidence();
+    expect(findAutoplayInvariantFailures({
+      ...valid,
+      mode: 'video',
+      durationMs: VIDEO_DURATION_ACCEPTANCE.targetDurationMs,
+    })).toContain('video report is missing its wall-clock duration acceptance');
+    expect(findAutoplayInvariantFailures({
+      ...valid,
+      mode: 'video',
+      durationMs: VIDEO_DURATION_ACCEPTANCE.targetDurationMs,
+      durationAcceptance: {
+        ...VIDEO_DURATION_ACCEPTANCE,
+        maximumDurationMs: 360_000,
+      },
+    })).toContain('video report duration acceptance does not match the declared product gate');
+  });
+
+  it('rejects malformed envelope, warnings, and grade order', () => {
+    const valid = validBestEvidence();
+    const nodes = valid.nodes.map((node, index) =>
+      index === 0 ? { ...node, warnings: ['transient soft-lock'] } : node,
+    );
+    const gradeHistory = [...valid.finalState.gradeHistory].reverse();
+    const failures = findAutoplayInvariantFailures({
+      ...valid,
+      schemaVersion: '0.0',
+      seed: 0x1_0000_0000,
+      nodes,
+      finalState: {
+        ...valid.finalState,
+        gradeHistory,
+      },
+    });
+    expect(failures).toEqual(expect.arrayContaining([
+      expect.stringContaining('report schema'),
+      expect.stringContaining('outside uint32'),
+      expect.stringContaining('warning: transient soft-lock'),
+      expect.stringContaining('canonical encounter order'),
+    ]));
   });
 });

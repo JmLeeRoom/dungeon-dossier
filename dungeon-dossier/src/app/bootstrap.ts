@@ -48,12 +48,15 @@ import {
   type RunState,
 } from '../engine/run';
 import {
+  collectAutoplaySceneStrings,
   isAutoplayRequested,
+  parseAutoplaySeedParameter,
   scaledDirectionDelayMs,
   type AutoplayOptions,
   type AutoplayPort,
   type AutoplayScene,
 } from './autoplayPort';
+import { createRunSaveRepository } from './autoplayStorage';
 import { installStrings } from './i18n';
 import { createEncounterSession, type EncounterSession } from './createEncounterSession';
 import {
@@ -69,6 +72,7 @@ import {
   type Phase4DialogueService,
 } from './createPhase4DialogueService';
 import { createRunSession, type RunSession } from './createRunSession';
+import { createFlowErrorBoundary } from './flowErrorBoundary';
 import {
   toEndingScreenModel,
   toEventSceneModel,
@@ -84,7 +88,10 @@ import {
   endingIdForRun,
   rewardRarityForOutcome,
 } from './gameRunState';
-import { restoreRunState, SaveRepository } from './save';
+import {
+  assertRestoredRunSaveSemantics,
+  restoreRunState,
+} from './save';
 
 function stableDialogueSeed(parts: readonly string[]): number {
   let seed = 2_166_136_261;
@@ -206,13 +213,15 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
     autoplayParameter,
     import.meta.env.DEV,
   );
-  // An autoplay run must be deterministic; stale saves would move the start node.
-  if (autoplayRequested) window.localStorage.clear();
   const devSeedParam = import.meta.env.DEV ? urlParams.get('seed') : null;
-  const parsedSeed = devSeedParam === null ? Number.NaN : Number(devSeedParam);
-  const runSeedOverride = Number.isFinite(parsedSeed) ? parsedSeed >>> 0 : undefined;
+  const runSeedOverride = parseAutoplaySeedParameter(devSeedParam);
 
-  const saveRepository = new SaveRepository(window.localStorage);
+  // Deterministic autoplay discards only the run save. Workbench transforms,
+  // locks, and other same-origin preferences must survive in localStorage.
+  const saveRepository = createRunSaveRepository(
+    window.localStorage,
+    autoplayRequested,
+  );
   const freshState = (): RunState => createInitialGameRunState(
     cards,
     balanceRepository.current(),
@@ -222,9 +231,25 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
   let initialState: RunState;
   try {
     const saved = saveRepository.load();
-    initialState = saved === undefined ? freshState() : restoreRunState(saved);
-    if (initialState.nodeIndex > strip.length) {
-      throw new Error('Saved run position is outside the canonical strip.');
+    if (saved === undefined) {
+      initialState = freshState();
+    } else {
+      initialState = restoreRunState(saved);
+      assertRestoredRunSaveSemantics(saved, initialState, {
+        strip,
+        cardIds: cards.cards.map((card) => card.card_id),
+        rewardIds: runCatalog.rewards.rewards.map((reward) => reward.reward_id),
+        relicIds: runCatalog.relics.relics.map((relic) => relic.relic_id),
+        enhancementIds: runCatalog.enhancements.enhancements.map(
+          (enhancement) => enhancement.enhancement_id,
+        ),
+        evidenceIds: loadedCases.flatMap(([, definition]) =>
+          definition.evidence.map((evidence) => evidence.evidence_id),
+        ),
+        flagIds: runCatalog.flags.flags.map((flag) => flag.flag_id),
+        caseIdsByDirectory,
+        contentVersionsByDirectory,
+      });
     }
   } catch (error) {
     console.warn('Saved run could not be restored; starting a fresh run.', error);
@@ -385,27 +410,21 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
     }
   };
 
-  let disposeErrorBanner: (() => void) | undefined;
-  const closeErrorBanner = (): void => {
-    const dispose = disposeErrorBanner;
-    disposeErrorBanner = undefined;
-    dispose?.();
-  };
-  const handleFlowError = (error: unknown, retry: () => void): void => {
-    const message = error instanceof Error ? error.message : String(error);
-    mount.dataset.flowError = message;
-    console.error('Game run flow failed.', error);
-    closeErrorBanner();
-    const recover = (action: () => void): void => {
-      closeErrorBanner();
+  const flowErrorBoundary = createFlowErrorBoundary({
+    userMessage: RUN_FLOW_ERROR_MESSAGE,
+    publishTechnicalError(message): void {
+      mount.dataset.flowError = message;
+    },
+    clearTechnicalError(): void {
       delete mount.dataset.flowError;
-      try {
-        action();
-      } catch (recoveryError) {
-        handleFlowError(recoveryError, action);
-      }
-    };
-    const returnToStrip = (): void => {
+    },
+    reportError(error): void {
+      console.error('Game run flow failed.', error);
+    },
+    reportBannerError(error): void {
+      console.error('Flow-error banner could not be shown.', error);
+    },
+    returnToSafeState(): void {
       outcomeTransitionPending = false;
       openingNode = false;
       if (outcomeBgmMuted) {
@@ -419,21 +438,16 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
         return;
       }
       routeAfterBoundary();
-    };
-    try {
-      const banner = createErrorBanner({ message: RUN_FLOW_ERROR_MESSAGE }, {
-        onRetry(): void {
-          recover(retry);
-        },
-        onReturnToStrip(): void {
-          recover(returnToStrip);
-        },
+    },
+    showBanner(message, callbacks): () => void {
+      const banner = createErrorBanner({ message }, {
+        onRetry: callbacks.onRetry,
+        onReturnToStrip: callbacks.onReturnToSafeState,
       });
-      disposeErrorBanner = mounted.scenes.showOverlay({ view: banner });
-    } catch (overlayError) {
-      console.error('Flow-error banner could not be shown.', overlayError);
-    }
-  };
+      return mounted.scenes.showOverlay({ view: banner });
+    },
+  });
+  const handleFlowError = flowErrorBoundary.handle;
 
   const activeModel = (): InterrogationScreenModel => {
     if (encounterSession === undefined) throw new Error('No encounter is active.');
@@ -469,10 +483,8 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
         handleFlowError(error, continueRun);
       });
     };
-    const view = createRunStripScreen(
-      toRunStripScreenModel(runStripDefinition, runSession.snapshot),
-      { onContinue: continueRun },
-    );
+    const model = toRunStripScreenModel(runStripDefinition, runSession.snapshot);
+    const view = createRunStripScreen(model, { onContinue: continueRun });
     const node = currentRunNode(strip, runSession.snapshot.nodeIndex);
     if (node === null) {
       throw new Error('Cannot mount the run strip after the terminal node.');
@@ -484,6 +496,7 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
       nodeId: node.nodeId,
       nodeKind: node.kind,
       nodeRef: node.ref,
+      displayStrings: collectAutoplaySceneStrings(model),
       continue: continueRun,
     });
   };
@@ -508,7 +521,12 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
     };
     const view = createEndingScreen(model, assets, restartRun);
     setScene({ view }, 'ENDING');
-    setAutoplayScene({ kind: 'ENDING', endingId, restart: restartRun });
+    setAutoplayScene({
+      kind: 'ENDING',
+      endingId,
+      displayStrings: collectAutoplaySceneStrings(model),
+      restart: restartRun,
+    });
   };
 
   const routeAfterBoundary = (): void => {
@@ -545,12 +563,14 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
         handleFlowError(error, routeAfterBoundary);
       }
     };
-    const view = createRewardScreen(toRewardScreenModel(grade, choices), selectReward);
+    const model = toRewardScreenModel(grade, choices);
+    const view = createRewardScreen(model, selectReward);
     setScene({ view }, 'AMBIENT');
     setAutoplayScene({
       kind: 'REWARD',
       grade,
       rewardIds: choices.map((choice) => choice.reward_id),
+      displayStrings: collectAutoplaySceneStrings(model),
       select: selectReward,
     });
   };
@@ -639,22 +659,23 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
           return;
         }
         const showPlacementResult = (): void => {
-          const resultView = createEventScreen(
-            {
-              ...model,
-              placementResult: {
-                correct: placementResult.correct,
-                total: placementResult.total,
-                ratio: placementResult.ratio,
-                result: placementResult.result,
-              },
+          const resultModel = {
+            ...model,
+            placementResult: {
+              correct: placementResult.correct,
+              total: placementResult.total,
+              ratio: placementResult.ratio,
+              result: placementResult.result,
             },
-            { onContinue: continueAfterResult },
-          );
+          };
+          const resultView = createEventScreen(resultModel, {
+            onContinue: continueAfterResult,
+          });
           setScene({ view: resultView }, 'AMBIENT');
           setAutoplayScene({
             kind: 'EVENT_RESULT',
             eventId: event.event_id,
+            displayStrings: collectAutoplaySceneStrings(resultModel),
             continue: continueAfterResult,
           });
         };
@@ -703,6 +724,7 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
       spotIds: event.pattern === 'C' ? event.spots.map((spot) => spot.spot_id) : [],
       discoveredSpotIds,
       attemptLimit: event.pattern === 'C' ? event.attempt_limit : 0,
+      displayStrings: collectAutoplaySceneStrings(model),
       choose: (choiceId): void => { eventCallbacks.onChoice?.(choiceId); },
       submitPlacement: (placement): void => { eventCallbacks.onPlacementSubmit?.(placement); },
       investigate: (spotId): void => { eventCallbacks.onInvestigate?.(spotId); },
@@ -1095,6 +1117,7 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
         objectiveId: objective.objectiveId,
         completed: objective.completed,
       })),
+      displayStrings: collectAutoplaySceneStrings(screenModel),
       submit: (submission): void => {
         interrogationCallbacks.onSubmit?.({
           cardId: submission.cardId,

@@ -8,6 +8,7 @@ import ep001CaseJson from '../../content/cases/ep001/case.json';
 import ep004CaseJson from '../../content/cases/ep004/case.json';
 import tutorialCaseJson from '../../content/cases/tutorial/case.json';
 import { createRunSession, type RunSession } from '../app/createRunSession';
+import { isAutoplaySeed, MAX_AUTOPLAY_SEED } from '../app/autoplayPort';
 import {
   createInitialGameRunState,
   endingIdForRun,
@@ -154,8 +155,10 @@ export const AUTO_PLAY_NODE_IDS: readonly string[] = Object.freeze(
 );
 
 function validateSeed(seed: number): number {
-  if (!Number.isSafeInteger(seed) || seed < 0) {
-    throw new Error('Autoplay seed must be a non-negative safe integer.');
+  if (!isAutoplaySeed(seed)) {
+    throw new Error(
+      `Autoplay seed must be an integer from 0 through ${MAX_AUTOPLAY_SEED.toString()}.`,
+    );
   }
   return seed;
 }
