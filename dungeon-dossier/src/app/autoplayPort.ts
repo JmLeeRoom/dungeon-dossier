@@ -139,7 +139,7 @@ export interface AutoplayPort {
 }
 
 export interface AutoplayOptions {
-  readonly mode: 'watch' | 'turbo' | 'record';
+  readonly mode: 'watch' | 'turbo' | 'record' | 'video';
   readonly policy: 'best' | 'partial' | 'coerced' | 'greedy' | 'fuzz';
   readonly seed: number;
 }

@@ -1292,7 +1292,7 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
       const modeParam = urlParams.get('mode');
       const policyParam = urlParams.get('policy');
       const autoplayModes: readonly AutoplayOptions['mode'][] =
-        ['watch', 'turbo', 'record'];
+        ['watch', 'turbo', 'record', 'video'];
       const autoplayPolicies: readonly AutoplayOptions['policy'][] =
         ['best', 'partial', 'coerced', 'greedy', 'fuzz'];
       // A typo in a URL parameter must degrade to defaults, never crash boot.

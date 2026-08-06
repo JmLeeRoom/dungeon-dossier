@@ -7,6 +7,7 @@ import type {
   AutoplaySubmission,
 } from '../../app/autoplayPort';
 import { BalanceSchema, CardsSchema } from '../../engine/domain';
+import { t } from '../../app/i18n';
 import { createAutoplayHud } from './hud';
 import {
   chooseEventChoice,
@@ -42,9 +43,11 @@ interface ModeConfig {
   readonly sceneStallMs: number;
   readonly runTimeoutMs: number;
   readonly skipTypewriter: boolean;
+  /** Cinematic pacing target: the run is stretched to land on this length. */
+  readonly targetDurationSec?: number;
 }
 
-const MODE_CONFIGS: Readonly<Record<AutoplayOptions['mode'], ModeConfig>> = {
+export const MODE_CONFIGS: Readonly<Record<AutoplayOptions['mode'], ModeConfig>> = {
   watch: {
     timeScale: 1,
     actionDelayMs: 600,
@@ -66,10 +69,32 @@ const MODE_CONFIGS: Readonly<Record<AutoplayOptions['mode'], ModeConfig>> = {
     runTimeoutMs: 600_000,
     skipTypewriter: false,
   },
+  // 2m30s promo/demo recording: realtime directions, readable 1.8s action
+  // cadence, full typewriter, and a per-node schedule that lands on 150s.
+  video: {
+    timeScale: 1,
+    actionDelayMs: 1_800,
+    sceneStallMs: 90_000,
+    runTimeoutMs: 200_000,
+    skipTypewriter: false,
+    targetDurationSec: 150,
+  },
 };
 
 const POLL_INTERVAL_MS = 150;
 const NODE_COUNT = 15;
+/** Hover → dotted docking → submit beat before a staged cinematic action fires. */
+export const CINEMATIC_LEAD_MS = 1_500;
+
+/** Earliest run offset (ms) at which node `nodeIndex` may leave the strip. */
+export function videoNodeGateMs(
+  nodeIndex: number,
+  targetDurationSec: number,
+  nodeCount: number = NODE_COUNT,
+): number {
+  if (!Number.isFinite(nodeIndex) || nodeIndex < 0) return 0;
+  return Math.max(0, Math.floor((targetDurationSec * 1000 * nodeIndex) / nodeCount));
+}
 
 interface NodeProgress {
   readonly index: number;
@@ -129,6 +154,7 @@ export function startAutoplay(port: AutoplayPort, options: AutoplayOptions): voi
   let lastProgressAt = startedAt;
   let lastActionAt = 0;
   let directionSince: number | undefined;
+  let stagedActionTimer: number | undefined;
   let currentEncounterId: string | undefined;
   let encounterSubmissions = 0;
   let encounterTurnLimit = 0;
@@ -192,13 +218,70 @@ export function startAutoplay(port: AutoplayPort, options: AutoplayOptions): voi
       elapsedMs: Date.now() - startedAt,
       status,
       ...(failure === undefined ? {} : { failure }),
+      ...(config.targetDurationSec === undefined
+        ? {}
+        : {
+            targetDurationMs: config.targetDurationSec * 1000,
+            ...(currentNode === undefined
+              ? {}
+              : { nodeLabel: t(`node.${currentNode.ref}`, currentNode.ref) }),
+          }),
     });
   };
+
+  // Video mode plays a hover → dotted-docking → submit beat before the real
+  // action lands so recordings stay readable; other modes act immediately.
+  const performWithCinematic = (caption: string, action: () => void): void => {
+    if (config.targetDurationSec === undefined) {
+      action();
+      return;
+    }
+    hud.showAction(caption);
+    stagedActionTimer = window.setTimeout(() => {
+      stagedActionTimer = undefined;
+      try {
+        action();
+      } catch (error) {
+        fail(`staged action threw: ${errorMessage(error)}`);
+      }
+    }, CINEMATIC_LEAD_MS);
+  };
+
+  const facetLabel = (facet: string): string =>
+    t(`facet.${facet.toLowerCase()}`, facet);
+
+  const submissionCaption = (
+    scene: InterrogationScene,
+    submission: AutoplaySubmission,
+  ): string => {
+    const card = scene.model.cards.find(
+      (candidate) => candidate.cardId === submission.cardId,
+    );
+    return `${card?.title ?? submission.cardId} → [${facetLabel(submission.facet)}] 도킹`;
+  };
+
+  const cinematicScene = (scene: InterrogationScene): InterrogationScene => ({
+    ...scene,
+    submit: (submission): void => {
+      performWithCinematic(submissionCaption(scene, submission), () => {
+        scene.submit(submission);
+      });
+    },
+    secureStatement: (): void => {
+      performWithCinematic('진술 확보 — 서명 날인', () => {
+        scene.secureStatement();
+      });
+    },
+  });
 
   const finish = (): void => {
     if (finished) return;
     finished = true;
     window.clearInterval(pollTimer);
+    if (stagedActionTimer !== undefined) {
+      window.clearTimeout(stagedActionTimer);
+      stagedActionTimer = undefined;
+    }
     unsubscribe();
     console.error = originalConsoleError;
     console.warn = originalConsoleWarn;
@@ -427,9 +510,13 @@ export function startAutoplay(port: AutoplayPort, options: AutoplayOptions): voi
               fail(`event ${scene.eventId} offers no choices`);
               break;
             }
-            scene.choose(choiceId);
+            performWithCinematic('선택지 결정', () => {
+              scene.choose(choiceId);
+            });
           } else if (scene.pattern === 'B') {
-            scene.submitPlacement(scene.answerMapping);
+            performWithCinematic('연결 배치 제출', () => {
+              scene.submitPlacement(scene.answerMapping);
+            });
           } else {
             const spotId = scene.spotIds.find(
               (candidate) => !scene.discoveredSpotIds.includes(candidate),
@@ -438,14 +525,18 @@ export function startAutoplay(port: AutoplayPort, options: AutoplayOptions): voi
               fail(`event ${scene.eventId} has no undiscovered spot left`);
               break;
             }
-            scene.investigate(spotId);
+            performWithCinematic('현장 조사', () => {
+              scene.investigate(spotId);
+            });
           }
           break;
         case 'EVENT_RESULT':
           scene.continue();
           break;
         case 'INTERROGATION':
-          actInterrogation(scene);
+          actInterrogation(
+            config.targetDurationSec === undefined ? scene : cinematicScene(scene),
+          );
           break;
         case 'REWARD': {
           const rewardId = chooseReward(
@@ -461,7 +552,9 @@ export function startAutoplay(port: AutoplayPort, options: AutoplayOptions): voi
             currentNode.rewardOffered = [...scene.rewardIds];
             currentNode.rewardClaimed = rewardId;
           }
-          scene.select(rewardId);
+          performWithCinematic('보상 카드 선택', () => {
+            scene.select(rewardId);
+          });
           break;
         }
         case 'ENDING':
@@ -505,10 +598,20 @@ export function startAutoplay(port: AutoplayPort, options: AutoplayOptions): voi
     }
     directionSince = undefined;
     if (scene === undefined) return;
+    // A staged cinematic beat owns the next action; do not double-act.
+    if (stagedActionTimer !== undefined) return;
     if (scene === lastActedScene) {
       if (now - lastProgressAt > config.sceneStallMs) {
         fail(`STALLED on ${scene.kind} after ${config.sceneStallMs.toString()}ms`);
       }
+      return;
+    }
+    if (
+      config.targetDurationSec !== undefined &&
+      scene.kind === 'STRIP' &&
+      now - startedAt < videoNodeGateMs(scene.nodeIndex, config.targetDurationSec)
+    ) {
+      // Hold fast nodes on the strip so the full run lands on the video budget.
       return;
     }
     if (now - lastActionAt < config.actionDelayMs) return;

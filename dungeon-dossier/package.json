@@ -18,6 +18,7 @@
     "test:gates": "vitest run tests/ai tests/ai-contract tests/app tests/arch tests/audio tests/content tests/content-io tests/dev tests/e2e tests/engine tests/judgment tests/leakage tests/schema tests/ui",
     "test:e2e": "vitest run tests/e2e",
     "autoplay": "vite --open \"/?autoplay=1&mode=watch\"",
+    "autoplay:video": "vite --open \"/?autoplay=true&mode=video\"",
     "content:validate": "node tools/validate/index.mjs",
     "placeholder:generate": "node tools/placeholder/index.mjs",
     "schema:export": "vitest run tests/schema/schema-export.test.ts",
