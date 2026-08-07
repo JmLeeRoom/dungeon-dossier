@@ -7,10 +7,6 @@
       "minLength": 1,
       "maxLength": 500
     },
-    "save_version": {
-      "type": "number",
-      "const": 1
-    },
     "case_id": {
       "$ref": "#/$defs/__schema0"
     },
@@ -94,12 +90,7 @@
             "type": "boolean"
           },
           "grade": {
-            "type": "string",
-            "enum": [
-              "A",
-              "B",
-              "C"
-            ]
+            "$ref": "#/$defs/__schema2"
           },
           "integrity": {
             "type": "string",
@@ -207,22 +198,22 @@
       "type": "object",
       "properties": {
         "cp": {
-          "$ref": "#/$defs/__schema2"
+          "$ref": "#/$defs/__schema3"
         },
         "stress": {
-          "$ref": "#/$defs/__schema2"
+          "$ref": "#/$defs/__schema3"
         },
         "dp": {
-          "$ref": "#/$defs/__schema2"
+          "$ref": "#/$defs/__schema3"
         },
         "composure": {
-          "$ref": "#/$defs/__schema2"
+          "$ref": "#/$defs/__schema3"
         },
         "coercion": {
-          "$ref": "#/$defs/__schema2"
+          "$ref": "#/$defs/__schema3"
         },
         "trust": {
-          "$ref": "#/$defs/__schema2"
+          "$ref": "#/$defs/__schema3"
         },
         "turn": {
           "$ref": "#/$defs/__schema1"
@@ -280,7 +271,7 @@
                 "$ref": "#/$defs/__schema0"
               },
               "additionalProperties": {
-                "$ref": "#/$defs/__schema2"
+                "$ref": "#/$defs/__schema3"
               }
             }
           },
@@ -320,6 +311,10 @@
       "items": {
         "$ref": "#/$defs/__schema0"
       }
+    },
+    "save_version": {
+      "type": "number",
+      "const": 2
     },
     "run": {
       "type": "object",
@@ -372,7 +367,7 @@
                 "$ref": "#/$defs/__schema0"
               },
               "outcome": {
-                "$ref": "#/$defs/__schema3"
+                "$ref": "#/$defs/__schema4"
               },
               "grade": {
                 "type": "string",
@@ -403,7 +398,7 @@
                 "$ref": "#/$defs/__schema0"
               },
               "outcome": {
-                "$ref": "#/$defs/__schema3"
+                "$ref": "#/$defs/__schema4"
               }
             },
             "required": [
@@ -415,6 +410,64 @@
         },
         "terminal": {
           "type": "boolean"
+        },
+        "card_tuning": {
+          "type": "object",
+          "propertyNames": {
+            "$ref": "#/$defs/__schema0"
+          },
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "cp_delta": {
+                "type": "integer",
+                "minimum": -10000,
+                "maximum": 10000
+              },
+              "composure_damage_delta": {
+                "type": "number",
+                "minimum": -10000,
+                "maximum": 10000
+              },
+              "coercion_delta": {
+                "type": "number",
+                "minimum": -10000,
+                "maximum": 10000
+              }
+            },
+            "required": [
+              "cp_delta",
+              "composure_damage_delta",
+              "coercion_delta"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "canvassed_topic_ids": {
+          "minItems": 0,
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/__schema0"
+          }
+        },
+        "evidence_grade_by_id": {
+          "type": "object",
+          "propertyNames": {
+            "$ref": "#/$defs/__schema0"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/__schema2"
+          }
+        },
+        "open_route_ids": {
+          "minItems": 0,
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/__schema0"
+          }
+        },
+        "retry_count": {
+          "$ref": "#/$defs/__schema1"
         }
       },
       "required": [
@@ -427,13 +480,17 @@
         "acquired_evidence_ids",
         "grade_history",
         "outcome_history",
-        "terminal"
+        "terminal",
+        "card_tuning",
+        "canvassed_topic_ids",
+        "evidence_grade_by_id",
+        "open_route_ids",
+        "retry_count"
       ],
       "additionalProperties": false
     }
   },
   "required": [
-    "save_version",
     "case_id",
     "content_version",
     "run_seed",
@@ -445,7 +502,8 @@
     "encounter",
     "used_routes",
     "acquired_relics",
-    "acquired_enhancements"
+    "acquired_enhancements",
+    "save_version"
   ],
   "additionalProperties": false,
   "$defs": {
@@ -460,10 +518,18 @@
       "maximum": 9007199254740991
     },
     "__schema2": {
+      "type": "string",
+      "enum": [
+        "A",
+        "B",
+        "C"
+      ]
+    },
+    "__schema3": {
       "type": "number",
       "minimum": 0
     },
-    "__schema3": {
+    "__schema4": {
       "type": "string",
       "enum": [
         "BEST_RESOLUTION",

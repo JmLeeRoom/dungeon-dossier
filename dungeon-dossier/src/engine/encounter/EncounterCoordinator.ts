@@ -27,6 +27,7 @@ import {
   applyResolution,
   hasSolvableProofPath,
   resolveArgument,
+  selectProofRule,
   toResolutionClaim,
   toResolutionEvidence,
   toResolutionProofRule,
@@ -142,6 +143,14 @@ export interface ResolutionEffectSource {
   readonly compatibleCardIds?: readonly ContentId[];
   readonly usesPerEncounter?: number;
 }
+
+/**
+ * Authoring sentinels usable in any effect `target`/`targets` that runs off a
+ * submission: card modifiers, relics, and enhancements all bind them to the
+ * claim and evidence the player just submitted.
+ */
+export const RUNTIME_SELECTED_CLAIM = 'runtime-selected-claim';
+export const RUNTIME_SELECTED_EVIDENCE = 'runtime-selected-evidence';
 
 export interface SubmissionRequest {
   readonly cardId: ContentId;
@@ -674,10 +683,10 @@ export class EncounterCoordinator {
     });
     const proofDefinition =
       card.intent === 'CONFIRM' || card.intent === 'CONTRADICT'
-        ? this.#definition.proof_rules.find(
-            (rule) =>
-              rule.target_claim_id === request.targetClaimId &&
-              rule.direction === targetDirection(card.intent),
+        ? selectProofRule(
+            this.#definition.proof_rules,
+            request.targetClaimId,
+            targetDirection(card.intent),
           )
         : undefined;
     const proofRule =
@@ -777,6 +786,15 @@ export class EncounterCoordinator {
         ]),
       };
     }
+    // Card modifiers are play-scoped, not success-scoped: the resolver blanks
+    // cardEffects only for the codes that refund the CP, so an authored
+    // modifier lands on every resolution that actually spent the card —
+    // including R_INSUFFICIENT_GROUNDS and friends. Author them accordingly.
+    this.#applyCardEffects(
+      applied.appliedCardEffects,
+      request,
+      evidence.map((item) => item.evidenceId),
+    );
     if (resolution.effects.consumeCommandPoints) {
       this.#applyResolutionEffectSources(card, request);
     }
@@ -996,10 +1014,69 @@ export class EncounterCoordinator {
     }
   }
 
+  /**
+   * A played card's authored modifiers. The resolver already blanks
+   * `cardEffects` for invalid, blocked, and procedure-violating codes, so this
+   * reducer never has to re-check whether the action actually happened.
+   */
+  #applyCardEffects(
+    effects: readonly Effect[],
+    request: SubmissionRequest,
+    submittedEvidenceIds: readonly ContentId[],
+  ): void {
+    if (effects.length === 0) return;
+    const bound = effects.map((effect) =>
+      this.#bindSubmissionTargets(effect, request, submittedEvidenceIds),
+    );
+    this.#state = applyModifierEffects(
+      this.#state,
+      bound.map((effect) => ({ type: effect.type, payload: effect })),
+      (state, wrapped) => this.#applyEncounterEffect(state, wrapped.payload),
+    );
+  }
+
+  /**
+   * The 14-card catalogue is shared by every case, so card modifiers address
+   * the play the player just made through sentinels instead of case-local ids.
+   * An unmatched sentinel collapses to no targets, which every effect reducer
+   * already treats as a no-op.
+   *
+   * `submittedEvidenceIds` is the resolver's own accepted set, not the raw
+   * request: an unowned or sealed item never reached the judgment, so a card
+   * modifier must not be able to reach it either.
+   */
+  #bindSubmissionTargets(
+    effect: Effect,
+    request: SubmissionRequest,
+    submittedEvidenceIds: readonly ContentId[],
+  ): Effect {
+    const claimBound = this.#bindSelectedClaim(effect, request.targetClaimId);
+    const declared = [
+      ...(claimBound.target === undefined ? [] : [claimBound.target]),
+      ...(claimBound.targets ?? []),
+    ];
+    if (!declared.includes(RUNTIME_SELECTED_EVIDENCE)) return claimBound;
+    const expanded = [...unique(declared.flatMap((target) =>
+      target === RUNTIME_SELECTED_EVIDENCE ? [...submittedEvidenceIds] : [target],
+    ))];
+    // `target` is intentionally dropped: one sentinel can expand to many ids.
+    return {
+      type: claimBound.type,
+      ...(claimBound.resource === undefined ? {} : { resource: claimBound.resource }),
+      ...(claimBound.delta === undefined ? {} : { delta: claimBound.delta }),
+      ...(claimBound.value === undefined ? {} : { value: claimBound.value }),
+      ...(claimBound.duration_turns === undefined
+        ? {}
+        : { duration_turns: claimBound.duration_turns }),
+      ...(claimBound.parameters === undefined ? {} : { parameters: claimBound.parameters }),
+      targets: expanded,
+    };
+  }
+
   #bindSelectedClaim(effect: Effect, targetClaimId?: ContentId): Effect {
     if (targetClaimId === undefined) return effect;
     const bind = (target: ContentId): ContentId =>
-      target === 'runtime-selected-claim' ? targetClaimId : target;
+      target === RUNTIME_SELECTED_CLAIM ? targetClaimId : target;
     const targets = effect.targets?.map(bind);
     return {
       ...effect,

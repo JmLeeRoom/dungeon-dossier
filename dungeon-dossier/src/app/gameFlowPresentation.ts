@@ -81,9 +81,88 @@ export function toRunStripScreenModel(
   );
 }
 
+export interface EventOwnedCardView {
+  readonly cardId: string;
+  readonly intent: string;
+  /** The card's authored name key. Rebuilding one from the id would miss. */
+  readonly nameKey: string;
+}
+
 export interface EventPresentationState {
   readonly discoveredSpotIds?: readonly string[];
   readonly attemptsUsed?: number;
+  /** Live run resources; absent means every choice renders as affordable. */
+  readonly resources?: Pick<RunState, 'dp' | 'stress' | 'trust'>;
+  /** Pattern D: the deck the player may spend a tuning on. */
+  readonly ownedCards?: readonly EventOwnedCardView[];
+  readonly cardTuning?: RunState['cardTuning'];
+  readonly selectedOptionId?: string;
+  readonly selectedCardId?: string;
+  /** Pattern E: topics already canvassed, run-wide. */
+  readonly canvassedTopicIds?: readonly string[];
+  /** Pattern F: targets swept during this visit, plus the pouch contents. */
+  readonly collectedTargetIds?: readonly string[];
+  readonly acquiredEvidenceIds?: readonly string[];
+}
+
+const TUNING_LABELS: Readonly<Record<string, string>> = {
+  cp_delta: 'CP',
+  composure_damage_delta: '평정 타격',
+  coercion_delta: '강압',
+};
+
+function signed(value: number): string {
+  return `${value >= 0 ? '+' : ''}${String(value)}`;
+}
+
+function tuningLabels(
+  tuning: Readonly<Record<string, number | undefined>>,
+): readonly EventEffectView[] {
+  return Object.entries(tuning).flatMap(([key, value]) => {
+    if (typeof value !== 'number' || value === 0) return [];
+    const label = t(`tuning.${key}`, TUNING_LABELS[key] ?? key);
+    return [{ label: `${label} ${signed(value)}` }];
+  });
+}
+
+function cardTuningLabels(
+  tuning: RunState['cardTuning'][string] | undefined,
+): readonly EventEffectView[] {
+  if (tuning === undefined) return [];
+  return tuningLabels({
+    cp_delta: tuning.cpDelta,
+    composure_damage_delta: tuning.composureDamageDelta,
+    coercion_delta: tuning.coercionDelta,
+  });
+}
+
+type EventCost = NonNullable<
+  Extract<NonCombatEventDefinition, { pattern: 'A' }>['choices'][number]['costs']
+>;
+
+/**
+ * Mirrors the run-layer cost check so a choice the engine would reject is greyed
+ * out instead of failing silently when it is clicked.
+ */
+function costShortfall(
+  cost: EventCost | undefined,
+  resources: EventPresentationState['resources'],
+): string | undefined {
+  if (cost === undefined || resources === undefined) return undefined;
+  const available: Readonly<Record<string, number>> = {
+    dp: resources.dp,
+    stress: resources.stress,
+    trust: resources.trust,
+  };
+  for (const [key, amount] of Object.entries(cost)) {
+    if (typeof amount !== 'number' || amount <= 0) continue;
+    const held = available[key];
+    if (held === undefined) continue;
+    if (held < amount) {
+      return `${resourceLabel(key)} 부족 (${String(held)}/${String(amount)})`;
+    }
+  }
+  return undefined;
 }
 
 export function toEventSceneModel(
@@ -102,12 +181,17 @@ export function toEventSceneModel(
     return {
       ...base,
       pattern: 'A',
-      choices: event.choices.map((choice) => ({
-        choiceId: choice.choice_id,
-        label: t(choice.label_key),
-        costs: effectLabels(choice.costs),
-        gains: effectLabels(choice.gains),
-      })),
+      choices: event.choices.map((choice) => {
+        const blockedReason = costShortfall(choice.costs, state.resources);
+        return {
+          choiceId: choice.choice_id,
+          label: t(choice.label_key),
+          costs: effectLabels(choice.costs),
+          gains: effectLabels(choice.gains),
+          affordable: blockedReason === undefined,
+          ...(blockedReason === undefined ? {} : { blockedReason }),
+        };
+      }),
     };
   }
   if (event.pattern === 'B') {
@@ -127,17 +211,110 @@ export function toEventSceneModel(
       partialRatio: event.partial_scoring.partial_ratio,
     };
   }
+  if (event.pattern === 'D') {
+    const owned = state.ownedCards ?? [];
+    const tuning = state.cardTuning ?? {};
+    return {
+      ...base,
+      pattern: 'D',
+      options: event.options.map((option) => {
+        const blockedReason = costShortfall(option.costs, state.resources);
+        const intents = new Set<string>(option.eligible_intents);
+        return {
+          optionId: option.option_id,
+          label: t(option.label_key),
+          costs: effectLabels(option.costs),
+          tuning: tuningLabels(option.tuning),
+          affordable: blockedReason === undefined,
+          ...(blockedReason === undefined ? {} : { blockedReason }),
+          eligibleCardIds: owned
+            .filter((card) => intents.size === 0 || intents.has(card.intent))
+            .map((card) => card.cardId),
+        };
+      }),
+      cards: owned.map((card) => ({
+        cardId: card.cardId,
+        label: t(card.nameKey, card.cardId),
+        existingTuning: cardTuningLabels(tuning[card.cardId]),
+      })),
+      ...(state.selectedOptionId === undefined
+        ? {}
+        : { selectedOptionId: state.selectedOptionId }),
+      ...(state.selectedCardId === undefined
+        ? {}
+        : { selectedCardId: state.selectedCardId }),
+      ...(owned.length === 0
+        ? {
+            fallbackNotice: t(
+              'event.enhance.no_eligible_card',
+              '강화할 수 있는 카드가 없습니다. 대신 대체 보상을 받습니다.',
+            ),
+          }
+        : {}),
+    };
+  }
+  if (event.pattern === 'E') {
+    const canvassed = new Set(state.canvassedTopicIds ?? []);
+    const blocked = costShortfall(event.per_attempt_costs, state.resources);
+    return {
+      ...base,
+      pattern: 'E',
+      topics: event.topics.map((topic) => {
+        const done = canvassed.has(topic.topic_id);
+        return {
+          topicId: topic.topic_id,
+          label: t(topic.label_key),
+          // The payoff line is the reward; showing it up front would give it away.
+          ...(done ? { reveal: t(topic.reveal_key) } : {}),
+          canvassed: done,
+          affordable: blocked === undefined,
+        };
+      }),
+      attemptLimit: event.attempt_limit,
+      attemptsUsed: canvassed.size,
+      attemptCosts: effectLabels(event.per_attempt_costs),
+    };
+  }
+  if (event.pattern === 'F') {
+    const collected = new Set(state.collectedTargetIds ?? []);
+    const held = new Set(state.acquiredEvidenceIds ?? []);
+    const blocked = costShortfall(event.per_attempt_costs, state.resources);
+    return {
+      ...base,
+      pattern: 'F',
+      targets: event.targets.map((target) => ({
+        targetId: target.target_id,
+        label: t(target.label_key),
+        grade: target.grade,
+        collected: collected.has(target.target_id),
+        alreadyHeld: held.has(target.evidence_id),
+        affordable: blocked === undefined,
+      })),
+      attemptLimit: event.attempt_limit,
+      attemptsUsed: collected.size,
+      attemptCosts: effectLabels(event.per_attempt_costs),
+    };
+  }
   const discovered = new Set(state.discoveredSpotIds ?? []);
+  const attemptBlocked = costShortfall(event.per_attempt_costs, state.resources);
   return {
     ...base,
     pattern: 'C',
-    spots: event.spots.map((spot) => ({
-      spotId: spot.spot_id,
-      label: t(spot.label_key),
-      discovered: discovered.has(spot.spot_id),
-    })),
+    spots: event.spots.map((spot) => {
+      const found = discovered.has(spot.spot_id);
+      return {
+        spotId: spot.spot_id,
+        label: t(spot.label_key),
+        discovered: found,
+        // Findings stay sealed until the spot is probed, so the list is not a
+        // free preview of the whole scene.
+        findings: found ? effectLabels(spot.effects) : [],
+        affordable: attemptBlocked === undefined,
+      };
+    }),
     attemptLimit: event.attempt_limit,
     attemptsUsed: state.attemptsUsed ?? 0,
+    attemptCosts: effectLabels(event.per_attempt_costs),
   };
 }
 

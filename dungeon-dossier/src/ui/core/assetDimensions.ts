@@ -26,7 +26,10 @@ export type AssetDimensionId = (typeof ASSET_DIMENSION_IDS)[number];
  */
 export const ASSET_DIMENSIONS: Readonly<Record<AssetDimensionId, AssetDimension>> = {
   bg_interrogation: { width: 1280, height: 800 },
-  desk_foreground: { width: 1280, height: 236 },
+  // 321 is odd on purpose: it cannot land on an integer height in the 640x400
+  // grid, so `fg-desk` is the one slot that releases its aspect lock and states
+  // an explicit 640x161 rect. See docs/design/event_system_custom_scale_deadscene_design.md §2.3.
+  desk_foreground: { width: 1280, height: 321 },
   suspect_base: { width: 512, height: 512 },
   suspect_state_parts: { width: 512, height: 512 },
   partner: { width: 512, height: 512 },

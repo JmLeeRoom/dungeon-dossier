@@ -2,6 +2,7 @@ export * from './balance';
 export * from './cards';
 export * from './case';
 export * from './claim';
+export * from './cutscene';
 export * from './dialogue';
 export * from './encounter';
 export * from './enhancements';

@@ -4,6 +4,8 @@ import { resolve } from "node:path";
 import type { Plugin } from "vite";
 import { defineConfig } from "vitest/config";
 
+import { saveWorkbenchAssetsPlugin } from "./tools/workbench-save";
+
 const projectRoot = import.meta.dirname;
 const staticDirectories = ["content", "assets", "schemas"] as const;
 
@@ -74,7 +76,11 @@ export default defineConfig({
   base: "./",
   publicDir: false,
   appType: "spa",
-  plugins: [copyRuntimeData(), assertDeveloperConsoleTreeShaken()],
+  plugins: [
+    copyRuntimeData(),
+    assertDeveloperConsoleTreeShaken(),
+    saveWorkbenchAssetsPlugin(),
+  ],
   server: {
     host: true,
     fs: {

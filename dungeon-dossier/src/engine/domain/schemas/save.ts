@@ -7,6 +7,7 @@ import {
   GradeSchema,
   PresentationStateSchema,
 } from '../vocabulary';
+import { MAX_ABS_CARD_TUNING } from './case';
 import {
   JsonSchemaReferenceSchema,
   NonNegativeIntegerSchema,
@@ -18,7 +19,7 @@ import {
 import { CaseGradeSchema } from './grades';
 import { OutcomeGradeSchema } from './encounter';
 
-export const CURRENT_SAVE_VERSION = 1 as const;
+export const CURRENT_SAVE_VERSION = 2 as const;
 
 export const SavedClaimStateSchema = z.strictObject({
   claim_id: ContentIdSchema,
@@ -66,7 +67,7 @@ export const SavedEncounterStateSchema = z.strictObject({
   shield_durability: z.record(ContentIdSchema, NonNegativeNumberSchema),
 });
 
-export const SavedRunStateSchema = z.strictObject({
+const SavedRunStateV1Shape = {
   node_index: NonNegativeIntegerSchema,
   reward_seed_stream: z.number().int().min(0).max(0xffff_ffff),
   false_confessions: NonNegativeIntegerSchema,
@@ -84,11 +85,40 @@ export const SavedRunStateSchema = z.strictObject({
     outcome: OutcomeGradeSchema,
   })),
   terminal: z.boolean(),
+} as const;
+
+const SavedCardTuningSchema = z.strictObject({
+  cp_delta: z.number().int().safe().min(-MAX_ABS_CARD_TUNING).max(MAX_ABS_CARD_TUNING),
+  composure_damage_delta: z
+    .number()
+    .finite()
+    .min(-MAX_ABS_CARD_TUNING)
+    .max(MAX_ABS_CARD_TUNING),
+  coercion_delta: z
+    .number()
+    .finite()
+    .min(-MAX_ABS_CARD_TUNING)
+    .max(MAX_ABS_CARD_TUNING),
 });
 
-export const SaveSchema = z.strictObject({
+/** v2 persists the pattern D/E/F run state that acquired-ID lists cannot express. */
+const SavedRunStateV2Shape = {
+  card_tuning: z.record(ContentIdSchema, SavedCardTuningSchema),
+  canvassed_topic_ids: uniqueContentIds(),
+  evidence_grade_by_id: z.record(ContentIdSchema, GradeSchema),
+  open_route_ids: uniqueContentIds(),
+  retry_count: NonNegativeIntegerSchema,
+} as const;
+
+const SavedRunStateV1Schema = z.strictObject(SavedRunStateV1Shape);
+
+export const SavedRunStateSchema = z.strictObject({
+  ...SavedRunStateV1Shape,
+  ...SavedRunStateV2Shape,
+});
+
+const SaveEnvelopeShape = {
   $schema: JsonSchemaReferenceSchema.optional(),
-  save_version: z.literal(CURRENT_SAVE_VERSION),
   case_id: ContentIdSchema,
   content_version: VersionSchema,
   run_seed: z.number().int().min(0).max(0xffff_ffff),
@@ -101,7 +131,18 @@ export const SaveSchema = z.strictObject({
   used_routes: uniqueContentIds(),
   acquired_relics: uniqueContentIds(),
   acquired_enhancements: uniqueContentIds(),
-  /** Optional for backward-compatible v1 saves created before the run layer. */
+} as const;
+
+const SaveV1Schema = z.strictObject({
+  ...SaveEnvelopeShape,
+  save_version: z.literal(1),
+  run: SavedRunStateV1Schema.optional(),
+});
+
+export const SaveSchema = z.strictObject({
+  ...SaveEnvelopeShape,
+  save_version: z.literal(CURRENT_SAVE_VERSION),
+  /** Optional for backward-compatible saves created before the run layer. */
   run: SavedRunStateSchema.optional(),
 });
 export type SaveData = z.infer<typeof SaveSchema>;
@@ -118,13 +159,37 @@ export class UnsupportedSaveVersionError extends Error {
 }
 
 /**
- * Stable migration entrypoint. Version 1 is the first persisted contract; new
- * migrations are added here in ascending order before parsing the current form.
+ * v1 predates pattern D/E/F, so its run boundary genuinely has no tuning,
+ * canvassed topic, grade override, opened route, or retry. Defaults are filled
+ * once here and re-parsed by the v2 schema instead of at each reading layer.
+ */
+function migrateSaveV1ToV2(input: unknown): SaveData {
+  const legacy = SaveV1Schema.parse(input);
+  return SaveSchema.parse({
+    ...legacy,
+    save_version: CURRENT_SAVE_VERSION,
+    ...(legacy.run === undefined
+      ? {}
+      : {
+          run: {
+            ...legacy.run,
+            card_tuning: {},
+            canvassed_topic_ids: [],
+            evidence_grade_by_id: {},
+            open_route_ids: [],
+            retry_count: 0,
+          },
+        }),
+  });
+}
+
+/**
+ * Stable migration entrypoint. Migrations run in ascending order before the
+ * document is parsed as the current contract.
  */
 export function migrateSave(input: unknown): SaveData {
   const probe = SaveVersionProbeSchema.parse(input);
-  if (probe.save_version !== CURRENT_SAVE_VERSION) {
-    throw new UnsupportedSaveVersionError(probe.save_version);
-  }
-  return SaveSchema.parse(input);
+  if (probe.save_version === CURRENT_SAVE_VERSION) return SaveSchema.parse(input);
+  if (probe.save_version === 1) return migrateSaveV1ToV2(input);
+  throw new UnsupportedSaveVersionError(probe.save_version);
 }

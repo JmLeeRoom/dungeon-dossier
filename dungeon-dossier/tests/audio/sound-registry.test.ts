@@ -22,11 +22,12 @@ function inertHowl(): HowlAdapter {
 }
 
 describe('logical sound registry', () => {
-  it('covers all 13 SFX, four BGM tracks, and two stingers', () => {
+  it('covers all 13 SFX, four BGM tracks, and six stingers', () => {
     expect(SFX_IDS).toHaveLength(13);
     expect(BGM_IDS).toHaveLength(4);
-    expect(STINGER_IDS).toHaveLength(2);
-    expect(SOUND_IDS).toHaveLength(19);
+    // Four of the stingers are the defeat cues, one per failure reason.
+    expect(STINGER_IDS).toHaveLength(6);
+    expect(SOUND_IDS).toHaveLength(23);
     expect(Object.keys(SOUND_REGISTRY).sort()).toEqual([...SOUND_IDS].sort());
     expect(new Set(SOUND_IDS).size).toBe(SOUND_IDS.length);
 

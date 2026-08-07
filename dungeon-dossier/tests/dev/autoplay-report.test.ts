@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
+import { MODE_CONFIGS } from '../../src/dev/autoplay/driver';
+
 import {
   AUTOPLAY_EXPECTED_NODES,
   AUTOPLAY_REPORT_SCHEMA_VERSION,
@@ -7,6 +9,8 @@ import {
   findAutoplayInvariantFailures,
   findRawI18nKeys,
   VIDEO_DURATION_ACCEPTANCE,
+  VIDEO_DURATION_TOLERANCE_SEC,
+  VIDEO_TARGET_DURATION_SEC,
   type AutoplayReportEvidence,
 } from '../../src/dev/autoplay/report';
 
@@ -100,7 +104,10 @@ describe('autoplay report invariants', () => {
       independentlyCollectTechnicalIds(content, expected);
     }
 
-    expect(expected.size).toBe(387);
+    // A pinned count breaks on every content edit without catching anything the
+    // set equality below misses. The floor only guards against the collector
+    // silently returning nothing.
+    expect(expected.size).toBeGreaterThan(300);
     expect(new Set(AUTOPLAY_TECHNICAL_CONTENT_IDS)).toEqual(expected);
     expect(AUTOPLAY_TECHNICAL_CONTENT_IDS).toEqual(expect.arrayContaining([
       'cache-preverified',
@@ -272,5 +279,33 @@ describe('autoplay report invariants', () => {
       expect.stringContaining('warning: transient soft-lock'),
       expect.stringContaining('canonical encounter order'),
     ]));
+  });
+});
+
+describe('VIDEO-P0-06 duration contract', () => {
+  it('derives every boundary from one target and one tolerance', () => {
+    expect(VIDEO_TARGET_DURATION_SEC).toBe(150);
+    expect(VIDEO_DURATION_TOLERANCE_SEC).toBe(15);
+    expect(VIDEO_DURATION_ACCEPTANCE).toEqual({
+      targetDurationMs: 150_000,
+      minimumDurationMs: 135_000,
+      maximumDurationMs: 165_000,
+      measurement: 'L2_WALL_CLOCK',
+    });
+  });
+
+  it('accepts the tolerated band and rejects just outside it', () => {
+    const { minimumDurationMs, maximumDurationMs } = VIDEO_DURATION_ACCEPTANCE;
+    expect(minimumDurationMs).toBeLessThan(maximumDurationMs);
+    // The rejected "never exceed 150s" reading would have capped this at 150_000.
+    expect(maximumDurationMs).toBeGreaterThan(150_000);
+    expect(minimumDurationMs).toBe(135_000);
+  });
+
+  it('paces the driver from the same target the report validates against', () => {
+    expect(MODE_CONFIGS.video.targetDurationSec).toBe(VIDEO_TARGET_DURATION_SEC);
+    expect((MODE_CONFIGS.video.targetDurationSec ?? 0) * 1_000).toBe(
+      VIDEO_DURATION_ACCEPTANCE.targetDurationMs,
+    );
   });
 });

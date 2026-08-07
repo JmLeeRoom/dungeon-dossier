@@ -40,6 +40,10 @@
         <button id="reset-all-geometry" class="button button-quiet" type="button">
           전체 좌표 초기화
         </button>
+
+        <button id="save-to-project" class="button button-save" type="button">
+          💾 프로젝트 assets/ 에 직접 저장
+        </button>
       </div>
     </header>
 
@@ -190,6 +194,13 @@
                 <button type="button" data-scale-axis="y" data-scale-delta="1" aria-label="세로 크기 1퍼센트 증가">+</button>
               </div>
             </div>
+            <div class="aspect-control">
+              <label class="aspect-toggle" for="geometry-aspect-lock">
+                <input id="geometry-aspect-lock" type="checkbox" checked />
+                <span>비율 유지</span>
+              </label>
+              <output id="geometry-distortion" class="aspect-badge" hidden></output>
+            </div>
             <div class="button-row">
               <button id="clamp-selected-geometry" class="button button-quiet" type="button">스테이지 안으로 맞춤</button>
               <button id="reset-selected-geometry" class="button button-quiet" type="button">선택 좌표 초기화</button>
@@ -197,9 +208,33 @@
           </fieldset>
         </section>
 
-        <section class="panel parts-panel" aria-labelledby="parts-heading">
+        <section class="panel parts-panel" aria-labelledby="character-heading">
           <div class="panel-heading">
             <span class="section-number">03</span>
+            <h2 id="character-heading">CHARACTER PARTS</h2>
+          </div>
+          <p>캐릭터별 512×512 시트를 교체하고 base 원점 기준 오프셋을 편집합니다. 선택한 캐릭터가 스테이지 용의자 슬롯에 그대로 반영됩니다.</p>
+
+          <label class="field-label" for="character-select">캐릭터</label>
+          <select id="character-select" class="wide-select"></select>
+
+          <div id="character-parts" class="character-parts"></div>
+
+          <div class="button-row">
+            <button id="download-character-parts" class="button" type="button">사이드카 내보내기</button>
+            <button id="import-character-parts" class="button button-quiet" type="button">사이드카 가져오기</button>
+            <input id="character-parts-file" type="file" accept="application/json,.json" hidden />
+          </div>
+
+          <div class="json-heading">
+            <span id="character-parts-json-name">portrait_물컹이.state-parts.json</span>
+          </div>
+          <pre id="character-parts-json" class="json-preview"></pre>
+        </section>
+
+        <section class="panel parts-panel" aria-labelledby="parts-heading">
+          <div class="panel-heading">
+            <span class="section-number">04</span>
             <h2 id="parts-heading">SUSPECT STATE PARTS</h2>
           </div>
           <p>용의자 베이스 좌상단을 원점으로 사용합니다. base · upset · lose 모두 512×512입니다.</p>
@@ -231,7 +266,7 @@
 
         <section class="panel manifest-panel" aria-labelledby="manifest-heading">
           <div class="panel-heading">
-            <span class="section-number">04</span>
+            <span class="section-number">05</span>
             <h2 id="manifest-heading">ASSET MANIFEST</h2>
           </div>
           <div class="json-heading">
@@ -243,7 +278,7 @@
 
         <section class="panel manifest-panel" aria-labelledby="slots-heading">
           <div class="panel-heading">
-            <span class="section-number">05</span>
+            <span class="section-number">06</span>
             <h2 id="slots-heading">16 ASSET SLOTS</h2>
           </div>
           <div id="asset-list" class="asset-list"></div>

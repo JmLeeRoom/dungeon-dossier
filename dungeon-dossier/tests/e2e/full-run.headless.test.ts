@@ -10,6 +10,7 @@ import {
   GradesSchema,
   RewardsSchema,
   RunStripSchema,
+  type ActionIntent,
   type CaseDefinition,
   type EncounterDefinition,
 } from '../../src/engine/domain';
@@ -50,6 +51,30 @@ const FLAGS = FlagsSchema.parse(common('flags.json'));
 const REWARDS = RewardsSchema.parse(common('rewards.json'));
 const GRADES = GradesSchema.parse(common('grades.json'));
 const CARDS = CardsSchema.parse(common('cards.json'));
+
+function cardIntentsById(): Readonly<Record<string, ActionIntent>> {
+  return Object.fromEntries(CARDS.cards.map((card) => [card.card_id, card.intent]));
+}
+
+function eligibleCards(
+  session: RunSession,
+  option: Readonly<{ eligible_intents: readonly ActionIntent[] }>,
+  intents: Readonly<Record<string, ActionIntent>>,
+): readonly string[] {
+  const deck = session.snapshot.deck;
+  const owned = [
+    ...deck.drawPile,
+    ...deck.hand,
+    ...deck.discardPile,
+    ...deck.exhaustPile,
+  ].filter((cardId, index, ids) => ids.indexOf(cardId) === index);
+  if (option.eligible_intents.length === 0) return owned;
+  const allowed = new Set<ActionIntent>(option.eligible_intents);
+  return owned.filter((cardId) => {
+    const intent = intents[cardId];
+    return intent !== undefined && allowed.has(intent);
+  });
+}
 const BALANCE = BalanceSchema.parse(common('balance.json'));
 const CASES = {
   tutorial: caseContent('tutorial'),
@@ -214,11 +239,7 @@ function playFullRun(seed: number): FullRunResult {
       );
       if (event === undefined) throw new Error(`Missing event ${node.ref}.`);
       if (event.pattern === 'A') {
-        // The final branch must be chosen by choice_id, never index: only
-        // choice_ep004_question_broker keeps F-12 true for the true ending.
-        const choiceId = event.event_id === 'event_ep004_ticket_trade'
-          ? 'choice_ep004_question_broker'
-          : event.choices[0]?.choice_id;
+        const choiceId = event.choices[0]?.choice_id;
         if (choiceId === undefined) {
           throw new Error(`Event ${event.event_id} has no choice.`);
         }
@@ -228,12 +249,47 @@ function playFullRun(seed: number): FullRunResult {
           eventDefinition: event,
           placement: { ...event.answer_mapping },
         });
-      } else {
+      } else if (event.pattern === 'C') {
         session.finishEvent({
           eventDefinition: event,
           investigatedSpotIds: event.spots
             .slice(0, event.attempt_limit)
             .map((spot) => spot.spot_id),
+        });
+      } else if (event.pattern === 'D') {
+        const cardIntents = cardIntentsById();
+        const option = event.options.find(
+          (candidate) => eligibleCards(session, candidate, cardIntents).length > 0,
+        );
+        const tunedCardId = option === undefined
+          ? undefined
+          : eligibleCards(session, option, cardIntents)[0];
+        session.finishEvent({
+          eventDefinition: event,
+          cardIntentsById: cardIntents,
+          ...(option === undefined || tunedCardId === undefined
+            ? {}
+            : { optionId: option.option_id, tunedCardId }),
+        });
+      } else if (event.pattern === 'E') {
+        // Topic order matters: the route topic is the only writer of F-12, and
+        // the attempt limit is smaller than the topic list on purpose.
+        const canvassed = new Set(session.snapshot.canvassedTopicIds);
+        session.finishEvent({
+          eventDefinition: event,
+          canvassedTopicIds: event.topics
+            .filter((topic) => !canvassed.has(topic.topic_id))
+            .slice(0, event.attempt_limit)
+            .map((topic) => topic.topic_id),
+        });
+      } else {
+        const held = new Set(session.snapshot.acquiredEvidenceIds);
+        session.finishEvent({
+          eventDefinition: event,
+          collectedTargetIds: event.targets
+            .filter((target) => !held.has(target.evidence_id))
+            .slice(0, event.attempt_limit)
+            .map((target) => target.target_id),
         });
       }
       continue;

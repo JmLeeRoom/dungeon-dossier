@@ -47,7 +47,7 @@
       "name": "책상",
       "state": "기본",
       "width": 1280,
-      "height": 236,
+      "height": 321,
       "label": "DESK",
       "theme": "sepia"
     },
@@ -510,6 +510,46 @@
       "height": 32,
       "label": "COERCION",
       "theme": "magenta"
+    },
+    {
+      "directory": "dead",
+      "category": "dead",
+      "name": "과로",
+      "state": "기본",
+      "width": 1280,
+      "height": 440,
+      "label": "OVERWORK",
+      "theme": "sepia"
+    },
+    {
+      "directory": "dead",
+      "category": "dead",
+      "name": "징계",
+      "state": "기본",
+      "width": 1280,
+      "height": 440,
+      "label": "DISCIPLINE",
+      "theme": "magenta"
+    },
+    {
+      "directory": "dead",
+      "category": "dead",
+      "name": "시한",
+      "state": "기본",
+      "width": 1280,
+      "height": 440,
+      "label": "DEADLINE",
+      "theme": "cyan"
+    },
+    {
+      "directory": "dead",
+      "category": "dead",
+      "name": "미제",
+      "state": "기본",
+      "width": 1280,
+      "height": 440,
+      "label": "COLD CASE",
+      "theme": "sepia"
     }
   ]
 }

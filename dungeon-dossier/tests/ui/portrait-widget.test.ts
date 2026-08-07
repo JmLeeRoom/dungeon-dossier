@@ -59,15 +59,16 @@ describe('portrait widget rendering', () => {
       baseUrl: WHITE_TEXTURE_URL,
       statePartsUrl: WHITE_TEXTURE_URL,
     });
-    const base = portrait.children[1];
-    const parts = portrait.children[2];
+    const base = portrait.view.children[1];
+    const parts = portrait.view.children[2];
+    expect(portrait.statePart).toBe('upset');
     expect(base).toBeInstanceOf(Sprite);
     expect(parts).toBeInstanceOf(Sprite);
     expect(base).toMatchObject({ width: 216, height: 216 });
     expect(parts).toMatchObject({ width: 216, height: 216 });
     expect(parts?.position).toMatchObject({ x: 0, y: 0 });
 
-    portrait.destroy({ children: true });
+    portrait.view.destroy({ children: true });
   });
 
   it('keeps a readable state overlay when authored state-parts art is unavailable', () => {
@@ -76,13 +77,13 @@ describe('portrait widget rendering', () => {
     const lose = createPortrait({ statePart: 'lose' });
 
     // Placeholder + optional state wash + fallback label.
-    expect(base.children).toHaveLength(2);
-    expect(upset.children).toHaveLength(3);
-    expect(lose.children).toHaveLength(3);
+    expect(base.view.children).toHaveLength(2);
+    expect(upset.view.children).toHaveLength(3);
+    expect(lose.view.children).toHaveLength(3);
 
-    base.destroy({ children: true });
-    upset.destroy({ children: true });
-    lose.destroy({ children: true });
+    base.view.destroy({ children: true });
+    upset.view.destroy({ children: true });
+    lose.view.destroy({ children: true });
   });
 });
 

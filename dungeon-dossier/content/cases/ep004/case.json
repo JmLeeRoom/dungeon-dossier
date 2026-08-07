@@ -48,54 +48,82 @@
       "type": "LOCATION",
       "role": "SCENE",
       "display_name_key": "entity.ep004.machine_room.name",
-      "attributes": { "deck": "LOWER" }
+      "attributes": {
+        "deck": "LOWER"
+      }
     },
     {
       "entity_id": "ent_ep004_vip_gate",
       "type": "LOCATION",
       "role": "SCENE",
       "display_name_key": "entity.ep004.vip_gate.name",
-      "attributes": { "deck": "UPPER" }
+      "attributes": {
+        "deck": "UPPER"
+      }
     },
     {
       "entity_id": "ent_ep004_drive_core",
       "type": "OBJECT",
       "role": "INSTRUMENT",
       "display_name_key": "entity.ep004.drive_core.name",
-      "attributes": { "system": "LEY_DRIVE" }
+      "attributes": {
+        "system": "LEY_DRIVE"
+      }
     },
     {
       "entity_id": "ent_ep004_vip_ticket",
       "type": "OBJECT",
       "role": "INSTRUMENT",
       "display_name_key": "entity.ep004.vip_ticket.name",
-      "attributes": { "class": "BLACK_GOLD" }
+      "attributes": {
+        "class": "BLACK_GOLD"
+      }
     }
   ],
   "events": [
     {
       "event_id": "evt_ep004_safety_bypass",
-      "time": { "from": "01:14", "to": "01:20" },
+      "time": {
+        "from": "01:14",
+        "to": "01:20"
+      },
       "location_id": "ent_ep004_machine_room",
-      "participants": ["ent_ep004_dwarf"],
+      "participants": [
+        "ent_ep004_dwarf"
+      ],
       "action": "BYPASS_DRIVE_SAFETY_LOCK",
-      "objects": ["ent_ep004_drive_core"]
+      "objects": [
+        "ent_ep004_drive_core"
+      ]
     },
     {
       "event_id": "evt_ep004_audio_erasure",
-      "time": { "from": "01:22", "to": "01:28" },
+      "time": {
+        "from": "01:22",
+        "to": "01:28"
+      },
       "location_id": "ent_ep004_machine_room",
-      "participants": ["ent_ep004_cyclops"],
+      "participants": [
+        "ent_ep004_cyclops"
+      ],
       "action": "REMOVE_WARNING_AUDIO_SEGMENT",
       "caused_by": "evt_ep004_safety_bypass"
     },
     {
       "event_id": "evt_ep004_vip_diversion",
-      "time": { "from": "01:30", "to": "01:38" },
+      "time": {
+        "from": "01:30",
+        "to": "01:38"
+      },
       "location_id": "ent_ep004_vip_gate",
-      "participants": ["ent_ep004_fallen_hero", "ent_ep004_cyclops"],
+      "participants": [
+        "ent_ep004_fallen_hero",
+        "ent_ep004_cyclops"
+      ],
       "action": "AUTHORIZE_UNSCHEDULED_ROUTE_DIVERSION",
-      "objects": ["ent_ep004_vip_ticket"],
+      "objects": [
+        "ent_ep004_vip_ticket"
+      ],
       "instructed_by": "ent_ep004_fallen_hero"
     }
   ],
@@ -108,13 +136,21 @@
       "facet": "WHO",
       "canonical_meaning": "용맥 기관의 안전 잠금을 해제한 정비사는 자신이 아니다",
       "predicate": "DENY_SAFETY_BYPASS_OPERATOR",
-      "time_ref": { "from": "01:14", "to": "01:20" },
-      "initial": { "commitment": "COMMITTED", "presentation": "NORMAL" },
+      "time_ref": {
+        "from": "01:14",
+        "to": "01:20"
+      },
+      "initial": {
+        "commitment": "COMMITTED",
+        "presentation": "NORMAL"
+      },
       "resistance": 2,
       "is_required": true,
       "truth": {
         "relation": "CONTRADICTED_BY_WORLD",
-        "contradicting_events": ["evt_ep004_safety_bypass"]
+        "contradicting_events": [
+          "evt_ep004_safety_bypass"
+        ]
       }
     },
     {
@@ -124,13 +160,21 @@
       "facet": "WHEN",
       "canonical_meaning": "압력 경보가 울리기 전에 이미 기계실 근무를 마쳤다",
       "predicate": "LEFT_BEFORE_PRESSURE_ALARM",
-      "time_ref": { "from": "01:00", "to": "01:14" },
-      "initial": { "commitment": "ASSERTED", "presentation": "NORMAL" },
+      "time_ref": {
+        "from": "01:00",
+        "to": "01:14"
+      },
+      "initial": {
+        "commitment": "ASSERTED",
+        "presentation": "NORMAL"
+      },
       "resistance": 1,
       "is_required": true,
       "truth": {
         "relation": "CONTRADICTED_BY_WORLD",
-        "contradicting_events": ["evt_ep004_safety_bypass"]
+        "contradicting_events": [
+          "evt_ep004_safety_bypass"
+        ]
       }
     },
     {
@@ -140,13 +184,21 @@
       "facet": "WHERE",
       "canonical_meaning": "경보 뒤에도 상부 관측실을 떠나지 않았다",
       "predicate": "STAYED_IN_OBSERVATION_ROOM",
-      "time_ref": { "from": "01:20", "to": "01:30" },
-      "initial": { "commitment": "COMMITTED", "presentation": "NORMAL" },
+      "time_ref": {
+        "from": "01:20",
+        "to": "01:30"
+      },
+      "initial": {
+        "commitment": "COMMITTED",
+        "presentation": "NORMAL"
+      },
       "resistance": 2,
       "is_required": true,
       "truth": {
         "relation": "CONTRADICTED_BY_WORLD",
-        "contradicting_events": ["evt_ep004_audio_erasure"]
+        "contradicting_events": [
+          "evt_ep004_audio_erasure"
+        ]
       }
     },
     {
@@ -156,12 +208,17 @@
       "facet": "WHAT",
       "canonical_meaning": "음성 캐시에는 정상 운행 안내만 저장되어 있었다",
       "predicate": "AUDIO_CACHE_CONTAINED_ONLY_NORMAL_NOTICE",
-      "initial": { "commitment": "ASSERTED", "presentation": "NORMAL" },
+      "initial": {
+        "commitment": "ASSERTED",
+        "presentation": "NORMAL"
+      },
       "resistance": 2,
       "is_required": true,
       "truth": {
         "relation": "CONTRADICTED_BY_WORLD",
-        "contradicting_events": ["evt_ep004_audio_erasure"]
+        "contradicting_events": [
+          "evt_ep004_audio_erasure"
+        ]
       }
     },
     {
@@ -171,12 +228,17 @@
       "facet": "HOW",
       "canonical_meaning": "VIP 우회 승인은 정식 검표 절차만으로 처리되었다",
       "predicate": "VIP_DIVERSION_USED_STANDARD_VALIDATION",
-      "initial": { "commitment": "COMMITTED", "presentation": "NORMAL" },
+      "initial": {
+        "commitment": "COMMITTED",
+        "presentation": "NORMAL"
+      },
       "resistance": 3,
       "is_required": true,
       "truth": {
         "relation": "CONTRADICTED_BY_WORLD",
-        "contradicting_events": ["evt_ep004_vip_diversion"]
+        "contradicting_events": [
+          "evt_ep004_vip_diversion"
+        ]
       }
     },
     {
@@ -186,12 +248,17 @@
       "facet": "WHY",
       "canonical_meaning": "열차 노선이 바뀌어도 자신에게 돌아오는 이익은 없었다",
       "predicate": "DENY_DIVERSION_BENEFIT",
-      "initial": { "commitment": "ASSERTED", "presentation": "NORMAL" },
+      "initial": {
+        "commitment": "ASSERTED",
+        "presentation": "NORMAL"
+      },
       "resistance": 2,
       "is_required": false,
       "truth": {
         "relation": "CONTRADICTED_BY_WORLD",
-        "contradicting_events": ["evt_ep004_vip_diversion"]
+        "contradicting_events": [
+          "evt_ep004_vip_diversion"
+        ]
       }
     },
     {
@@ -202,12 +269,17 @@
       "facet": "WHERE",
       "canonical_meaning": "압력 경보 뒤에는 객실에 머물렀다",
       "predicate": "DWARF_STAYED_IN_CABIN_AFTER_ALARM",
-      "initial": { "commitment": "ASSERTED", "presentation": "NORMAL" },
+      "initial": {
+        "commitment": "ASSERTED",
+        "presentation": "NORMAL"
+      },
       "resistance": 0,
       "is_required": false,
       "truth": {
         "relation": "CONTRADICTED_BY_WORLD",
-        "contradicting_events": ["evt_ep004_safety_bypass"]
+        "contradicting_events": [
+          "evt_ep004_safety_bypass"
+        ]
       }
     },
     {
@@ -218,12 +290,17 @@
       "facet": "WHAT",
       "canonical_meaning": "그날 점검한 것은 압력계뿐이었다",
       "predicate": "DWARF_CHECKED_ONLY_PRESSURE_GAUGE",
-      "initial": { "commitment": "ASSERTED", "presentation": "NORMAL" },
+      "initial": {
+        "commitment": "ASSERTED",
+        "presentation": "NORMAL"
+      },
       "resistance": 1,
       "is_required": false,
       "truth": {
         "relation": "CONTRADICTED_BY_WORLD",
-        "contradicting_events": ["evt_ep004_safety_bypass"]
+        "contradicting_events": [
+          "evt_ep004_safety_bypass"
+        ]
       }
     },
     {
@@ -233,12 +310,17 @@
       "facet": "HOW",
       "canonical_meaning": "안전 잠금 키를 사용하지 않았다",
       "predicate": "DWARF_DENY_USING_SAFETY_KEY",
-      "initial": { "commitment": "ASSERTED", "presentation": "NORMAL" },
+      "initial": {
+        "commitment": "ASSERTED",
+        "presentation": "NORMAL"
+      },
       "resistance": 2,
       "is_required": false,
       "truth": {
         "relation": "CONTRADICTED_BY_WORLD",
-        "contradicting_events": ["evt_ep004_safety_bypass"]
+        "contradicting_events": [
+          "evt_ep004_safety_bypass"
+        ]
       }
     },
     {
@@ -248,10 +330,16 @@
       "facet": "WHY",
       "canonical_meaning": "기관 설정을 바꿀 이유가 없었다",
       "predicate": "DWARF_DENY_BYPASS_MOTIVE",
-      "initial": { "commitment": "ASSERTED", "presentation": "NORMAL" },
+      "initial": {
+        "commitment": "ASSERTED",
+        "presentation": "NORMAL"
+      },
       "resistance": 3,
       "is_required": false,
-      "truth": { "relation": "UNVERIFIABLE", "contradicting_events": [] }
+      "truth": {
+        "relation": "UNVERIFIABLE",
+        "contradicting_events": []
+      }
     },
     {
       "claim_id": "clm_ep004_cyclops_who",
@@ -260,12 +348,17 @@
       "facet": "WHO",
       "canonical_meaning": "VIP 통로에서 몰락한 영웅을 만나지 않았다",
       "predicate": "CYCLOPS_DENY_MEETING_HERO",
-      "initial": { "commitment": "ASSERTED", "presentation": "NORMAL" },
+      "initial": {
+        "commitment": "ASSERTED",
+        "presentation": "NORMAL"
+      },
       "resistance": 0,
       "is_required": false,
       "truth": {
         "relation": "CONTRADICTED_BY_WORLD",
-        "contradicting_events": ["evt_ep004_vip_diversion"]
+        "contradicting_events": [
+          "evt_ep004_vip_diversion"
+        ]
       }
     },
     {
@@ -275,12 +368,17 @@
       "facet": "WHEN",
       "canonical_meaning": "경고 음성이 사라질 때는 관측 기록을 쓰고 있었다",
       "predicate": "CYCLOPS_WROTE_LOG_DURING_ERASURE",
-      "initial": { "commitment": "ASSERTED", "presentation": "NORMAL" },
+      "initial": {
+        "commitment": "ASSERTED",
+        "presentation": "NORMAL"
+      },
       "resistance": 1,
       "is_required": false,
       "truth": {
         "relation": "CONTRADICTED_BY_WORLD",
-        "contradicting_events": ["evt_ep004_audio_erasure"]
+        "contradicting_events": [
+          "evt_ep004_audio_erasure"
+        ]
       }
     },
     {
@@ -290,12 +388,17 @@
       "facet": "HOW",
       "canonical_meaning": "경고 음성은 보존 기한이 지나 자동 정리되었다",
       "predicate": "CYCLOPS_CLAIM_AUTOMATIC_AUDIO_CLEANUP",
-      "initial": { "commitment": "ASSERTED", "presentation": "NORMAL" },
+      "initial": {
+        "commitment": "ASSERTED",
+        "presentation": "NORMAL"
+      },
       "resistance": 2,
       "is_required": false,
       "truth": {
         "relation": "CONTRADICTED_BY_WORLD",
-        "contradicting_events": ["evt_ep004_audio_erasure"]
+        "contradicting_events": [
+          "evt_ep004_audio_erasure"
+        ]
       }
     },
     {
@@ -305,10 +408,16 @@
       "facet": "WHY",
       "canonical_meaning": "경고 음성을 지울 이유가 없었다",
       "predicate": "CYCLOPS_DENY_AUDIO_ERASURE_MOTIVE",
-      "initial": { "commitment": "ASSERTED", "presentation": "NORMAL" },
+      "initial": {
+        "commitment": "ASSERTED",
+        "presentation": "NORMAL"
+      },
       "resistance": 3,
       "is_required": false,
-      "truth": { "relation": "UNVERIFIABLE", "contradicting_events": [] }
+      "truth": {
+        "relation": "UNVERIFIABLE",
+        "contradicting_events": []
+      }
     },
     {
       "claim_id": "clm_ep004_fallen_hero_who",
@@ -317,12 +426,17 @@
       "facet": "WHO",
       "canonical_meaning": "VIP 우회 승인은 다른 검표관이 내렸다",
       "predicate": "HERO_DENY_DIVERSION_AUTHORITY",
-      "initial": { "commitment": "ASSERTED", "presentation": "NORMAL" },
+      "initial": {
+        "commitment": "ASSERTED",
+        "presentation": "NORMAL"
+      },
       "resistance": 0,
       "is_required": false,
       "truth": {
         "relation": "CONTRADICTED_BY_WORLD",
-        "contradicting_events": ["evt_ep004_vip_diversion"]
+        "contradicting_events": [
+          "evt_ep004_vip_diversion"
+        ]
       }
     },
     {
@@ -332,10 +446,16 @@
       "facet": "WHEN",
       "canonical_meaning": "VIP 승객이 도착한 뒤에야 승인 기록을 작성했다",
       "predicate": "HERO_RECORDED_APPROVAL_AFTER_ARRIVAL",
-      "initial": { "commitment": "ASSERTED", "presentation": "NORMAL" },
+      "initial": {
+        "commitment": "ASSERTED",
+        "presentation": "NORMAL"
+      },
       "resistance": 1,
       "is_required": true,
-      "truth": { "relation": "PARTIALLY_TRUE", "contradicting_events": [] }
+      "truth": {
+        "relation": "PARTIALLY_TRUE",
+        "contradicting_events": []
+      }
     },
     {
       "claim_id": "clm_ep004_fallen_hero_where",
@@ -344,12 +464,17 @@
       "facet": "WHERE",
       "canonical_meaning": "승인 시간에는 VIP 승강장에 가지 않았다",
       "predicate": "HERO_DENY_VIP_GATE_PRESENCE",
-      "initial": { "commitment": "ASSERTED", "presentation": "NORMAL" },
+      "initial": {
+        "commitment": "ASSERTED",
+        "presentation": "NORMAL"
+      },
       "resistance": 2,
       "is_required": true,
       "truth": {
         "relation": "CONTRADICTED_BY_WORLD",
-        "contradicting_events": ["evt_ep004_vip_diversion"]
+        "contradicting_events": [
+          "evt_ep004_vip_diversion"
+        ]
       }
     },
     {
@@ -360,10 +485,16 @@
       "facet": "WHAT",
       "canonical_meaning": "VIP에게서 받은 것은 승차권 원본뿐이었다",
       "predicate": "HERO_RECEIVED_ONLY_ORIGINAL_TICKET",
-      "initial": { "commitment": "ASSERTED", "presentation": "NORMAL" },
+      "initial": {
+        "commitment": "ASSERTED",
+        "presentation": "NORMAL"
+      },
       "resistance": 3,
       "is_required": false,
-      "truth": { "relation": "UNVERIFIABLE", "contradicting_events": [] }
+      "truth": {
+        "relation": "UNVERIFIABLE",
+        "contradicting_events": []
+      }
     }
   ],
   "inquiry_routes": [
@@ -372,9 +503,14 @@
       "target_slot": "clm_ep004_when",
       "slot_label_key": "route.ep004.maintenance_clock",
       "facet": "WHEN",
-      "allowed_intents": ["QUERY", "CLARIFY"],
+      "allowed_intents": [
+        "QUERY",
+        "CLARIFY"
+      ],
       "preconditions": [],
-      "reveals": ["clm_ep004_when"],
+      "reveals": [
+        "clm_ep004_when"
+      ],
       "unlocks_routes": [],
       "creates_commitment": true,
       "commitment_level": "ASSERTED",
@@ -387,9 +523,14 @@
       "target_slot": "clm_ep004_fallen_hero_when",
       "slot_label_key": "route.ep004.fallen_hero.when",
       "facet": "WHEN",
-      "allowed_intents": ["QUERY", "CLARIFY"],
+      "allowed_intents": [
+        "QUERY",
+        "CLARIFY"
+      ],
       "preconditions": [],
-      "reveals": ["clm_ep004_fallen_hero_when"],
+      "reveals": [
+        "clm_ep004_fallen_hero_when"
+      ],
       "unlocks_routes": [],
       "creates_commitment": true,
       "commitment_level": "ASSERTED",
@@ -402,9 +543,14 @@
       "target_slot": "clm_ep004_who",
       "slot_label_key": "route.ep004.dwarf.who",
       "facet": "WHO",
-      "allowed_intents": ["QUERY", "CLARIFY"],
+      "allowed_intents": [
+        "QUERY",
+        "CLARIFY"
+      ],
       "preconditions": [],
-      "reveals": ["clm_ep004_who"],
+      "reveals": [
+        "clm_ep004_who"
+      ],
       "unlocks_routes": [],
       "creates_commitment": true,
       "commitment_level": "ASSERTED",
@@ -417,9 +563,14 @@
       "target_slot": "clm_ep004_cyclops_who",
       "slot_label_key": "route.ep004.cyclops.who",
       "facet": "WHO",
-      "allowed_intents": ["QUERY", "CLARIFY"],
+      "allowed_intents": [
+        "QUERY",
+        "CLARIFY"
+      ],
       "preconditions": [],
-      "reveals": ["clm_ep004_cyclops_who"],
+      "reveals": [
+        "clm_ep004_cyclops_who"
+      ],
       "unlocks_routes": [],
       "creates_commitment": true,
       "commitment_level": "COMMITTED",
@@ -432,9 +583,14 @@
       "target_slot": "clm_ep004_cyclops_when",
       "slot_label_key": "route.ep004.cyclops.when",
       "facet": "WHEN",
-      "allowed_intents": ["QUERY", "CLARIFY"],
+      "allowed_intents": [
+        "QUERY",
+        "CLARIFY"
+      ],
       "preconditions": [],
-      "reveals": ["clm_ep004_cyclops_when"],
+      "reveals": [
+        "clm_ep004_cyclops_when"
+      ],
       "unlocks_routes": [],
       "creates_commitment": true,
       "commitment_level": "ASSERTED",
@@ -447,9 +603,14 @@
       "target_slot": "clm_ep004_fallen_hero_who",
       "slot_label_key": "route.ep004.fallen_hero.who",
       "facet": "WHO",
-      "allowed_intents": ["QUERY", "CLARIFY"],
+      "allowed_intents": [
+        "QUERY",
+        "CLARIFY"
+      ],
       "preconditions": [],
-      "reveals": ["clm_ep004_fallen_hero_who"],
+      "reveals": [
+        "clm_ep004_fallen_hero_who"
+      ],
       "unlocks_routes": [],
       "creates_commitment": true,
       "commitment_level": "COMMITTED",
@@ -463,42 +624,67 @@
       "evidence_id": "ev_ep004_wrench_imprint",
       "type": "TOOL_IMPRINT",
       "title_key": "evidence.ep004.wrench_imprint.title",
-      "acquire": { "node": "node_ep004_dwarf_start", "method": "STARTING" },
+      "acquire": {
+        "node": "node_ep004_dwarf_start",
+        "method": "STARTING"
+      },
       "source_category": "PHYSICAL",
       "independence": {
         "source_id": "source_ep004_drive_panel",
         "group": "PHYSICAL",
         "derived_from": null
       },
-      "grade": { "initial": "A", "upgrades": [] },
-      "integrity": { "initial": "INTACT" },
+      "grade": {
+        "initial": "A",
+        "upgrades": []
+      },
+      "integrity": {
+        "initial": "INTACT"
+      },
       "observations": [
-          {
-            "observation_id": "observation_ep004_wrench_imprint",
-            "object_id": "ent_ep004_drive_core",
+        {
+          "observation_id": "observation_ep004_wrench_imprint",
+          "object_id": "ent_ep004_drive_core",
           "predicate": "PERSONAL_WRENCH_OPENED_SAFETY_PANEL",
           "summary_key": "evidence.ep004.wrench_imprint.summary",
-          "scopes": ["IDENTITY", "ACTION"],
-          "detail": { "alloy": "SLAG_STEEL" },
+          "scopes": [
+            "IDENTITY",
+            "ACTION"
+          ],
+          "detail": {
+            "alloy": "SLAG_STEEL"
+          },
           "confidence": 1,
-          "contradicts_claim_ids": ["clm_ep004_who"]
+          "contradicts_claim_ids": [
+            "clm_ep004_who"
+          ]
         }
       ],
-      "not_proven_keys": ["evidence.ep004.wrench_imprint.not_time"]
+      "not_proven_keys": [
+        "evidence.ep004.wrench_imprint.not_time"
+      ]
     },
     {
       "evidence_id": "ev_ep004_heat_clock",
       "type": "THERMAL_MAINTENANCE_CLOCK",
       "title_key": "evidence.ep004.heat_clock.title",
-      "acquire": { "node": "node_ep004_dwarf_start", "method": "STARTING" },
+      "acquire": {
+        "node": "node_ep004_dwarf_start",
+        "method": "STARTING"
+      },
       "source_category": "DIGITAL",
       "independence": {
         "source_id": "source_ep004_thermal_sensor",
         "group": "DIGITAL",
         "derived_from": null
       },
-      "grade": { "initial": "A", "upgrades": [] },
-      "integrity": { "initial": "INTACT" },
+      "grade": {
+        "initial": "A",
+        "upgrades": []
+      },
+      "integrity": {
+        "initial": "INTACT"
+      },
       "observations": [
         {
           "observation_id": "observation_ep004_heat_clock",
@@ -506,28 +692,48 @@
           "location_id": "ent_ep004_machine_room",
           "predicate": "WORKED_DURING_PRESSURE_ALARM",
           "summary_key": "evidence.ep004.heat_clock.summary",
-          "scopes": ["TIME", "SEQUENCE"],
-          "detail": { "alarm_phase": "RED" },
-          "time": { "from": "01:14", "to": "01:20" },
+          "scopes": [
+            "TIME",
+            "SEQUENCE"
+          ],
+          "detail": {
+            "alarm_phase": "RED"
+          },
+          "time": {
+            "from": "01:14",
+            "to": "01:20"
+          },
           "confidence": 1,
-          "contradicts_claim_ids": ["clm_ep004_when"]
+          "contradicts_claim_ids": [
+            "clm_ep004_when"
+          ]
         }
       ],
-      "not_proven_keys": ["evidence.ep004.heat_clock.not_operator"]
+      "not_proven_keys": [
+        "evidence.ep004.heat_clock.not_operator"
+      ]
     },
     {
       "evidence_id": "ev_ep004_corridor_lens",
       "type": "CORRIDOR_LENS_FRAME",
       "title_key": "evidence.ep004.corridor_lens.title",
-      "acquire": { "node": "node_ep004_cyclops_start", "method": "STARTING" },
+      "acquire": {
+        "node": "node_ep004_cyclops_start",
+        "method": "STARTING"
+      },
       "source_category": "DIGITAL",
       "independence": {
         "source_id": "source_ep004_corridor_lens",
         "group": "DIGITAL",
         "derived_from": null
       },
-      "grade": { "initial": "A", "upgrades": [] },
-      "integrity": { "initial": "INTACT" },
+      "grade": {
+        "initial": "A",
+        "upgrades": []
+      },
+      "integrity": {
+        "initial": "INTACT"
+      },
       "observations": [
         {
           "observation_id": "observation_ep004_corridor_lens",
@@ -535,55 +741,92 @@
           "location_id": "ent_ep004_machine_room",
           "predicate": "ENTERED_MACHINE_CORRIDOR",
           "summary_key": "evidence.ep004.corridor_lens.summary",
-          "scopes": ["LOCATION", "PRESENCE"],
-          "detail": { "camera": "LOWER_CORRIDOR" },
-          "time": { "from": "01:21", "to": "01:29" },
+          "scopes": [
+            "LOCATION",
+            "PRESENCE"
+          ],
+          "detail": {
+            "camera": "LOWER_CORRIDOR"
+          },
+          "time": {
+            "from": "01:21",
+            "to": "01:29"
+          },
           "confidence": 1,
-          "contradicts_claim_ids": ["clm_ep004_where"]
+          "contradicts_claim_ids": [
+            "clm_ep004_where"
+          ]
         }
       ],
-      "not_proven_keys": ["evidence.ep004.corridor_lens.not_audio"]
+      "not_proven_keys": [
+        "evidence.ep004.corridor_lens.not_audio"
+      ]
     },
     {
       "evidence_id": "ev_ep004_audio_cache",
       "type": "RECOVERED_AUDIO_CACHE",
       "title_key": "evidence.ep004.audio_cache.title",
-      "acquire": { "node": "node_ep004_cyclops_start", "method": "STARTING" },
+      "acquire": {
+        "node": "node_ep004_cyclops_start",
+        "method": "STARTING"
+      },
       "source_category": "DIGITAL",
       "independence": {
         "source_id": "source_ep004_audio_recorder",
         "group": "DIGITAL",
         "derived_from": null
       },
-      "grade": { "initial": "A", "upgrades": [] },
-      "integrity": { "initial": "INTACT" },
+      "grade": {
+        "initial": "A",
+        "upgrades": []
+      },
+      "integrity": {
+        "initial": "INTACT"
+      },
       "observations": [
         {
           "observation_id": "observation_ep004_audio_cache",
           "subject_id": "ent_ep004_cyclops",
           "predicate": "DELETED_WARNING_SEGMENT_RECOVERED",
           "summary_key": "evidence.ep004.audio_cache.summary",
-          "scopes": ["ACTION", "INTEGRITY"],
-          "detail": { "segment": "PRESSURE_WARNING" },
+          "scopes": [
+            "ACTION",
+            "INTEGRITY"
+          ],
+          "detail": {
+            "segment": "PRESSURE_WARNING"
+          },
           "confidence": 1,
-          "contradicts_claim_ids": ["clm_ep004_what"]
+          "contradicts_claim_ids": [
+            "clm_ep004_what"
+          ]
         }
       ],
-      "not_proven_keys": ["evidence.ep004.audio_cache.not_location"]
+      "not_proven_keys": [
+        "evidence.ep004.audio_cache.not_location"
+      ]
     },
     {
       "evidence_id": "ev_ep004_vip_ticket_trace",
       "type": "VIP_TICKET_TRACE",
       "title_key": "evidence.ep004.vip_ticket_trace.title",
-      "acquire": { "node": "node_ep004_fallen_hero_start", "method": "STARTING" },
+      "acquire": {
+        "node": "node_ep004_fallen_hero_start",
+        "method": "STARTING"
+      },
       "source_category": "DOCUMENT",
       "independence": {
         "source_id": "source_ep004_ticket_office",
         "group": "DOCUMENT",
         "derived_from": null
       },
-      "grade": { "initial": "A", "upgrades": [] },
-      "integrity": { "initial": "INTACT" },
+      "grade": {
+        "initial": "A",
+        "upgrades": []
+      },
+      "integrity": {
+        "initial": "INTACT"
+      },
       "observations": [
         {
           "observation_id": "observation_ep004_vip_ticket_trace",
@@ -592,54 +835,88 @@
           "location_id": "ent_ep004_vip_gate",
           "predicate": "USED_MANUAL_GATE_BYPASS",
           "summary_key": "evidence.ep004.vip_ticket_trace.summary",
-          "scopes": ["ROUTE", "ACTION"],
-          "detail": { "validation": "MANUAL_OVERRIDE" },
+          "scopes": [
+            "ROUTE",
+            "ACTION"
+          ],
+          "detail": {
+            "validation": "MANUAL_OVERRIDE"
+          },
           "confidence": 1,
-          "contradicts_claim_ids": ["clm_ep004_how"]
+          "contradicts_claim_ids": [
+            "clm_ep004_how"
+          ]
         }
       ],
-      "not_proven_keys": ["evidence.ep004.vip_ticket_trace.not_motive"]
+      "not_proven_keys": [
+        "evidence.ep004.vip_ticket_trace.not_motive"
+      ]
     },
     {
       "evidence_id": "ev_ep004_diversion_contract",
       "type": "ROUTE_CONCESSION_CONTRACT",
       "title_key": "evidence.ep004.diversion_contract.title",
-      "acquire": { "node": "node_ep004_fallen_hero_start", "method": "STARTING" },
+      "acquire": {
+        "node": "node_ep004_fallen_hero_start",
+        "method": "STARTING"
+      },
       "source_category": "FINANCIAL",
       "independence": {
         "source_id": "source_ep004_concession_registry",
         "group": "FINANCIAL",
         "derived_from": null
       },
-      "grade": { "initial": "A", "upgrades": [] },
-      "integrity": { "initial": "INTACT" },
+      "grade": {
+        "initial": "A",
+        "upgrades": []
+      },
+      "integrity": {
+        "initial": "INTACT"
+      },
       "observations": [
         {
           "observation_id": "observation_ep004_diversion_contract",
           "subject_id": "ent_ep004_fallen_hero",
           "predicate": "RECEIVED_DIVERSION_CONCESSION",
           "summary_key": "evidence.ep004.diversion_contract.summary",
-          "scopes": ["MOTIVE", "OWNERSHIP"],
-          "detail": { "benefit": "MINING_RIGHTS" },
+          "scopes": [
+            "MOTIVE",
+            "OWNERSHIP"
+          ],
+          "detail": {
+            "benefit": "MINING_RIGHTS"
+          },
           "confidence": 1,
-          "contradicts_claim_ids": ["clm_ep004_why"]
+          "contradicts_claim_ids": [
+            "clm_ep004_why"
+          ]
         }
       ],
-      "not_proven_keys": ["evidence.ep004.diversion_contract.not_bypass_method"]
+      "not_proven_keys": [
+        "evidence.ep004.diversion_contract.not_bypass_method"
+      ]
     },
     {
       "evidence_id": "ev_ep004_platform_manifest",
       "type": "VIP_PLATFORM_MANIFEST",
       "title_key": "evidence.ep004.platform_manifest.title",
-      "acquire": { "node": "node_ep004_fallen_hero_start", "method": "STARTING" },
+      "acquire": {
+        "node": "node_ep004_fallen_hero_start",
+        "method": "STARTING"
+      },
       "source_category": "DOCUMENT",
       "independence": {
         "source_id": "source_ep004_platform_dispatch",
         "group": "DOCUMENT",
         "derived_from": null
       },
-      "grade": { "initial": "B", "upgrades": [] },
-      "integrity": { "initial": "INTACT" },
+      "grade": {
+        "initial": "B",
+        "upgrades": []
+      },
+      "integrity": {
+        "initial": "INTACT"
+      },
       "observations": [
         {
           "observation_id": "observation_ep004_platform_manifest",
@@ -647,28 +924,49 @@
           "location_id": "ent_ep004_vip_gate",
           "predicate": "MANIFEST_PLACES_HERO_AT_VIP_GATE",
           "summary_key": "evidence.ep004.platform_manifest.summary",
-          "scopes": ["LOCATION", "PRESENCE"],
-          "detail": { "platform": "VIP_GATE", "entry": "ROUTE_APPROVAL" },
-          "time": { "from": "01:30", "to": "01:38" },
+          "scopes": [
+            "LOCATION",
+            "PRESENCE"
+          ],
+          "detail": {
+            "platform": "VIP_GATE",
+            "entry": "ROUTE_APPROVAL"
+          },
+          "time": {
+            "from": "01:30",
+            "to": "01:38"
+          },
           "confidence": 0.9,
-          "contradicts_claim_ids": ["clm_ep004_fallen_hero_where"]
+          "contradicts_claim_ids": [
+            "clm_ep004_fallen_hero_where"
+          ]
         }
       ],
-      "not_proven_keys": ["evidence.ep004.platform_manifest.not_payment"]
+      "not_proven_keys": [
+        "evidence.ep004.platform_manifest.not_payment"
+      ]
     },
     {
       "evidence_id": "ev_ep004_signal_switch_log",
       "type": "SIGNAL_SWITCH_LOG",
       "title_key": "evidence.ep004.signal_switch_log.title",
-      "acquire": { "node": "node_ep004_fallen_hero_start", "method": "STARTING" },
+      "acquire": {
+        "node": "node_ep004_fallen_hero_start",
+        "method": "STARTING"
+      },
       "source_category": "DIGITAL",
       "independence": {
         "source_id": "source_ep004_signal_interlock",
         "group": "DIGITAL",
         "derived_from": null
       },
-      "grade": { "initial": "A", "upgrades": [] },
-      "integrity": { "initial": "INTACT" },
+      "grade": {
+        "initial": "A",
+        "upgrades": []
+      },
+      "integrity": {
+        "initial": "INTACT"
+      },
       "observations": [
         {
           "observation_id": "observation_ep004_signal_switch_log",
@@ -676,24 +974,48 @@
           "location_id": "ent_ep004_vip_gate",
           "predicate": "HERO_TRIGGERED_MANUAL_ROUTE_SWITCH",
           "summary_key": "evidence.ep004.signal_switch_log.summary",
-          "scopes": ["ROUTE", "ACTION"],
-          "detail": { "switch_mode": "MANUAL_OVERRIDE", "interlock": "BYPASSED" },
-          "time": { "from": "01:30", "to": "01:38" },
+          "scopes": [
+            "ROUTE",
+            "ACTION"
+          ],
+          "detail": {
+            "switch_mode": "MANUAL_OVERRIDE",
+            "interlock": "BYPASSED"
+          },
+          "time": {
+            "from": "01:30",
+            "to": "01:38"
+          },
           "confidence": 1,
-          "contradicts_claim_ids": ["clm_ep004_how"]
+          "contradicts_claim_ids": [
+            "clm_ep004_how"
+          ]
         },
         {
           "observation_id": "observation_ep004_signal_switch_sequence",
           "predicate": "SIGNAL_SWITCH_FOLLOWS_VIP_ARRIVAL",
           "summary_key": "evidence.ep004.signal_switch_log.sequence",
-          "scopes": ["TIME", "SEQUENCE"],
-          "detail": { "arrival_order": 1, "approval_order": 2 },
-          "time": { "from": "01:30", "to": "01:38" },
+          "scopes": [
+            "TIME",
+            "SEQUENCE"
+          ],
+          "detail": {
+            "arrival_order": 1,
+            "approval_order": 2
+          },
+          "time": {
+            "from": "01:30",
+            "to": "01:38"
+          },
           "confidence": 1,
-          "supports_claim_ids": ["clm_ep004_fallen_hero_when"]
+          "supports_claim_ids": [
+            "clm_ep004_fallen_hero_when"
+          ]
         }
       ],
-      "not_proven_keys": ["evidence.ep004.signal_switch_log.not_motive"]
+      "not_proven_keys": [
+        "evidence.ep004.signal_switch_log.not_motive"
+      ]
     }
   ],
   "proof_rules": [
@@ -702,62 +1024,97 @@
       "target_claim_id": "clm_ep004_who",
       "direction": "CONTRADICT",
       "requirements": {
-        "required_scopes": ["IDENTITY", "ACTION"],
+        "required_scopes": [
+          "IDENTITY",
+          "ACTION"
+        ],
         "minimum_confidence": 0.8,
         "minimum_independent_sources": 1,
         "require_integrity": true
       },
-      "guaranteed_evidence_sets": [["ev_ep004_wrench_imprint"]]
+      "guaranteed_evidence_sets": [
+        [
+          "ev_ep004_wrench_imprint"
+        ]
+      ]
     },
     {
       "rule_id": "rule_ep004_when",
       "target_claim_id": "clm_ep004_when",
       "direction": "CONTRADICT",
       "requirements": {
-        "required_scopes": ["TIME", "SEQUENCE"],
+        "required_scopes": [
+          "TIME",
+          "SEQUENCE"
+        ],
         "minimum_confidence": 0.8,
         "minimum_independent_sources": 1,
         "require_integrity": true
       },
-      "guaranteed_evidence_sets": [["ev_ep004_heat_clock"]]
+      "guaranteed_evidence_sets": [
+        [
+          "ev_ep004_heat_clock"
+        ]
+      ]
     },
     {
       "rule_id": "rule_ep004_where",
       "target_claim_id": "clm_ep004_where",
       "direction": "CONTRADICT",
       "requirements": {
-        "required_scopes": ["LOCATION", "PRESENCE"],
+        "required_scopes": [
+          "LOCATION",
+          "PRESENCE"
+        ],
         "minimum_confidence": 0.8,
         "minimum_independent_sources": 1,
         "require_integrity": true
       },
-      "guaranteed_evidence_sets": [["ev_ep004_corridor_lens"]]
+      "guaranteed_evidence_sets": [
+        [
+          "ev_ep004_corridor_lens"
+        ]
+      ]
     },
     {
       "rule_id": "rule_ep004_what",
       "target_claim_id": "clm_ep004_what",
       "direction": "CONTRADICT",
       "requirements": {
-        "required_scopes": ["ACTION", "INTEGRITY"],
+        "required_scopes": [
+          "ACTION",
+          "INTEGRITY"
+        ],
         "minimum_confidence": 0.8,
         "minimum_independent_sources": 1,
         "require_integrity": true
       },
-      "guaranteed_evidence_sets": [["ev_ep004_audio_cache"]]
+      "guaranteed_evidence_sets": [
+        [
+          "ev_ep004_audio_cache"
+        ]
+      ]
     },
     {
       "rule_id": "rule_ep004_how",
       "target_claim_id": "clm_ep004_how",
       "direction": "CONTRADICT",
       "requirements": {
-        "required_scopes": ["ROUTE", "ACTION"],
+        "required_scopes": [
+          "ROUTE",
+          "ACTION"
+        ],
         "minimum_confidence": 0.8,
         "minimum_independent_sources": 1,
         "require_integrity": true
       },
       "guaranteed_evidence_sets": [
-        ["ev_ep004_vip_ticket_trace"],
-        ["ev_ep004_signal_switch_log"]
+        [
+          "ev_ep004_vip_ticket_trace"
+        ],
+        [
+          "ev_ep004_signal_switch_log"
+        ]
       ]
     },
     {
@@ -765,39 +1122,60 @@
       "target_claim_id": "clm_ep004_why",
       "direction": "CONTRADICT",
       "requirements": {
-        "required_scopes": ["MOTIVE", "OWNERSHIP"],
+        "required_scopes": [
+          "MOTIVE",
+          "OWNERSHIP"
+        ],
         "minimum_confidence": 0.8,
         "minimum_independent_sources": 1,
         "require_integrity": true
       },
-      "guaranteed_evidence_sets": [["ev_ep004_diversion_contract"]]
+      "guaranteed_evidence_sets": [
+        [
+          "ev_ep004_diversion_contract"
+        ]
+      ]
     },
     {
       "rule_id": "rule_ep004_fallen_hero_where",
       "target_claim_id": "clm_ep004_fallen_hero_where",
       "direction": "CONTRADICT",
       "requirements": {
-        "required_scopes": ["LOCATION", "PRESENCE", "ROUTE", "ACTION"],
+        "required_scopes": [
+          "LOCATION",
+          "PRESENCE",
+          "ROUTE",
+          "ACTION"
+        ],
         "minimum_confidence": 0.8,
         "minimum_independent_sources": 2,
         "require_integrity": true
       },
-      "guaranteed_evidence_sets": [[
-        "ev_ep004_platform_manifest",
-        "ev_ep004_signal_switch_log"
-      ]]
+      "guaranteed_evidence_sets": [
+        [
+          "ev_ep004_platform_manifest",
+          "ev_ep004_signal_switch_log"
+        ]
+      ]
     },
     {
       "rule_id": "rule_ep004_fallen_hero_when",
       "target_claim_id": "clm_ep004_fallen_hero_when",
       "direction": "SUPPORT",
       "requirements": {
-        "required_scopes": ["TIME", "SEQUENCE"],
+        "required_scopes": [
+          "TIME",
+          "SEQUENCE"
+        ],
         "minimum_confidence": 0.8,
         "minimum_independent_sources": 1,
         "require_integrity": true
       },
-      "guaranteed_evidence_sets": [["ev_ep004_signal_switch_log"]]
+      "guaranteed_evidence_sets": [
+        [
+          "ev_ep004_signal_switch_log"
+        ]
+      ]
     }
   ],
   "encounters": [
@@ -822,13 +1200,22 @@
             "clm_ep004_dwarf_how",
             "clm_ep004_dwarf_why"
           ],
-          "shields": [{ "claim_id": "clm_ep004_who", "durability": 2 }]
+          "shields": [
+            {
+              "claim_id": "clm_ep004_who",
+              "durability": 2
+            }
+          ]
         }
       ],
       "flow_nodes": [
         {
           "node_id": "node_ep004_dwarf_start",
-          "enter_conditions": [{ "type": "ALWAYS" }],
+          "enter_conditions": [
+            {
+              "type": "ALWAYS"
+            }
+          ],
           "reveal_claim_ids": [
             "clm_ep004_who",
             "clm_ep004_when",
@@ -859,8 +1246,14 @@
             "target_selector": {
               "scope": "VISIBLE",
               "exclude_states": {
-                "epistemic": ["SUPPORTED", "REFUTED"],
-                "presentation": ["DISTORTED", "LOCKED"]
+                "epistemic": [
+                  "SUPPORTED",
+                  "REFUTED"
+                ],
+                "presentation": [
+                  "DISTORTED",
+                  "LOCKED"
+                ]
               },
               "count": 2,
               "selection": "MOST_RECENT"
@@ -868,7 +1261,9 @@
             "duration_turns": 1
           },
           "counterplay": {
-            "allowed_intents": ["CLARIFY"],
+            "allowed_intents": [
+              "CLARIFY"
+            ],
             "partner_skills": [],
             "always_available": true
           },
@@ -888,8 +1283,14 @@
             "target_selector": {
               "scope": "VISIBLE",
               "exclude_states": {
-                "epistemic": ["SUPPORTED", "REFUTED"],
-                "presentation": ["DISTORTED", "LOCKED"]
+                "epistemic": [
+                  "SUPPORTED",
+                  "REFUTED"
+                ],
+                "presentation": [
+                  "DISTORTED",
+                  "LOCKED"
+                ]
               },
               "count": 2,
               "selection": "MOST_RECENT"
@@ -897,7 +1298,9 @@
             "duration_turns": 1
           },
           "counterplay": {
-            "allowed_intents": ["CLARIFY"],
+            "allowed_intents": [
+              "CLARIFY"
+            ],
             "partner_skills": [],
             "always_available": true
           },
@@ -930,14 +1333,24 @@
           "outcome_id": "outcome_ep004_dwarf_best",
           "grade": "BEST_RESOLUTION",
           "priority": 10,
-          "conditions": [{ "type": "ALL_REQUIRED_OBJECTIVES" }],
-          "rewards": { "dp": 25 }
+          "conditions": [
+            {
+              "type": "ALL_REQUIRED_OBJECTIVES"
+            }
+          ],
+          "rewards": {
+            "dp": 25
+          }
         },
         {
           "outcome_id": "outcome_ep004_dwarf_partial",
           "grade": "PARTIAL_RESOLUTION",
           "priority": 5,
-          "conditions": [{ "type": "SOME_REQUIRED_OBJECTIVES" }]
+          "conditions": [
+            {
+              "type": "SOME_REQUIRED_OBJECTIVES"
+            }
+          ]
         }
       ]
     },
@@ -962,13 +1375,22 @@
             "clm_ep004_cyclops_how",
             "clm_ep004_cyclops_why"
           ],
-          "shields": [{ "claim_id": "clm_ep004_where", "durability": 2 }]
+          "shields": [
+            {
+              "claim_id": "clm_ep004_where",
+              "durability": 2
+            }
+          ]
         }
       ],
       "flow_nodes": [
         {
           "node_id": "node_ep004_cyclops_start",
-          "enter_conditions": [{ "type": "ALWAYS" }],
+          "enter_conditions": [
+            {
+              "type": "ALWAYS"
+            }
+          ],
           "reveal_claim_ids": [
             "clm_ep004_cyclops_who",
             "clm_ep004_cyclops_when",
@@ -978,7 +1400,10 @@
             "clm_ep004_cyclops_why"
           ],
           "revise_claim_ids": [],
-          "open_route_ids": ["route_ep004_cyclops_where", "route_ep004_cyclops_how"],
+          "open_route_ids": [
+            "route_ep004_cyclops_where",
+            "route_ep004_cyclops_how"
+          ],
           "activate_modifiers": [],
           "deactivate_modifiers": [],
           "reaction_key": "reaction.ep004.cyclops.start",
@@ -997,7 +1422,10 @@
             "delta": 2
           },
           "counterplay": {
-            "allowed_intents": ["SPECIAL", "RECOVER"],
+            "allowed_intents": [
+              "SPECIAL",
+              "RECOVER"
+            ],
             "partner_skills": [],
             "always_available": true
           },
@@ -1030,14 +1458,24 @@
           "outcome_id": "outcome_ep004_cyclops_best",
           "grade": "BEST_RESOLUTION",
           "priority": 10,
-          "conditions": [{ "type": "ALL_REQUIRED_OBJECTIVES" }],
-          "rewards": { "dp": 25 }
+          "conditions": [
+            {
+              "type": "ALL_REQUIRED_OBJECTIVES"
+            }
+          ],
+          "rewards": {
+            "dp": 25
+          }
         },
         {
           "outcome_id": "outcome_ep004_cyclops_partial",
           "grade": "PARTIAL_RESOLUTION",
           "priority": 5,
-          "conditions": [{ "type": "SOME_REQUIRED_OBJECTIVES" }]
+          "conditions": [
+            {
+              "type": "SOME_REQUIRED_OBJECTIVES"
+            }
+          ]
         }
       ]
     },
@@ -1060,7 +1498,12 @@
             "clm_ep004_fallen_hero_where",
             "clm_ep004_how"
           ],
-          "shields": [{ "claim_id": "clm_ep004_how", "durability": 3 }]
+          "shields": [
+            {
+              "claim_id": "clm_ep004_how",
+              "durability": 3
+            }
+          ]
         },
         {
           "round_id": "round_ep004_fallen_hero_02",
@@ -1068,13 +1511,22 @@
             "clm_ep004_fallen_hero_what",
             "clm_ep004_why"
           ],
-          "shields": [{ "claim_id": "clm_ep004_why", "durability": 2 }]
+          "shields": [
+            {
+              "claim_id": "clm_ep004_why",
+              "durability": 2
+            }
+          ]
         }
       ],
       "flow_nodes": [
         {
           "node_id": "node_ep004_fallen_hero_start",
-          "enter_conditions": [{ "type": "ALWAYS" }],
+          "enter_conditions": [
+            {
+              "type": "ALWAYS"
+            }
+          ],
           "reveal_claim_ids": [
             "clm_ep004_fallen_hero_who",
             "clm_ep004_fallen_hero_when",
@@ -1084,7 +1536,10 @@
             "clm_ep004_why"
           ],
           "revise_claim_ids": [],
-          "open_route_ids": ["route_ep004_fallen_hero_how", "route_ep004_sponsor"],
+          "open_route_ids": [
+            "route_ep004_fallen_hero_how",
+            "route_ep004_sponsor"
+          ],
           "activate_modifiers": [],
           "deactivate_modifiers": [],
           "reaction_key": "reaction.ep004.fallen_hero.start",
@@ -1104,7 +1559,9 @@
             "clm_ep004_fallen_hero_what",
             "clm_ep004_why"
           ],
-          "revise_claim_ids": ["clm_ep004_how"],
+          "revise_claim_ids": [
+            "clm_ep004_how"
+          ],
           "open_route_ids": [],
           "activate_modifiers": [],
           "deactivate_modifiers": [],
@@ -1122,14 +1579,20 @@
             "type": "SEAL_EVIDENCE",
             "target_selector": {
               "scope": "OWNED",
-              "ids": ["ev_ep004_vip_ticket_trace"],
+              "ids": [
+                "ev_ep004_vip_ticket_trace"
+              ],
               "count": 1,
               "selection": "DETERMINISTIC_BY_INDEX"
             },
             "duration_turns": 2
           },
           "counterplay": {
-            "allowed_intents": ["FORENSIC", "CONFIRM", "CROSS_CHECK"],
+            "allowed_intents": [
+              "FORENSIC",
+              "CONFIRM",
+              "CROSS_CHECK"
+            ],
             "partner_skills": [],
             "always_available": true
           },
@@ -1173,14 +1636,27 @@
           "outcome_id": "outcome_ep004_fallen_hero_best",
           "grade": "BEST_RESOLUTION",
           "priority": 10,
-          "conditions": [{ "type": "ALL_REQUIRED_OBJECTIVES" }],
-          "rewards": { "dp": 40, "flags": { "F-13": true } }
+          "conditions": [
+            {
+              "type": "ALL_REQUIRED_OBJECTIVES"
+            }
+          ],
+          "rewards": {
+            "dp": 40,
+            "flags": {
+              "F-13": true
+            }
+          }
         },
         {
           "outcome_id": "outcome_ep004_fallen_hero_partial",
           "grade": "PARTIAL_RESOLUTION",
           "priority": 5,
-          "conditions": [{ "type": "SOME_REQUIRED_OBJECTIVES" }]
+          "conditions": [
+            {
+              "type": "SOME_REQUIRED_OBJECTIVES"
+            }
+          ]
         }
       ]
     }
@@ -1190,48 +1666,169 @@
       "event_id": "event_ep004_machine_room",
       "node": "node_ep004_machine_room",
       "title_key": "event.ep004.machine_room.title",
-      "description_key": "event.event_ep004_machine_room.description",
-      "pattern": "C",
-      "spots": [
+      "description_key": "event.ep004.machine_room.description",
+      "pattern": "D",
+      "fallback_gains": [
         {
-          "spot_id": "spot_ep004_safety_panel",
-          "label_key": "event.ep004.machine_room.safety_panel",
-          "effects": [{ "type": "GRANT_EVIDENCE", "target": "ev_ep004_wrench_imprint" }]
-        },
-        {
-          "spot_id": "spot_ep004_thermal_dial",
-          "label_key": "event.ep004.machine_room.thermal_dial",
-          "effects": [{ "type": "GRANT_EVIDENCE", "target": "ev_ep004_heat_clock" }]
-        },
-        {
-          "spot_id": "spot_ep004_audio_rack",
-          "label_key": "event.ep004.machine_room.audio_rack",
-          "effects": [{ "type": "GRANT_EVIDENCE", "target": "ev_ep004_audio_cache" }]
+          "type": "ADJUST_RESOURCE",
+          "resource": "dp",
+          "delta": 6
         }
       ],
-      "attempt_limit": 3,
-      "per_attempt_costs": { "stress": 3 }
-    },
-    {
-      "event_id": "event_ep004_ticket_trade",
-      "node": "node_ep004_ticket_trade",
-      "title_key": "event.ep004.ticket_trade.title",
-      "description_key": "event.event_ep004_ticket_trade.description",
-      "pattern": "A",
-      "choices": [
+      "options": [
         {
-          "choice_id": "choice_ep004_buy_vip_ticket",
-          "label_key": "event.ep004.ticket_trade.buy",
-          "costs": { "dp": 5 },
-          "gains": [{ "type": "GRANT_EVIDENCE", "target": "ev_ep004_vip_ticket_trace" }],
-          "sets_flags": { "F-12": false }
+          "option_id": "option_ep004_file_the_teeth",
+          "label_key": "event.ep004.machine_room.file_the_teeth",
+          "autoplay_priority": 10,
+          "costs": {
+            "stress": 4
+          },
+          "eligible_intents": [
+            "CONTRADICT"
+          ],
+          "tuning": {
+            "composure_damage_delta": 3
+          },
+          "effects": []
         },
         {
-          "choice_id": "choice_ep004_question_broker",
-          "label_key": "event.ep004.ticket_trade.question",
-          "costs": { "stress": 3 },
-          "gains": [{ "type": "GRANT_EVIDENCE", "target": "ev_ep004_diversion_contract" }],
-          "sets_flags": { "F-12": true }
+          "option_id": "option_ep004_regrind_the_pin",
+          "label_key": "event.ep004.machine_room.regrind_the_pin",
+          "autoplay_priority": 5,
+          "costs": {
+            "dp": 4
+          },
+          "eligible_intents": [
+            "QUERY",
+            "CLARIFY"
+          ],
+          "tuning": {
+            "cp_delta": -1
+          },
+          "effects": []
+        },
+        {
+          "option_id": "option_ep004_soften_the_grip",
+          "label_key": "event.ep004.machine_room.soften_the_grip",
+          "autoplay_priority": 1,
+          "costs": {
+            "stress": 2
+          },
+          "eligible_intents": [
+            "PRESSURE"
+          ],
+          "tuning": {
+            "coercion_delta": -2
+          },
+          "effects": []
+        }
+      ]
+    },
+    {
+      "event_id": "event_ep004_broker_canvass",
+      "node": "node_ep004_broker_canvass",
+      "title_key": "event.ep004.canvass.title",
+      "description_key": "event.ep004.canvass.description",
+      "pattern": "E",
+      "attempt_limit": 2,
+      "per_attempt_costs": {
+        "stress": 2
+      },
+      "topics": [
+        {
+          "topic_id": "topic_ep004_broker_route",
+          "label_key": "event.ep004.canvass.broker_route",
+          "reveal_key": "event.ep004.canvass.broker_route_reveal",
+          "effects": [
+            {
+              "type": "SET_FLAG",
+              "target": "F-12",
+              "value": true
+            },
+            {
+              "type": "GRANT_EVIDENCE",
+              "target": "ev_ep004_diversion_contract"
+            }
+          ]
+        },
+        {
+          "topic_id": "topic_ep004_night_shift",
+          "label_key": "event.ep004.canvass.night_shift",
+          "reveal_key": "event.ep004.canvass.night_shift_reveal",
+          "effects": [
+            {
+              "type": "GRANT_EVIDENCE",
+              "target": "ev_ep004_platform_manifest"
+            }
+          ]
+        },
+        {
+          "topic_id": "topic_ep004_vip_car",
+          "label_key": "event.ep004.canvass.vip_car",
+          "reveal_key": "event.ep004.canvass.vip_car_reveal",
+          "effects": [
+            {
+              "type": "ADJUST_RESOURCE",
+              "resource": "dp",
+              "delta": 5
+            }
+          ]
+        }
+      ],
+      "cutscenes": [
+        {
+          "cutscene_id": "cutscene_ep004_canvass_close",
+          "timing": "AFTER",
+          "skippable": true,
+          "beats": [
+            {
+              "beat_id": "beat_ep004_canvass_leave",
+              "background_asset_key": "배경/심문실/마젠타",
+              "speaker_name_key": "entity.ep004.dwarf.name",
+              "text_key": "cutscene.ep004.canvass.leave",
+              "treatment": "FADE_OUT",
+              "duration_ms": 2000,
+              "portraits": [
+                {
+                  "side": "RIGHT",
+                  "asset_key": "portrait/김태훈/base",
+                  "dim": false
+                }
+              ]
+            },
+            {
+              "beat_id": "beat_ep004_canvass_decide",
+              "text_key": "cutscene.ep004.canvass.decide",
+              "treatment": "NONE",
+              "duration_ms": 2400,
+              "choices": [
+                {
+                  "choice_id": "choice_ep004_log_the_lead",
+                  "label_key": "cutscene.ep004.canvass.log_the_lead",
+                  "sets_flags": {},
+                  "gains": [
+                    {
+                      "type": "ADJUST_RESOURCE",
+                      "resource": "trust",
+                      "delta": 1
+                    }
+                  ]
+                },
+                {
+                  "choice_id": "choice_ep004_keep_it_quiet",
+                  "label_key": "cutscene.ep004.canvass.keep_it_quiet",
+                  "sets_flags": {},
+                  "gains": [
+                    {
+                      "type": "ADJUST_RESOURCE",
+                      "resource": "dp",
+                      "delta": 6
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
         }
       ]
     }
@@ -1243,8 +1840,12 @@
       "default_value": false,
       "set_by": [
         {
-          "event": "event_ep004_ticket_trade",
-          "choice": "choice_ep004_question_broker",
+          "event": "event_ep004_broker_canvass",
+          "condition": {
+            "type": "FLAG_EQUALS",
+            "flag_id": "F-12",
+            "value": true
+          },
           "value": true
         }
       ],
@@ -1285,105 +1886,277 @@
     "speaker_profiles": {
       "ent_ep004_dwarf": {
         "race": "DWARF",
-        "personality": ["METICULOUS", "PRICKLY"],
+        "personality": [
+          "METICULOUS",
+          "PRICKLY"
+        ],
         "speech": "TECHNICAL_GRUFF",
-        "forbidden_expressions": ["범인", "정답"]
+        "forbidden_expressions": [
+          "범인",
+          "정답"
+        ]
       },
       "ent_ep004_cyclops": {
         "race": "CYCLOPS",
-        "personality": ["WATCHFUL", "RESERVED"],
+        "personality": [
+          "WATCHFUL",
+          "RESERVED"
+        ],
         "speech": "SLOW_OBSERVANT",
-        "forbidden_expressions": ["자백", "진범"]
+        "forbidden_expressions": [
+          "자백",
+          "진범"
+        ]
       },
       "ent_ep004_fallen_hero": {
         "race": "FALLEN_HERO",
-        "personality": ["COMMANDING", "DISILLUSIONED"],
+        "personality": [
+          "COMMANDING",
+          "DISILLUSIONED"
+        ],
         "speech": "FORMAL_HEROIC",
-        "forbidden_expressions": ["거짓말", "사실은"]
+        "forbidden_expressions": [
+          "거짓말",
+          "사실은"
+        ]
       }
     },
     "statements": {
       "clm_ep004_who": {
-        "fallback": ["안전 잠금을 푼 정비사는 내가 아니오. 내 공구는 누구나 빌릴 수 있지."],
-        "spans": [{ "claim_id": "clm_ep004_who", "start": 0, "end": 1 }]
+        "fallback": [
+          "안전 잠금을 푼 정비사는 내가 아니오. 내 공구는 누구나 빌릴 수 있지."
+        ],
+        "spans": [
+          {
+            "claim_id": "clm_ep004_who",
+            "start": 0,
+            "end": 1
+          }
+        ]
       },
       "clm_ep004_when": {
-        "fallback": ["압력 경보가 울리기 전에 내 기계실 근무는 끝났소."],
-        "spans": [{ "claim_id": "clm_ep004_when", "start": 0, "end": 1 }]
+        "fallback": [
+          "압력 경보가 울리기 전에 내 기계실 근무는 끝났소."
+        ],
+        "spans": [
+          {
+            "claim_id": "clm_ep004_when",
+            "start": 0,
+            "end": 1
+          }
+        ]
       },
       "clm_ep004_where": {
-        "fallback": ["경보가 난 뒤에도 나는 상부 관측실에서 움직이지 않았다."],
-        "spans": [{ "claim_id": "clm_ep004_where", "start": 0, "end": 1 }]
+        "fallback": [
+          "경보가 난 뒤에도 나는 상부 관측실에서 움직이지 않았다."
+        ],
+        "spans": [
+          {
+            "claim_id": "clm_ep004_where",
+            "start": 0,
+            "end": 1
+          }
+        ]
       },
       "clm_ep004_what": {
-        "fallback": ["음성 캐시에는 평범한 운행 안내만 남아 있었다."],
-        "spans": [{ "claim_id": "clm_ep004_what", "start": 0, "end": 1 }]
+        "fallback": [
+          "음성 캐시에는 평범한 운행 안내만 남아 있었다."
+        ],
+        "spans": [
+          {
+            "claim_id": "clm_ep004_what",
+            "start": 0,
+            "end": 1
+          }
+        ]
       },
       "clm_ep004_how": {
-        "fallback": ["VIP 우회 승인은 정식 검표 절차를 거쳐 처리되었다."],
-        "spans": [{ "claim_id": "clm_ep004_how", "start": 0, "end": 1 }]
+        "fallback": [
+          "VIP 우회 승인은 정식 검표 절차를 거쳐 처리되었다."
+        ],
+        "spans": [
+          {
+            "claim_id": "clm_ep004_how",
+            "start": 0,
+            "end": 1
+          }
+        ]
       },
       "clm_ep004_why": {
-        "fallback": ["노선이 바뀐다고 해서 내게 돌아올 이익은 없다."],
-        "spans": [{ "claim_id": "clm_ep004_why", "start": 0, "end": 1 }]
+        "fallback": [
+          "노선이 바뀐다고 해서 내게 돌아올 이익은 없다."
+        ],
+        "spans": [
+          {
+            "claim_id": "clm_ep004_why",
+            "start": 0,
+            "end": 1
+          }
+        ]
       },
       "clm_ep004_dwarf_where": {
-        "fallback": ["압력 경보 뒤에는 객실에 머물렀소."],
-        "spans": [{ "claim_id": "clm_ep004_dwarf_where", "start": 0, "end": 1 }]
+        "fallback": [
+          "압력 경보 뒤에는 객실에 머물렀소."
+        ],
+        "spans": [
+          {
+            "claim_id": "clm_ep004_dwarf_where",
+            "start": 0,
+            "end": 1
+          }
+        ]
       },
       "clm_ep004_dwarf_what": {
-        "fallback": ["그날 점검한 것은 압력계뿐이었소."],
-        "spans": [{ "claim_id": "clm_ep004_dwarf_what", "start": 0, "end": 1 }]
+        "fallback": [
+          "그날 점검한 것은 압력계뿐이었소."
+        ],
+        "spans": [
+          {
+            "claim_id": "clm_ep004_dwarf_what",
+            "start": 0,
+            "end": 1
+          }
+        ]
       },
       "clm_ep004_dwarf_how": {
-        "fallback": ["안전 잠금 키를 사용하지 않았소."],
-        "spans": [{ "claim_id": "clm_ep004_dwarf_how", "start": 0, "end": 1 }]
+        "fallback": [
+          "안전 잠금 키를 사용하지 않았소."
+        ],
+        "spans": [
+          {
+            "claim_id": "clm_ep004_dwarf_how",
+            "start": 0,
+            "end": 1
+          }
+        ]
       },
       "clm_ep004_dwarf_why": {
-        "fallback": ["기관 설정을 바꿀 이유가 없었소."],
-        "spans": [{ "claim_id": "clm_ep004_dwarf_why", "start": 0, "end": 1 }]
+        "fallback": [
+          "기관 설정을 바꿀 이유가 없었소."
+        ],
+        "spans": [
+          {
+            "claim_id": "clm_ep004_dwarf_why",
+            "start": 0,
+            "end": 1
+          }
+        ]
       },
       "clm_ep004_cyclops_who": {
-        "fallback": ["VIP 통로에서 몰락한 영웅을 만나지 않았다."],
-        "spans": [{ "claim_id": "clm_ep004_cyclops_who", "start": 0, "end": 1 }]
+        "fallback": [
+          "VIP 통로에서 몰락한 영웅을 만나지 않았다."
+        ],
+        "spans": [
+          {
+            "claim_id": "clm_ep004_cyclops_who",
+            "start": 0,
+            "end": 1
+          }
+        ]
       },
       "clm_ep004_cyclops_when": {
-        "fallback": ["경고 음성이 사라질 때는 관측 기록을 쓰고 있었다."],
-        "spans": [{ "claim_id": "clm_ep004_cyclops_when", "start": 0, "end": 1 }]
+        "fallback": [
+          "경고 음성이 사라질 때는 관측 기록을 쓰고 있었다."
+        ],
+        "spans": [
+          {
+            "claim_id": "clm_ep004_cyclops_when",
+            "start": 0,
+            "end": 1
+          }
+        ]
       },
       "clm_ep004_cyclops_how": {
-        "fallback": ["경고 음성은 보존 기한 뒤 자동 정리되었다."],
-        "spans": [{ "claim_id": "clm_ep004_cyclops_how", "start": 0, "end": 1 }]
+        "fallback": [
+          "경고 음성은 보존 기한 뒤 자동 정리되었다."
+        ],
+        "spans": [
+          {
+            "claim_id": "clm_ep004_cyclops_how",
+            "start": 0,
+            "end": 1
+          }
+        ]
       },
       "clm_ep004_cyclops_why": {
-        "fallback": ["경고 음성을 지울 이유가 없었다."],
-        "spans": [{ "claim_id": "clm_ep004_cyclops_why", "start": 0, "end": 1 }]
+        "fallback": [
+          "경고 음성을 지울 이유가 없었다."
+        ],
+        "spans": [
+          {
+            "claim_id": "clm_ep004_cyclops_why",
+            "start": 0,
+            "end": 1
+          }
+        ]
       },
       "clm_ep004_fallen_hero_who": {
-        "fallback": ["VIP 우회 승인은 다른 검표관이 내렸네."],
-        "spans": [{ "claim_id": "clm_ep004_fallen_hero_who", "start": 0, "end": 1 }]
+        "fallback": [
+          "VIP 우회 승인은 다른 검표관이 내렸네."
+        ],
+        "spans": [
+          {
+            "claim_id": "clm_ep004_fallen_hero_who",
+            "start": 0,
+            "end": 1
+          }
+        ]
       },
       "clm_ep004_fallen_hero_when": {
-        "fallback": ["VIP가 도착한 뒤에야 승인 기록을 작성했네."],
-        "spans": [{ "claim_id": "clm_ep004_fallen_hero_when", "start": 0, "end": 1 }]
+        "fallback": [
+          "VIP가 도착한 뒤에야 승인 기록을 작성했네."
+        ],
+        "spans": [
+          {
+            "claim_id": "clm_ep004_fallen_hero_when",
+            "start": 0,
+            "end": 1
+          }
+        ]
       },
       "clm_ep004_fallen_hero_where": {
-        "fallback": ["승인 시간에는 VIP 승강장에 가지 않았네."],
-        "spans": [{ "claim_id": "clm_ep004_fallen_hero_where", "start": 0, "end": 1 }]
+        "fallback": [
+          "승인 시간에는 VIP 승강장에 가지 않았네."
+        ],
+        "spans": [
+          {
+            "claim_id": "clm_ep004_fallen_hero_where",
+            "start": 0,
+            "end": 1
+          }
+        ]
       },
       "clm_ep004_fallen_hero_what": {
-        "fallback": ["VIP에게서 받은 것은 승차권 원본뿐이었네."],
-        "spans": [{ "claim_id": "clm_ep004_fallen_hero_what", "start": 0, "end": 1 }]
+        "fallback": [
+          "VIP에게서 받은 것은 승차권 원본뿐이었네."
+        ],
+        "spans": [
+          {
+            "claim_id": "clm_ep004_fallen_hero_what",
+            "start": 0,
+            "end": 1
+          }
+        ]
       }
     },
     "reactions": {
-      "reaction.ep004.dwarf.start": ["공구 자국만으로 손잡은 사람까지 가려낼 수는 없소."],
-      "reaction.ep004.cyclops.start": ["한 장면과 복원 음성만으로 내 동선을 모두 안다고 할 수 없다."],
-      "reaction.ep004.fallen_hero.start": ["수동 검표가 곧 부정한 우회라는 결론은 성급하군."]
+      "reaction.ep004.dwarf.start": [
+        "공구 자국만으로 손잡은 사람까지 가려낼 수는 없소."
+      ],
+      "reaction.ep004.cyclops.start": [
+        "한 장면과 복원 음성만으로 내 동선을 모두 안다고 할 수 없다."
+      ],
+      "reaction.ep004.fallen_hero.start": [
+        "수동 검표가 곧 부정한 우회라는 결론은 성급하군."
+      ]
     },
     "confession": {
-      "full": ["안전 잠금과 음성 삭제, VIP 우회권 거래의 전말을 모두 밝히겠다."],
-      "coerced": ["그만두게. 원하는 결론을 기록하도록 해."]
+      "full": [
+        "안전 잠금과 음성 삭제, VIP 우회권 거래의 전말을 모두 밝히겠다."
+      ],
+      "coerced": [
+        "그만두게. 원하는 결론을 기록하도록 해."
+      ]
     }
   }
 }

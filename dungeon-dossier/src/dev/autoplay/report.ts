@@ -8,11 +8,21 @@ import { RunStripSchema } from '../../engine/domain';
 export const AUTOPLAY_REPORT_SCHEMA_VERSION = '1.0';
 export const AUTOPLAY_REPORT_ELEMENT_ID = 'dd-autoplay-report';
 
-/** Default product acceptance: a 150s cinematic run with a +/-15s tolerance. */
+/**
+ * The single source of the video acceptance contract (VIDEO-P0-06).
+ *
+ * The product contract is "about 150 seconds", tolerated at +/-15s — NOT
+ * "never exceed 150s". Anything that needs the target (driver pacing, the HUD
+ * clock, report validation, docs) derives it from here so the two readings
+ * cannot drift apart again.
+ */
+export const VIDEO_TARGET_DURATION_SEC = 150;
+export const VIDEO_DURATION_TOLERANCE_SEC = 15;
+
 export const VIDEO_DURATION_ACCEPTANCE = Object.freeze({
-  targetDurationMs: 150_000,
-  minimumDurationMs: 135_000,
-  maximumDurationMs: 165_000,
+  targetDurationMs: VIDEO_TARGET_DURATION_SEC * 1_000,
+  minimumDurationMs: (VIDEO_TARGET_DURATION_SEC - VIDEO_DURATION_TOLERANCE_SEC) * 1_000,
+  maximumDurationMs: (VIDEO_TARGET_DURATION_SEC + VIDEO_DURATION_TOLERANCE_SEC) * 1_000,
   measurement: 'L2_WALL_CLOCK' as const,
 });
 
@@ -98,6 +108,8 @@ export interface AutoplayNodeReport {
   readonly grade?: string;
   readonly rewardOffered?: readonly string[];
   readonly rewardClaimed?: string;
+  /** Present when this node ended in a defeat screen. */
+  readonly deadSceneReason?: string;
   readonly flagsSet: readonly string[];
   readonly durationMs: number;
   readonly warnings: readonly string[];

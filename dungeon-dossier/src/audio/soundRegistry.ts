@@ -25,7 +25,14 @@ export const BGM_IDS = [
 ] as const;
 export type BgmId = (typeof BGM_IDS)[number];
 
-export const STINGER_IDS = ['sting_confession', 'sting_arrest'] as const;
+export const STINGER_IDS = [
+  'sting_confession',
+  'sting_arrest',
+  'sting_collapse',
+  'sting_gavel',
+  'sting_clock',
+  'sting_file_close',
+] as const;
 export type StingerId = (typeof STINGER_IDS)[number];
 
 export const SOUND_IDS = [...SFX_IDS, ...BGM_IDS, ...STINGER_IDS] as const;
@@ -71,6 +78,10 @@ export const SOUND_REGISTRY = {
   bgm_ending: bgm('bgm_ending'),
   sting_confession: stinger('sting_confession'),
   sting_arrest: stinger('sting_arrest'),
+  sting_collapse: stinger('sting_collapse'),
+  sting_gavel: stinger('sting_gavel'),
+  sting_clock: stinger('sting_clock'),
+  sting_file_close: stinger('sting_file_close'),
 } satisfies Readonly<Record<SoundId, LogicalSoundDefinition>>;
 
 const discoveredOggSources = import.meta.glob<string>(

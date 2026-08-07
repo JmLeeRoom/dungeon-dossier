@@ -1,7 +1,6 @@
 import type {
   FlagDefinition,
   GradesDefinition,
-  NonCombatEventDefinition,
   RewardsDefinition,
 } from '../engine/domain';
 import {
@@ -37,14 +36,14 @@ export interface FinishEncounterInput {
   readonly gradeMetrics: EncounterGradeMetrics;
   readonly encounterState?: Parameters<typeof completeEncounterNode>[1]['encounterState'];
   readonly outcomeRewards?: Parameters<typeof completeEncounterNode>[1]['outcomeRewards'];
+  readonly failurePolicy?: Parameters<typeof completeEncounterNode>[1]['failurePolicy'];
 }
 
-export interface FinishEventInput {
-  readonly choiceId?: string;
-  readonly eventDefinition: NonCombatEventDefinition;
-  readonly placement?: Readonly<Record<string, string>>;
-  readonly investigatedSpotIds?: readonly string[];
-}
+/** Mirrors the run layer's own event input minus the strip it already owns. */
+export type FinishEventInput = Omit<
+  Parameters<typeof completeEventNode>[1],
+  'strip' | 'flagDefinitions'
+>;
 
 /** App-owned run orchestration. Engine functions stay pure; each boundary auto-saves. */
 export class RunSession {
@@ -74,6 +73,9 @@ export class RunSession {
       ...(input.encounterState === undefined
         ? {}
         : { encounterState: input.encounterState }),
+      ...(input.failurePolicy === undefined
+        ? {}
+        : { failurePolicy: input.failurePolicy }),
       ...(input.outcomeRewards === undefined
         ? {}
         : { outcomeRewards: input.outcomeRewards }),

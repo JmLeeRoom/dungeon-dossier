@@ -8,3 +8,4 @@ export * from './ProofEvaluator';
 export * from './ResolutionEffectApplier';
 export * from './resolutionTable';
 export * from './types';
+export * from './selectProofRule';

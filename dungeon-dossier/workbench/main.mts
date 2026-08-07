@@ -1,6 +1,8 @@
 import {
+  DISTORTION_WARNING_THRESHOLD,
   degreesToRadians,
   radiansToDegrees,
+  transformDistortion,
 } from '../src/ui/core/assetManifest';
 import {
   IMAGE_SLOT_CHANGE_EVENT,
@@ -12,38 +14,64 @@ import {
 import {
   ASSET_MANIFEST_JSON_NAME,
   CANONICAL_SLOTS,
+  CHARACTER_PART_NAMES,
   PORTRAIT_PARTS_JSON_NAME,
   SLOT_IDS,
   STAGE_HEIGHT,
   STAGE_WIDTH,
+  WORKBENCH_CHARACTERS,
   applyWorkbenchDrag,
   canonicalDownloadName,
+  characterFromPartsManifest,
+  characterPartFileName,
+  characterPartHasOffset,
+  characterPartNames,
+  characterPartSlotId,
+  characterPartsJsonName,
   clampRect,
   createInitialWorkbenchState,
+  getCharacterPartImage,
+  getCharacterPartOffset,
   getPartsOffset,
   getSlotDefinition,
   getSlotScale,
   getSlotSourceDimension,
   isSlotId,
   isSlotLocked,
+  isWorkbenchCharacter,
   loadWorkbenchState,
   nudgeRect,
   patchRect,
   resetAllGeometry,
   resetSlotGeometry,
+  resolveSlotBinding,
+  resolveStageSlotImage,
   saveWorkbenchState,
   serializeAssetManifest,
+  serializeCharacterPartsManifest,
+  buildSlotTransform,
+  collectWorkbenchSaveRequest,
+  describeSaveError,
+  formatSaveSuccess,
   serializePortraitPartsManifest,
+  setSlotAspectLock,
+  setSlotSize,
   toggleSlotLock,
+  withActiveCharacter,
+  withCharacterPartOffset,
+  withImportedCharacterParts,
   withPartsOffset,
-  withSlotImage,
   withSlotRect,
   withSlotRotation,
   withSlotScale,
-  withoutSlotImage,
+  withStageSlotImage,
+  withoutStageSlotImage,
+  type CharacterPartName,
   type Rect,
   type SlotId,
   type WorkbenchDragMode,
+  type WorkbenchSaveRequest,
+  type WorkbenchSaveSuccess,
   type WorkbenchState,
 } from './model.mts';
 
@@ -83,8 +111,16 @@ const clearSelectedImageButton = requiredElement<HTMLButtonElement>('#clear-sele
 const clampSelectedGeometryButton = requiredElement<HTMLButtonElement>('#clamp-selected-geometry');
 const resetSelectedGeometryButton = requiredElement<HTMLButtonElement>('#reset-selected-geometry');
 const resetAllGeometryButton = requiredElement<HTMLButtonElement>('#reset-all-geometry');
+const saveToProjectButton = requiredElement<HTMLButtonElement>('#save-to-project');
 const downloadPartsJsonButton = requiredElement<HTMLButtonElement>('#download-parts-json');
 const downloadManifestButton = requiredElement<HTMLButtonElement>('#download-asset-manifest');
+const characterSelect = requiredElement<HTMLSelectElement>('#character-select');
+const characterPartsContainer = requiredElement<HTMLDivElement>('#character-parts');
+const characterPartsJson = requiredElement<HTMLPreElement>('#character-parts-json');
+const characterPartsJsonLabel = requiredElement<HTMLElement>('#character-parts-json-name');
+const downloadCharacterPartsButton = requiredElement<HTMLButtonElement>('#download-character-parts');
+const importCharacterPartsButton = requiredElement<HTMLButtonElement>('#import-character-parts');
+const characterPartsFileInput = requiredElement<HTMLInputElement>('#character-parts-file');
 
 const geometryInputs: Readonly<Record<keyof Rect, HTMLInputElement>> = {
   x: requiredElement<HTMLInputElement>('#geometry-x'),
@@ -93,13 +129,15 @@ const geometryInputs: Readonly<Record<keyof Rect, HTMLInputElement>> = {
   height: requiredElement<HTMLInputElement>('#geometry-height'),
 };
 const rotationInput = requiredElement<HTMLInputElement>('#geometry-rotation');
+const aspectLockInput = requiredElement<HTMLInputElement>('#geometry-aspect-lock');
+const distortionBadge = requiredElement<HTMLOutputElement>('#geometry-distortion');
 const scaleInputs = {
   x: requiredElement<HTMLInputElement>('#geometry-scale-x'),
   y: requiredElement<HTMLInputElement>('#geometry-scale-y'),
 } as const;
 
 const imageSlotElements = new Map<SlotId, PlannerImageSlotElement>();
-for (const element of document.querySelectorAll<PlannerImageSlotElement>('image-slot[data-slot-id]')) {
+for (const element of stage.querySelectorAll<PlannerImageSlotElement>('image-slot[data-slot-id]')) {
   const id = element.dataset.slotId;
   if (id !== undefined && isSlotId(id)) imageSlotElements.set(id, element);
 }
@@ -117,6 +155,100 @@ for (const definition of CANONICAL_SLOTS) {
   option.value = definition.id;
   option.textContent = `${definition.label} · ${source.width}×${source.height}`;
   slotSelect.append(option);
+}
+
+const CHARACTER_PART_LABELS: Readonly<Record<CharacterPartName, string>> = {
+  base: '기본',
+  upset: '동요',
+  lose: '패배',
+  used: '쿨다운',
+};
+
+for (const character of WORKBENCH_CHARACTERS) {
+  const option = document.createElement('option');
+  option.value = character;
+  option.textContent = character.replaceAll('_', ' ');
+  characterSelect.append(option);
+}
+
+interface CharacterPartCard {
+  readonly root: HTMLDivElement;
+  readonly slot: PlannerImageSlotElement;
+  readonly filename: HTMLElement;
+  readonly status: HTMLElement;
+  readonly offsetInputs: Readonly<Record<'x' | 'y', HTMLInputElement>>;
+  readonly offsetFields: HTMLDivElement;
+}
+
+/**
+ * One card per part name, built once. Switching characters only re-binds data,
+ * so a slot never loses its drop target or its focus mid-edit.
+ */
+function buildCharacterPartCard(part: CharacterPartName): CharacterPartCard {
+  const root = document.createElement('div');
+  root.className = 'character-part';
+  root.dataset.part = part;
+
+  const slot = document.createElement('image-slot');
+  slot.dataset.slotId = characterPartSlotId(part);
+  slot.dataset.part = part;
+  slot.setAttribute('slot-label', CHARACTER_PART_LABELS[part]);
+
+  const meta = document.createElement('div');
+  meta.className = 'character-part-meta';
+
+  const title = document.createElement('div');
+  title.className = 'character-part-title';
+  const name = document.createElement('span');
+  name.textContent = `${CHARACTER_PART_LABELS[part]} · ${part}`;
+  const filename = document.createElement('code');
+  title.append(name, filename);
+
+  const status = document.createElement('div');
+  status.className = 'character-part-status';
+
+  const offsetFields = document.createElement('div');
+  offsetFields.className = 'geometry-grid';
+  const offsetInputs = {} as Record<'x' | 'y', HTMLInputElement>;
+  for (const axis of ['x', 'y'] as const) {
+    const control = document.createElement('div');
+    control.className = 'coordinate-control';
+    const label = document.createElement('label');
+    const input = document.createElement('input');
+    input.type = 'number';
+    input.step = '1';
+    input.id = `character-offset-${part}-${axis}`;
+    label.htmlFor = input.id;
+    label.textContent = axis.toUpperCase();
+    const decrease = document.createElement('button');
+    decrease.type = 'button';
+    decrease.dataset.characterAxis = axis;
+    decrease.dataset.characterPart = part;
+    decrease.dataset.delta = '-1';
+    decrease.setAttribute('aria-label', `${part} ${axis.toUpperCase()} 1 감소`);
+    decrease.textContent = '−';
+    const increase = document.createElement('button');
+    increase.type = 'button';
+    increase.dataset.characterAxis = axis;
+    increase.dataset.characterPart = part;
+    increase.dataset.delta = '1';
+    increase.setAttribute('aria-label', `${part} ${axis.toUpperCase()} 1 증가`);
+    increase.textContent = '+';
+    control.append(label, decrease, input, increase);
+    offsetFields.append(control);
+    offsetInputs[axis] = input;
+  }
+
+  meta.append(title, status, offsetFields);
+  root.append(slot, meta);
+  return { root, slot, filename, status, offsetInputs, offsetFields };
+}
+
+const characterPartCards = new Map<CharacterPartName, CharacterPartCard>(
+  CHARACTER_PART_NAMES.map((part) => [part, buildCharacterPartCard(part)]),
+);
+for (const card of characterPartCards.values()) {
+  characterPartsContainer.append(card.root);
 }
 
 let storage: Storage | undefined;
@@ -202,11 +334,19 @@ function triggerDownload(href: string, filename: string): void {
   anchor.remove();
 }
 
+function stageSlotDownloadName(id: SlotId): string {
+  const binding = resolveSlotBinding(state, id);
+  return binding === undefined
+    ? canonicalDownloadName(id)
+    : characterPartFileName(binding.character, binding.part);
+}
+
 function downloadSlotImage(id: SlotId): void {
-  const image = state.images[id];
+  const image = resolveStageSlotImage(state, id);
   if (image === undefined) return;
-  triggerDownload(image.dataUrl, canonicalDownloadName(id));
-  setStatus(`${canonicalDownloadName(id)} 다운로드`);
+  const filename = stageSlotDownloadName(id);
+  triggerDownload(image.dataUrl, filename);
+  setStatus(`${filename} 다운로드`);
 }
 
 function downloadTextFile(contents: string, filename: string): void {
@@ -305,7 +445,7 @@ function renderAssetList(): void {
   const fragment = document.createDocumentFragment();
 
   for (const definition of CANONICAL_SLOTS) {
-    const image = state.images[definition.id];
+    const image = resolveStageSlotImage(state, definition.id);
     const source = getSlotSourceDimension(definition.id);
     const row = document.createElement('div');
     row.className = 'asset-row';
@@ -329,7 +469,7 @@ function renderAssetList(): void {
 
     const filename = document.createElement('div');
     filename.className = 'asset-row-file';
-    filename.textContent = definition.downloadName;
+    filename.textContent = stageSlotDownloadName(definition.id);
 
     const status = document.createElement('div');
     status.className = 'asset-row-status';
@@ -364,6 +504,33 @@ function renderAssetList(): void {
   assetList.replaceChildren(fragment);
 }
 
+function renderCharacterPanel(): void {
+  const character = state.activeCharacter;
+  const available = new Set(characterPartNames(character));
+  characterSelect.value = character;
+  characterPartsJsonLabel.textContent = characterPartsJsonName(character);
+
+  for (const [part, card] of characterPartCards) {
+    const supported = available.has(part);
+    card.root.hidden = !supported;
+    if (!supported) continue;
+    const owner = resolveSlotBinding(state, characterPartSlotId(part))?.character ?? character;
+    const image = getCharacterPartImage(state, owner, part);
+    const offset = getCharacterPartOffset(state, owner, part);
+    card.slot.setImage(image);
+    card.filename.textContent = characterPartFileName(owner, part);
+    card.status.textContent =
+      image === undefined ? '비어 있음 · PNG 드롭/선택' : `채움 · ${image.originalName}`;
+    // Only the exported state parts carry an offset; showing the field for the
+    // others would accept edits no artifact could ever record.
+    card.offsetFields.hidden = !characterPartHasOffset(part);
+    card.offsetInputs.x.value = String(offset.x);
+    card.offsetInputs.y.value = String(offset.y);
+  }
+
+  characterPartsJson.textContent = serializeCharacterPartsManifest(state, character);
+}
+
 function render(): void {
   for (const definition of CANONICAL_SLOTS) {
     const element = imageSlotElements.get(definition.id);
@@ -375,7 +542,7 @@ function render(): void {
     element.style.height = `${rect.height}px`;
     element.style.zIndex = definition.layer.toString();
     element.style.transform = `rotate(${state.rotation[definition.id]}rad)`;
-    element.setImage(state.images[definition.id]);
+    element.setImage(resolveStageSlotImage(state, definition.id));
     element.toggleAttribute('tweak-mode', tweakMode);
     element.toggleAttribute('data-locked', state.locks[definition.id]);
     element.toggleAttribute('data-selected', tweakMode && definition.id === selectedId);
@@ -395,7 +562,7 @@ function render(): void {
   slotSelect.value = selectedId;
   slotDescription.textContent =
     `${definition.description} · 원본 ${source.width}×${source.height}px · 배치 ${rect.width}×${rect.height}px`;
-  slotDownloadName.textContent = definition.downloadName;
+  slotDownloadName.textContent = stageSlotDownloadName(selectedId);
 
   geometryInputs.x.value = String(rect.x);
   geometryInputs.y.value = String(rect.y);
@@ -405,6 +572,17 @@ function render(): void {
   const scale = getSlotScale(state, selectedId);
   scaleInputs.x.value = String(Math.round(scale.scaleX * 100));
   scaleInputs.y.value = String(Math.round(scale.scaleY * 100));
+  const aspectLocked = state.aspectLocks[selectedId];
+  aspectLockInput.checked = aspectLocked;
+  const distortion = transformDistortion(
+    buildSlotTransform(state, selectedId),
+    getSlotDefinition(selectedId).dimension,
+  );
+  const distorted = distortion > DISTORTION_WARNING_THRESHOLD;
+  distortionBadge.hidden = !distorted;
+  distortionBadge.textContent = distorted
+    ? `비율 왜곡 ${(distortion * 100).toFixed(1)}%`
+    : '';
   geometryFieldset.disabled = !tweakMode || locked;
   partsFieldset.disabled = !tweakMode || isSlotLocked(state, 'suspect-state-parts');
 
@@ -420,12 +598,13 @@ function render(): void {
   partsJson.textContent = serializePortraitPartsManifest(state.geometry);
   manifestJson.textContent = serializeAssetManifest(state);
 
-  const hasSelectedImage = state.images[selectedId] !== undefined;
+  const hasSelectedImage = resolveStageSlotImage(state, selectedId) !== undefined;
   downloadSelectedImageButton.disabled = !hasSelectedImage;
   clearSelectedImageButton.disabled = !hasSelectedImage;
 
   renderGizmo();
   renderAssetList();
+  renderCharacterPanel();
 }
 
 stage.addEventListener(IMAGE_SLOT_SELECT_EVENT, (event) => {
@@ -438,9 +617,116 @@ stage.addEventListener(IMAGE_SLOT_CHANGE_EVENT, (event) => {
   if (!isSlotId(detail.slotId)) return;
   selectedId = detail.slotId;
   commit(
-    withSlotImage(state, detail.slotId, detail.image),
-    `${getSlotDefinition(detail.slotId).label} PNG 저장됨`,
+    withStageSlotImage(state, detail.slotId, detail.image),
+    `${stageSlotDownloadName(detail.slotId)} 저장됨`,
   );
+});
+
+characterPartsContainer.addEventListener(IMAGE_SLOT_CHANGE_EVENT, (event) => {
+  const detail = (event as CustomEvent<ImageSlotChangeDetail>).detail;
+  if (!isSlotId(detail.slotId)) return;
+  commit(
+    withStageSlotImage(state, detail.slotId, detail.image),
+    `${stageSlotDownloadName(detail.slotId)} 저장됨`,
+  );
+});
+
+// The panel slots are editors, not stage selections; swallow the select event
+// so clicking a card does not retarget the gizmo.
+characterPartsContainer.addEventListener(IMAGE_SLOT_SELECT_EVENT, (event) => {
+  event.stopPropagation();
+});
+
+characterSelect.addEventListener('change', () => {
+  const character = characterSelect.value;
+  if (!isWorkbenchCharacter(character)) {
+    render();
+    return;
+  }
+  commit(withActiveCharacter(state, character), `캐릭터 ${character.replaceAll('_', ' ')} 선택`);
+});
+
+function applyCharacterOffset(
+  part: CharacterPartName,
+  axis: 'x' | 'y',
+  value: number,
+): void {
+  const current = getCharacterPartOffset(state, state.activeCharacter, part);
+  commit(
+    withCharacterPartOffset(
+      state,
+      state.activeCharacter,
+      part,
+      axis === 'x' ? value : current.x,
+      axis === 'y' ? value : current.y,
+    ),
+    `${state.activeCharacter.replaceAll('_', ' ')} ${part} 오프셋 조정`,
+  );
+}
+
+characterPartsContainer.addEventListener('click', (event) => {
+  const target = event.target;
+  if (!(target instanceof Element)) return;
+  const button = target.closest<HTMLButtonElement>('button[data-character-axis]');
+  if (button === null) return;
+  const axis = button.dataset.characterAxis;
+  const part = button.dataset.characterPart;
+  const delta = Number(button.dataset.delta);
+  if ((axis !== 'x' && axis !== 'y') || part === undefined || !Number.isFinite(delta)) return;
+  if (!isCharacterPart(part)) return;
+  const current = getCharacterPartOffset(state, state.activeCharacter, part);
+  applyCharacterOffset(part, axis, current[axis] + delta);
+});
+
+characterPartsContainer.addEventListener('change', (event) => {
+  const target = event.target;
+  if (!(target instanceof HTMLInputElement)) return;
+  const card = target.closest<HTMLDivElement>('.character-part');
+  const part = card?.dataset.part;
+  if (part === undefined || !isCharacterPart(part)) return;
+  const axis = target.id.endsWith('-x') ? 'x' : 'y';
+  const value = Number(target.value);
+  if (!Number.isFinite(value)) {
+    render();
+    return;
+  }
+  applyCharacterOffset(part, axis, value);
+});
+
+downloadCharacterPartsButton.addEventListener('click', () => {
+  const filename = characterPartsJsonName(state.activeCharacter);
+  downloadTextFile(serializeCharacterPartsManifest(state, state.activeCharacter), filename);
+  setStatus(`${filename} 다운로드`);
+});
+
+importCharacterPartsButton.addEventListener('click', () => {
+  characterPartsFileInput.click();
+});
+
+characterPartsFileInput.addEventListener('change', () => {
+  const file = characterPartsFileInput.files?.item(0);
+  characterPartsFileInput.value = '';
+  if (file === null || file === undefined) return;
+  void file
+    .text()
+    .then((source) => {
+      const parsed = JSON.parse(source) as unknown;
+      // The sidecar names its own character; fall back to the selection so a
+      // renamed file still lands somewhere the planner expects.
+      const character = characterFromPartsManifest(parsed) ?? state.activeCharacter;
+      const next = withImportedCharacterParts(
+        withActiveCharacter(state, character),
+        character,
+        parsed,
+      );
+      state = next;
+      persist(`${characterPartsJsonName(character)} 가져옴`);
+      render();
+    })
+    .catch((error: unknown) => {
+      const reason = error instanceof Error ? error.message : String(error);
+      setStatus(`사이드카를 가져오지 못했습니다: ${reason}`, true);
+    });
 });
 
 stageShell.addEventListener('pointerdown', (event) => {
@@ -493,7 +779,7 @@ downloadSelectedImageButton.addEventListener('click', () => {
 
 clearSelectedImageButton.addEventListener('click', () => {
   commit(
-    withoutSlotImage(state, selectedId),
+    withoutStageSlotImage(state, selectedId),
     `${getSlotDefinition(selectedId).label} 이미지 비움`,
   );
 });
@@ -550,16 +836,25 @@ for (const field of RECT_FIELDS) {
       render();
       return;
     }
-    commit(
-      withSlotRect(
-        state,
-        selectedId,
-        patchRect(state.geometry[selectedId], { [field]: value }),
-      ),
-      `${getSlotDefinition(selectedId).label} 좌표 입력`,
-    );
+    // A locked slot derives the opposite edge so typing a width cannot silently
+    // distort the art; x/y are pure placement and never touch the ratio.
+    const next = (field === 'width' || field === 'height') && state.aspectLocks[selectedId]
+      ? setSlotSize(state, selectedId, { [field]: value })
+      : withSlotRect(
+          state,
+          selectedId,
+          patchRect(state.geometry[selectedId], { [field]: value }),
+        );
+    commit(next, `${getSlotDefinition(selectedId).label} 좌표 입력`);
   });
 }
+
+aspectLockInput.addEventListener('change', () => {
+  commit(
+    setSlotAspectLock(state, selectedId, aspectLockInput.checked),
+    `${getSlotDefinition(selectedId).label} 비율 유지 ${aspectLockInput.checked ? '켜기' : '끄기'}`,
+  );
+});
 
 rotationInput.addEventListener('change', () => {
   const degrees = Number(rotationInput.value);
@@ -662,5 +957,65 @@ function isRectField(value: string | undefined): value is keyof Rect {
   return value !== undefined && (RECT_FIELDS as readonly string[]).includes(value);
 }
 
+function isCharacterPart(value: string): value is CharacterPartName {
+  return (CHARACTER_PART_NAMES as readonly string[]).includes(value);
+}
+
 render();
 if (storage !== undefined) setStatus('localStorage에서 워크벤치 상태를 불러왔습니다.');
+
+/**
+ * Posts the collected slots to the dev-server middleware. Only the dev server
+ * carries that route, so a 404 means the planner opened a built preview rather
+ * than `pnpm dev`.
+ */
+async function postWorkbenchSave(
+  request: WorkbenchSaveRequest,
+): Promise<WorkbenchSaveSuccess> {
+  const response = await fetch('/api/workbench/save', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json; charset=utf-8' },
+    body: JSON.stringify(request),
+  });
+  if (response.status === 404) {
+    throw new Error('개발 서버에서만 사용할 수 있습니다. (pnpm dev)');
+  }
+  const payload = (await response.json()) as
+    | { ok: true; assetsRoot: string; savedFiles: string[]; skippedFiles: string[] }
+    | { ok: false; message?: string };
+  if (!response.ok || payload.ok !== true) {
+    throw new Error(
+      'message' in payload && payload.message !== undefined
+        ? payload.message
+        : `서버가 ${String(response.status)}을(를) 반환했습니다.`,
+    );
+  }
+  return {
+    assetsRoot: payload.assetsRoot,
+    savedFiles: payload.savedFiles,
+    skippedFiles: payload.skippedFiles,
+  };
+}
+
+let saving = false;
+
+saveToProjectButton.addEventListener('click', () => {
+  if (saving) return;
+  const request = collectWorkbenchSaveRequest(state);
+  if (request.files.length === 0) {
+    setStatus('저장할 이미지가 없습니다. 먼저 슬롯에 PNG를 올려 주세요.', true);
+    return;
+  }
+  saving = true;
+  saveToProjectButton.disabled = true;
+  setStatus(`프로젝트 폴더에 저장 중… (${String(request.files.length)}개 파일)`);
+  void postWorkbenchSave(request)
+    .then((result) => { setStatus(formatSaveSuccess(result)); })
+    .catch((error: unknown) => {
+      setStatus(`❌ 저장 실패: ${describeSaveError(error)}`, true);
+    })
+    .finally(() => {
+      saving = false;
+      saveToProjectButton.disabled = false;
+    });
+});

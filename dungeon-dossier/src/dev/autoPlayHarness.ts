@@ -23,6 +23,7 @@ import {
   GradesSchema,
   RewardsSchema,
   RunStripSchema,
+  type ActionIntent,
   type CaseDefinition,
   type NonCombatEventDefinition,
 } from '../engine/domain';
@@ -272,6 +273,35 @@ function gradeMetricsFromSimulation(
   };
 }
 
+/** Pattern D eligibility needs each owned card's intent, keyed by card id. */
+const CARD_INTENTS_BY_ID: Readonly<Record<string, ActionIntent>> = Object.freeze(
+  Object.fromEntries(CARDS.cards.map((card) => [card.card_id, card.intent])),
+);
+
+function ownedCardIdsOf(session: RunSession): readonly string[] {
+  const deck = session.snapshot.deck;
+  return [
+    ...deck.drawPile,
+    ...deck.hand,
+    ...deck.discardPile,
+    ...deck.exhaustPile,
+  ].filter((cardId, index, ids) => ids.indexOf(cardId) === index);
+}
+
+function eligibleCardIdsFor(
+  session: RunSession,
+  option: Readonly<{ eligible_intents: readonly ActionIntent[] }>,
+  intents: Readonly<Record<string, ActionIntent>>,
+): readonly string[] {
+  const owned = ownedCardIdsOf(session);
+  if (option.eligible_intents.length === 0) return owned;
+  const allowed = new Set<ActionIntent>(option.eligible_intents);
+  return owned.filter((cardId) => {
+    const intent = intents[cardId];
+    return intent !== undefined && allowed.has(intent);
+  });
+}
+
 function findCase(node: NodeDefinition): CaseDefinition {
   const definition = CASES_BY_DIRECTORY[node.caseDirectory];
   if (definition === undefined) {
@@ -323,11 +353,52 @@ function completeEvent(
     }
     return { outcome, grade: null, resolutionCodes: [] };
   }
+  if (event.pattern === 'C') {
+    session.finishEvent({
+      eventDefinition: event,
+      investigatedSpotIds: event.spots
+        .slice(0, event.attempt_limit)
+        .map((spot) => spot.spot_id),
+    });
+    return { outcome: 'EVENT_COMPLETED', grade: null, resolutionCodes: [] };
+  }
+  if (event.pattern === 'D') {
+    // Best policy: spend the first option that has a legal target. With no
+    // eligible card the run layer pays the authored fallback instead.
+    const cardIntents = CARD_INTENTS_BY_ID;
+    const option = event.options.find((candidate) =>
+      eligibleCardIdsFor(session, candidate, cardIntents).length > 0,
+    );
+    const cardId = option === undefined
+      ? undefined
+      : eligibleCardIdsFor(session, option, cardIntents)[0];
+    session.finishEvent({
+      eventDefinition: event,
+      cardIntentsById: cardIntents,
+      ...(option === undefined || cardId === undefined
+        ? {}
+        : { optionId: option.option_id, tunedCardId: cardId }),
+    });
+    return { outcome: 'EVENT_COMPLETED', grade: null, resolutionCodes: [] };
+  }
+  if (event.pattern === 'E') {
+    const already = new Set(session.snapshot.canvassedTopicIds);
+    session.finishEvent({
+      eventDefinition: event,
+      canvassedTopicIds: event.topics
+        .filter((topic) => !already.has(topic.topic_id))
+        .slice(0, event.attempt_limit)
+        .map((topic) => topic.topic_id),
+    });
+    return { outcome: 'EVENT_COMPLETED', grade: null, resolutionCodes: [] };
+  }
+  const held = new Set(session.snapshot.acquiredEvidenceIds);
   session.finishEvent({
     eventDefinition: event,
-    investigatedSpotIds: event.spots
+    collectedTargetIds: event.targets
+      .filter((target) => !held.has(target.evidence_id))
       .slice(0, event.attempt_limit)
-      .map((spot) => spot.spot_id),
+      .map((target) => target.target_id),
   });
   return { outcome: 'EVENT_COMPLETED', grade: null, resolutionCodes: [] };
 }

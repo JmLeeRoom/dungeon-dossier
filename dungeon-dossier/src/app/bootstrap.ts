@@ -6,6 +6,7 @@ import {
   type ManagedUiLayer,
   type MountedGameApplication,
 } from '../ui/core';
+import type { CutsceneSelection } from '../ui/screens/cutscene';
 import {
   createEndingDirection,
   createInterrogationScreen,
@@ -13,6 +14,7 @@ import {
   directionForOutcome,
   directionForResolution,
   type InterrogationCallbacks,
+  type InterrogationSelection,
   type InterrogationScreenController,
   type InterrogationScreenModel,
   type TimedDirectionOverlay,
@@ -26,23 +28,36 @@ import {
   CardRepository,
   CaseRepository,
   FallbackRepository,
+  JudgmentUiMapRepository,
   RunCatalogRepository,
   RunStripRepository,
   StringsRepository,
   type BalanceDefinition,
   type CaseDefinition,
+  type JudgmentUiMapDefinition,
   type RewardDefinition,
 } from '../content-io';
 import { createErrorBanner, RUN_FLOW_ERROR_MESSAGE } from '../ui/screens/error';
+import { createDeadSceneScreen } from '../ui/screens/ending';
+import {
+  DEAD_SCENE_RETRY_ACTION,
+  isFailureReason,
+  toDeadSceneModel,
+  type FailureReason,
+} from './deadScene';
 import { AudioPlayer, RUNTIME_SOUND_DEFINITIONS } from '../audio';
 import {
   toRenderableClaims,
   type ResolutionCode,
+  type SuspectStatePart,
 } from '../dto';
+import type { ActionIntent, CutsceneDefinition } from '../engine/domain';
 import type { EncounterOutcome, OutcomeEvaluation } from '../engine/encounter';
 import {
   createNodeStrip,
   currentRunNode,
+  runResourceBoundsFromBalance,
+  DEFAULT_RETRY_LIMIT,
   type CaseGrade,
   type NodeDefinition,
   type RunState,
@@ -58,6 +73,13 @@ import {
 } from './autoplayPort';
 import { createRunSaveRepository } from './autoplayStorage';
 import { installStrings } from './i18n';
+import {
+  collectCutsceneOutcome,
+  cutsceneForTiming,
+  toCutsceneBeatViews,
+  type CutsceneChoiceOutcome,
+} from './cutscenePlayback';
+import { createCutsceneOverlay } from '../ui/screens/cutscene';
 import { createEncounterSession, type EncounterSession } from './createEncounterSession';
 import {
   cueOutcome,
@@ -71,11 +93,18 @@ import {
   toComposureBand,
   type Phase4DialogueService,
 } from './createPhase4DialogueService';
-import { createRunSession, type RunSession } from './createRunSession';
+import {
+  createRunSession,
+  type FinishEventInput,
+  type RunSession,
+} from './createRunSession';
+import { buildEvidencePreviewFeedback, buildJudgmentFeedback } from './judgmentFeedback';
+import { detectSuspectTransition } from './suspectTransition';
 import { createFlowErrorBoundary } from './flowErrorBoundary';
 import {
   toEndingScreenModel,
   toEventSceneModel,
+  type EventOwnedCardView,
   toRewardScreenModel,
   toRunStripScreenModel,
 } from './gameFlowPresentation';
@@ -155,13 +184,21 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
   const runCatalogRepository = new RunCatalogRepository();
   const runStripRepository = new RunStripRepository();
   const stringsRepository = new StringsRepository();
-  const [balanceValue, cardsValue, runCatalogValue, runStripValue, stringsValue] =
-    await Promise.all([
+  const judgmentUiMapRepository = new JudgmentUiMapRepository();
+  const [
+    balanceValue,
+    cardsValue,
+    runCatalogValue,
+    runStripValue,
+    stringsValue,
+    judgmentUiMapValue,
+  ] = await Promise.all([
       balanceRepository.reload(),
       cardRepository.load(),
       runCatalogRepository.load(),
       runStripRepository.load(),
       stringsRepository.load(),
+      judgmentUiMapRepository.load(),
     ]);
   const strings = required(stringsValue, 'Korean string table');
   installStrings(strings.strings);
@@ -169,6 +206,9 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
   const cards = required(cardsValue, 'Card catalogue');
   const runCatalog = required(runCatalogValue, 'Run catalogue');
   const runStripDefinition = required(runStripValue, 'Run strip');
+  // Presentation-only: a missing map degrades the banner to its tone defaults
+  // instead of blocking boot.
+  const judgmentUiMap: JudgmentUiMapDefinition | undefined = judgmentUiMapValue;
   const strip = createNodeStrip(runStripDefinition);
   const caseDirectories = strip
     .map((node) => node.caseDirectory)
@@ -234,7 +274,7 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
     if (saved === undefined) {
       initialState = freshState();
     } else {
-      initialState = restoreRunState(saved);
+      initialState = restoreRunState(saved, runResourceBoundsFromBalance(balanceRepository.current()));
       assertRestoredRunSaveSemantics(saved, initialState, {
         strip,
         cardIds: cards.cards.map((card) => card.card_id),
@@ -276,6 +316,12 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
   let audioActivated = false;
   let outcomeTransitionPending = false;
   let outcomeBgmMuted = false;
+  let lastFailureReason: FailureReason | undefined;
+  // The interrogation screen is rebuilt from scratch on every submission, so no
+  // widget survives long enough to notice a state change. Bootstrap is the only
+  // layer that sees both sides of a re-mount.
+  let lastSuspectStatePart: SuspectStatePart | undefined;
+  let lastSuspectEncounterId: string | undefined;
   let recordDevJudgment: ((input: unknown, result: unknown) => void) | undefined;
   let destroyDevConsole = (): void => undefined;
   const resourceOverrides: Partial<Record<
@@ -590,16 +636,85 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
 
   const finishEvent = (
     event: CaseDefinition['events_noncombat'][number],
-    input: Readonly<{
-      choiceId?: string;
-      placement?: Readonly<Record<string, string>>;
-      investigatedSpotIds?: readonly string[];
-    }>,
+    input: Omit<FinishEventInput, 'eventDefinition'>,
   ) => runSession.finishEvent({ eventDefinition: event, ...input });
+
+  /** Per-visit progress the run layer only receives once the node completes. */
+  interface EventProgress {
+    readonly discoveredSpotIds: readonly string[];
+    readonly canvassedTopicIds: readonly string[];
+    readonly collectedTargetIds: readonly string[];
+    readonly selectedOptionId?: string;
+    readonly selectedCardId?: string;
+    /** Branch consequences staged by an opening cutscene, committed with the node. */
+    readonly cutsceneOutcome?: CutsceneChoiceOutcome;
+  }
+
+  const emptyEventProgress: EventProgress = {
+    discoveredSpotIds: [],
+    canvassedTopicIds: [],
+    collectedTargetIds: [],
+  };
+
+  const cardIntentsById: Readonly<Record<string, ActionIntent>> = Object.fromEntries(
+    cards.cards.map((card) => [card.card_id, card.intent]),
+  );
+  const cardNameKeysById: Readonly<Record<string, string | undefined>> = Object.fromEntries(
+    cards.cards.map((card) => [card.card_id, card.name_key]),
+  );
+
+  const ownedCardViews = (): readonly EventOwnedCardView[] => {
+    const deck = runSession.snapshot.deck;
+    const owned = [
+      ...deck.drawPile,
+      ...deck.hand,
+      ...deck.discardPile,
+      ...deck.exhaustPile,
+    ].filter((cardId, index, ids) => ids.indexOf(cardId) === index);
+    return owned.flatMap((cardId) => {
+      const intent = cardIntentsById[cardId];
+      const nameKey = cardNameKeysById[cardId];
+      return intent === undefined || nameKey === undefined
+        ? []
+        : [{ cardId, intent, nameKey }];
+    });
+  };
+
+  /**
+   * Plays a node's cutscene through the existing timed-direction runtime and
+   * hands any branch consequences back so the run layer commits them with the
+   * node itself.
+   */
+  const playCutscene = (
+    cutscene: CutsceneDefinition,
+    onFinish: (outcome: CutsceneChoiceOutcome) => void,
+  ): void => {
+    const selections: CutsceneSelection[] = [];
+    const finish = (): void => {
+      onFinish(collectCutsceneOutcome(cutscene, selections));
+    };
+    try {
+      const overlay = createCutsceneOverlay(toCutsceneBeatViews(cutscene), {
+        assets,
+        skippable: cutscene.skippable,
+        onChoice(beatId, choiceId): void {
+          selections.push({ beatId, choiceId });
+        },
+        onSkipChoices(defaults): void {
+          selections.push(...defaults);
+        },
+      });
+      showTimedDirection(overlay, finish);
+    } catch (error) {
+      // A malformed cutscene must never strand the run on a blank screen.
+      handleFlowError(error, finish);
+      finish();
+    }
+  };
 
   const mountEvent = (
     node: NodeDefinition,
-    discoveredSpotIds: readonly string[] = [],
+    progress: EventProgress = emptyEventProgress,
   ): void => {
     encounterSession = undefined;
     dialogueService = undefined;
@@ -609,35 +724,65 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
       (candidate) => candidate.event_id === node.ref,
     );
     if (event === undefined) throw new Error(`Missing event ${node.ref}.`);
+    const { discoveredSpotIds } = progress;
     const model = toEventSceneModel(event, {
       discoveredSpotIds,
       attemptsUsed: discoveredSpotIds.length,
+      resources: runSession.snapshot,
+      ownedCards: ownedCardViews(),
+      cardTuning: runSession.snapshot.cardTuning,
+      canvassedTopicIds: progress.canvassedTopicIds,
+      collectedTargetIds: progress.collectedTargetIds,
+      acquiredEvidenceIds: runSession.snapshot.acquiredEvidenceIds,
+      ...(progress.selectedOptionId === undefined
+        ? {}
+        : { selectedOptionId: progress.selectedOptionId }),
+      ...(progress.selectedCardId === undefined
+        ? {}
+        : { selectedCardId: progress.selectedCardId }),
     });
     let completed = false;
-    const continueAfterResult = (): void => {
-      try {
-        routeAfterBoundary();
-      } catch (error) {
-        handleFlowError(error, continueAfterResult);
-      }
-    };
-    const eventCallbacks: EventScreenCallbacks = {
-      onChoice(choiceId: string): void {
-        if (completed) return;
-        activateAudio('AMBIENT');
-        completed = true;
-        try {
-          finishEvent(event, { choiceId });
-        } catch (error) {
-          completed = false;
-          handleFlowError(error, () => eventCallbacks.onChoice?.(choiceId));
-          return;
-        }
+    const closing = cutsceneForTiming(event, 'AFTER');
+    const routeAfterEvent = (): void => {
+      const advance = (): void => {
         try {
           routeAfterBoundary();
         } catch (error) {
           handleFlowError(error, routeAfterBoundary);
         }
+      };
+      if (closing === undefined) {
+        advance();
+        return;
+      }
+      // A closing cutscene plays after the node has already committed, so its
+      // branches are narrative only and cannot change what was just recorded.
+      playCutscene(closing, advance);
+    };
+    const finishEventAndRoute = (
+      input: Parameters<typeof finishEvent>[1],
+      retry: () => void,
+    ): void => {
+      completed = true;
+      try {
+        finishEvent(event, {
+          ...input,
+          ...(progress.cutsceneOutcome === undefined
+            ? {}
+            : { cutsceneOutcome: progress.cutsceneOutcome }),
+        });
+      } catch (error) {
+        completed = false;
+        handleFlowError(error, retry);
+        return;
+      }
+      routeAfterEvent();
+    };
+    const eventCallbacks: EventScreenCallbacks = {
+      onChoice(choiceId: string): void {
+        if (completed) return;
+        activateAudio('AMBIENT');
+        finishEventAndRoute({ choiceId }, () => eventCallbacks.onChoice?.(choiceId));
       },
       onPlacementSubmit(placement: Readonly<Record<string, string>>): void {
         if (completed) return;
@@ -669,14 +814,14 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
             },
           };
           const resultView = createEventScreen(resultModel, {
-            onContinue: continueAfterResult,
+            onContinue: routeAfterEvent,
           });
           setScene({ view: resultView }, 'AMBIENT');
           setAutoplayScene({
             kind: 'EVENT_RESULT',
             eventId: event.event_id,
             displayStrings: collectAutoplaySceneStrings(resultModel),
-            continue: continueAfterResult,
+            continue: routeAfterEvent,
           });
         };
         try {
@@ -693,22 +838,94 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
           ? Math.min(event.attempt_limit, event.spots.length)
           : 0;
         if (next.length >= targetAttempts) {
-          completed = true;
-          try {
-            finishEvent(event, { investigatedSpotIds: next });
-          } catch (error) {
-            completed = false;
-            handleFlowError(error, () => eventCallbacks.onInvestigate?.(spotId));
-            return;
-          }
-          try {
-            routeAfterBoundary();
-          } catch (error) {
-            handleFlowError(error, routeAfterBoundary);
-          }
+          finishEventAndRoute({ investigatedSpotIds: next }, () =>
+            eventCallbacks.onInvestigate?.(spotId),
+          );
           return;
         }
-        mountEvent(node, next);
+        mountEvent(node, { ...progress, discoveredSpotIds: next });
+      },
+      onSelectTuning(selection): void {
+        if (completed) return;
+        mountEvent(node, {
+          ...progress,
+          ...(selection.optionId === undefined
+            ? {}
+            : { selectedOptionId: selection.optionId }),
+          ...(selection.cardId === undefined ? {} : { selectedCardId: selection.cardId }),
+        });
+      },
+      onApplyTuning(optionId, cardId): void {
+        if (completed) return;
+        activateAudio('AMBIENT');
+        completed = true;
+        try {
+          finishEvent(event, { optionId, tunedCardId: cardId, cardIntentsById });
+        } catch (error) {
+          completed = false;
+          handleFlowError(error, () => eventCallbacks.onApplyTuning?.(optionId, cardId));
+          return;
+        }
+        try {
+          routeAfterBoundary();
+        } catch (error) {
+          handleFlowError(error, routeAfterBoundary);
+        }
+      },
+      onCanvass(topicId): void {
+        if (completed || progress.canvassedTopicIds.includes(topicId)) return;
+        activateAudio('AMBIENT');
+        const next = [...progress.canvassedTopicIds, topicId];
+        const limit = event.pattern === 'E'
+          ? Math.min(event.attempt_limit, event.topics.length)
+          : 0;
+        if (next.length >= limit) {
+          finishEventAndRoute({ canvassedTopicIds: next }, () =>
+            eventCallbacks.onCanvass?.(topicId),
+          );
+          return;
+        }
+        mountEvent(node, { ...progress, canvassedTopicIds: next });
+      },
+      onCollect(targetId): void {
+        if (completed || progress.collectedTargetIds.includes(targetId)) return;
+        activateAudio('AMBIENT');
+        const next = [...progress.collectedTargetIds, targetId];
+        const limit = event.pattern === 'F'
+          ? Math.min(event.attempt_limit, event.targets.length)
+          : 0;
+        if (next.length >= limit) {
+          finishEventAndRoute({ collectedTargetIds: next }, () =>
+            eventCallbacks.onCollect?.(targetId),
+          );
+          return;
+        }
+        mountEvent(node, { ...progress, collectedTargetIds: next });
+      },
+      onContinue(): void {
+        // Patterns D/E/F let the player stop early; the run layer still needs
+        // whatever was gathered before they walked away.
+        if (completed) return;
+        activateAudio('AMBIENT');
+        if (event.pattern === 'E') {
+          finishEventAndRoute({ canvassedTopicIds: progress.canvassedTopicIds }, () =>
+            eventCallbacks.onContinue?.(),
+          );
+          return;
+        }
+        if (event.pattern === 'F') {
+          finishEventAndRoute({ collectedTargetIds: progress.collectedTargetIds }, () =>
+            eventCallbacks.onContinue?.(),
+          );
+          return;
+        }
+        if (event.pattern === 'D') {
+          finishEventAndRoute({ cardIntentsById }, () => eventCallbacks.onContinue?.());
+          return;
+        }
+        finishEventAndRoute({ investigatedSpotIds: discoveredSpotIds }, () =>
+          eventCallbacks.onContinue?.(),
+        );
       },
     };
     const view = createEventScreen(model, eventCallbacks);
@@ -723,11 +940,82 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
       answerMapping: event.pattern === 'B' ? { ...event.answer_mapping } : {},
       spotIds: event.pattern === 'C' ? event.spots.map((spot) => spot.spot_id) : [],
       discoveredSpotIds,
-      attemptLimit: event.pattern === 'C' ? event.attempt_limit : 0,
+      attemptLimit: event.pattern === 'C'
+        ? event.attempt_limit
+        : event.pattern === 'E' || event.pattern === 'F'
+          ? event.attempt_limit
+          : 0,
+      tuningOptionIds: model.pattern === 'D'
+        ? model.options.filter((option) => option.affordable).map((option) => option.optionId)
+        : [],
+      tuningCardIdsByOption: model.pattern === 'D'
+        ? Object.fromEntries(
+            model.options.map((option) => [option.optionId, option.eligibleCardIds]),
+          )
+        : {},
+      topicIds: event.pattern === 'E' ? event.topics.map((topic) => topic.topic_id) : [],
+      canvassedTopicIds: progress.canvassedTopicIds,
+      collectTargetIds: model.pattern === 'F'
+        ? model.targets
+            .filter((target) => !target.alreadyHeld)
+            .map((target) => target.targetId)
+        : [],
+      collectedTargetIds: progress.collectedTargetIds,
       displayStrings: collectAutoplaySceneStrings(model),
       choose: (choiceId): void => { eventCallbacks.onChoice?.(choiceId); },
       submitPlacement: (placement): void => { eventCallbacks.onPlacementSubmit?.(placement); },
       investigate: (spotId): void => { eventCallbacks.onInvestigate?.(spotId); },
+      applyTuning: (optionId, cardId): void => {
+        eventCallbacks.onApplyTuning?.(optionId, cardId);
+      },
+      canvass: (topicId): void => { eventCallbacks.onCanvass?.(topicId); },
+      collect: (targetId): void => { eventCallbacks.onCollect?.(targetId); },
+      finish: (): void => { eventCallbacks.onContinue?.(); },
+    });
+  };
+
+  const mountDeadScene = (reason: FailureReason, coercion: number): void => {
+    encounterSession = undefined;
+    dialogueService = undefined;
+    interrogation = undefined;
+    const model = toDeadSceneModel({
+      reason,
+      state: runSession.snapshot,
+      totalNodes: strip.length,
+      coercion,
+      retryLimit: DEFAULT_RETRY_LIMIT,
+    });
+    const retryNode = (): void => {
+      void openCurrentNode().catch((error: unknown) => {
+        handleFlowError(error, retryNode);
+      });
+    };
+    const takeDeadSceneAction = (actionId: string): void => {
+      activateAudio('AMBIENT');
+      if (actionId === DEAD_SCENE_RETRY_ACTION) {
+        retryNode();
+        return;
+      }
+      routeAfterBoundary();
+    };
+    const controller = createDeadSceneScreen(model, { assets }, {
+      onAction: takeDeadSceneAction,
+    });
+    const update = (): void => controller.update(mounted.app.ticker.deltaMS);
+    mounted.app.ticker.add(update);
+    setScene({
+      view: controller.view,
+      onDestroy(): void {
+        mounted.app.ticker.remove(update);
+        controller.destroy();
+      },
+    }, 'ENDING');
+    setAutoplayScene({
+      kind: 'DEAD_SCENE',
+      reason,
+      actionIds: model.actions.filter((action) => action.enabled).map((action) => action.actionId),
+      displayStrings: [model.title, model.cause],
+      act: takeDeadSceneAction,
     });
   };
 
@@ -752,11 +1040,15 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
       act: active.caseDefinition.metadata.act,
       gradeMetrics: encounterGradeMetrics(active),
       encounterState: encounterRunProjection(active, runSession.snapshot),
+      // A defeat keeps the run alive while retries remain; the dead scene is
+      // where the player decides whether to spend one.
+      failurePolicy: 'RETRY',
       ...(authoredOutcome?.rewards === undefined
         ? {}
         : { outcomeRewards: authoredOutcome.rewards }),
     });
     syncDevFlags();
+    const coercionAtDefeat = active.currentModel().dto.resources.coercion;
     let routed = false;
     return (): void => {
       if (routed) return;
@@ -765,13 +1057,16 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
         audio.unmute();
         outcomeBgmMuted = false;
       }
+      routed = true;
       if (completion.rewardChoices.length > 0) {
         mountReward(completion.grade, completion.rewardChoices);
-        routed = true;
+        return;
+      }
+      if (outcome === 'FAILED' && lastFailureReason !== undefined) {
+        mountDeadScene(lastFailureReason, coercionAtDefeat);
         return;
       }
       routeAfterBoundary();
-      routed = true;
     };
   };
 
@@ -782,6 +1077,7 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
     if (outcomeTransitionPending) return;
     const outcome = evaluation.terminalOutcome;
     if (outcome === null) throw new Error('Cannot queue a non-terminal encounter outcome.');
+    lastFailureReason = isFailureReason(evaluation.reason) ? evaluation.reason : undefined;
     outcomeTransitionPending = true;
     let routeAfterDirection: () => void;
     try {
@@ -894,11 +1190,54 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
         handleFlowError(error, endTurnForAutoplay);
       }
     };
+    /**
+     * Proof rules are case-private, so the coverage check can only happen here
+     * in the app layer. The banner it feeds says "under review", never a
+     * verdict: the resolver still owns the judgment.
+     */
+    const previewSelection = (selection: InterrogationSelection): void => {
+      if (selection.cardId === undefined || selection.facet === undefined) return;
+      const card = active.cardsDefinition.cards.find(
+        (candidate) => candidate.card_id === selection.cardId,
+      );
+      if (card === undefined) return;
+      const direction = card.intent === 'CONTRADICT'
+        ? 'CONTRADICT'
+        : card.intent === 'CONFIRM'
+          ? 'SUPPORT'
+          : undefined;
+      if (direction === undefined) return;
+      const targetClaimId = active.targetClaimIdForFacet(selection.facet);
+      if (targetClaimId === undefined) return;
+      const rule = active.caseDefinition.proof_rules.find(
+        (candidate) =>
+          candidate.target_claim_id === targetClaimId && candidate.direction === direction,
+      );
+      if (rule === undefined) return;
+      const model = active.currentModel();
+      const docked = model.dto.evidence.filter((evidence) =>
+        selection.evidenceIds.includes(evidence.evidenceId),
+      );
+      if (docked.length === 0) return;
+      const statement = toRenderableClaims(model.dto).find(
+        (claim) => claim.claimId === targetClaimId,
+      )?.canonicalMeaning;
+      interrogation?.showJudgmentFeedback(
+        buildEvidencePreviewFeedback({
+          requiredScopes: rule.requirements.required_scopes,
+          coveredScopes: docked.flatMap((evidence) => evidence.scopes),
+          evidenceNames: docked.map((evidence) => evidence.displayName),
+          ...(statement === undefined ? {} : { statement }),
+          ...(judgmentUiMap === undefined ? {} : { uiMap: judgmentUiMap }),
+        }),
+      );
+    };
     const interrogationCallbacks: InterrogationCallbacks = {
         onSelectionChange(selection): void {
           if (outcomeTransitionPending) return;
           audio.play('paper_flip');
           if (selection.facet !== undefined) renderStatementForFacet(selection.facet);
+          previewSelection(selection);
         },
         onSubmit(selection): void {
           if (outcomeTransitionPending) return;
@@ -919,12 +1258,25 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
               active.coordinator.beginArgument();
             }
             audio.play('card_snap');
+            const modelBefore = active.currentModel();
             const evidenceBefore = new Map(
-              active.currentModel().dto.evidence.map((evidence) => [
+              modelBefore.dto.evidence.map((evidence) => [
                 evidence.evidenceId,
                 evidence.grade,
               ]),
             );
+            // Quoted back by the judgment banner. Both are read before the
+            // submission because a resolution can hide the claim or shred the
+            // evidence it was argued with.
+            const submittedStatement = toRenderableClaims(modelBefore.dto).find(
+              (claim) => claim.claimId === targetClaimId,
+            )?.canonicalMeaning;
+            const submittedEvidenceNames = selection.evidenceIds.flatMap((evidenceId) => {
+              const item = modelBefore.dto.evidence.find(
+                (candidate) => candidate.evidenceId === evidenceId,
+              );
+              return item === undefined ? [] : [item.displayName];
+            });
             const result = active.coordinator.submit({
               cardId: selection.cardId,
               targetClaimId,
@@ -950,8 +1302,34 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
                 outcome: result.outcome.terminalOutcome,
               },
             );
+            // Measured against the live gauge, never read off the resolution:
+            // card modifiers, encounter modifiers, and relics all move coercion
+            // after the judgment computes its own delta. If a relic absorbed
+            // the penalty the gauge did not move, and the player must not be
+            // shown a punishment the relic just cancelled.
+            const coercionRise =
+              active.currentModel().dto.resources.coercion -
+              modelBefore.dto.resources.coercion;
+            // The screen is rebuilt on every submission, so the judgment feed
+            // has to be replayed onto the controller that just replaced it.
+            const presentJudgment = (): void => {
+              const controllerAfterMount = interrogation;
+              if (controllerAfterMount === undefined) return;
+              controllerAfterMount.showJudgmentFeedback(
+                buildJudgmentFeedback({
+                  resolution: result.resolution,
+                  ...(submittedStatement === undefined
+                    ? {}
+                    : { statement: submittedStatement }),
+                  evidenceNames: submittedEvidenceNames,
+                  ...(judgmentUiMap === undefined ? {} : { uiMap: judgmentUiMap }),
+                }),
+              );
+              controllerAfterMount.playCoercionRise(coercionRise);
+            };
             if (result.outcome.terminalOutcome !== null) {
               mountInterrogation();
+              presentJudgment();
               queueEncounterOutcome(
                 result.outcome,
                 result.resolution.code,
@@ -959,6 +1337,7 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
               return;
             }
             mountInterrogation();
+            presentJudgment();
             cueResolution(audio, result.resolution.code);
             showTimedDirection(
               createJudgmentDirection(
@@ -1133,6 +1512,13 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
         controller.finishStatement();
       },
     });
+    const suspectTransition = detectSuspectTransition(
+      { encounterId: lastSuspectEncounterId, statePart: lastSuspectStatePart },
+      { encounterId: active.encounterId, statePart: screenModel.suspectStatePart },
+    );
+    lastSuspectStatePart = screenModel.suspectStatePart;
+    lastSuspectEncounterId = active.encounterId;
+    if (suspectTransition !== undefined) controller.playSuspectTransition(suspectTransition);
     if (renderInitialStatement) {
       const initialFacet = active.currentModel().dto.statement.find(
         (claim) => claim.presentation !== 'HIDDEN',
@@ -1176,8 +1562,22 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
         return;
       }
       devState.nodeId = node.ref;
+      // A new node means a new suspect: the first mount must never shake.
+      lastSuspectStatePart = undefined;
+      lastSuspectEncounterId = undefined;
       if (node.kind === 'EVENT') {
-        mountEvent(node);
+        const definition = caseForNode(node);
+        const event = definition.events_noncombat.find(
+          (candidate) => candidate.event_id === node.ref,
+        );
+        const opening = event === undefined ? undefined : cutsceneForTiming(event, 'BEFORE');
+        if (opening === undefined) {
+          mountEvent(node);
+          return;
+        }
+        playCutscene(opening, (outcome) => {
+          mountEvent(node, { ...emptyEventProgress, cutsceneOutcome: outcome });
+        });
         return;
       }
       for (const key of Object.keys(resourceOverrides) as Array<keyof typeof resourceOverrides>) {

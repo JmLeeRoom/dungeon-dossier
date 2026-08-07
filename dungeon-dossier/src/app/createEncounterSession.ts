@@ -186,6 +186,14 @@ export async function createEncounterSession(
     balanceRepository.reload(),
   ]);
   const loadedCase = required(caseDefinition, `Case ${caseDirectory}`);
+  // NOTE: run-level evidence grade overrides (RunState.evidenceGradeById) are
+  // NOT applied here yet. An earlier attempt rebuilt the case with a patched
+  // evidence array, and the browser matrix caught it flipping
+  // enc_ep001_succubus from BEST_RESOLUTION to PARTIAL_RESOLUTION even though
+  // every overridden grade was already the authored value — so the regression
+  // came from cloning the case object, not from the grade itself. Wiring this
+  // needs an identity-safe path plus a browser regression, tracked as the
+  // reopened half of ASSET/FLOW work in the audit backlog.
   const loadedCards = required(cardsDefinition, 'Card catalogue');
   const loadedBalance = required(balance, 'Balance catalogue');
   const encounterId = options.encounterId ?? loadedCase.encounters[0]?.encounter_id;

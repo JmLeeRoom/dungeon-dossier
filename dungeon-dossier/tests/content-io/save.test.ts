@@ -11,6 +11,7 @@ import {
 } from '../../src/app/save';
 import { createRunState, type RunState } from '../../src/engine/run';
 import {
+  CURRENT_SAVE_VERSION,
   UnsupportedSaveVersionError,
   type SaveData,
 } from '../../src/content-io/schemas';
@@ -82,7 +83,7 @@ function semanticRunState(): RunState {
 
 function validSave(): SaveData {
   return {
-    save_version: 1,
+    save_version: CURRENT_SAVE_VERSION,
     case_id: 'case_tutorial',
     content_version: '1.0',
     run_seed: 481_516,
@@ -386,7 +387,7 @@ describe('save schema usage path', () => {
 
   it('rejects unsupported future save versions', () => {
     expect(() =>
-      exportSaveJson({ ...validSave(), save_version: 2 }),
+      exportSaveJson({ ...validSave(), save_version: 3 }),
     ).toThrow(UnsupportedSaveVersionError);
   });
 });

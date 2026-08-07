@@ -206,16 +206,46 @@ export function planBestAction(
   return { kind: 'SUBMIT', submission: pathSubmission(damagePath) };
 }
 
-/** The node-14 regression guard: always pick this choice by id, never index. */
-export const TICKET_TRADE_EVENT_ID = 'event_ep004_ticket_trade';
-export const TICKET_TRADE_CHOICE_ID = 'choice_ep004_question_broker';
-
 export function chooseEventChoice(
   eventId: string,
   choiceIds: readonly string[],
 ): string | undefined {
-  if (eventId === TICKET_TRADE_EVENT_ID) return TICKET_TRADE_CHOICE_ID;
   return choiceIds[0];
+}
+
+/**
+ * The node-14 regression guard. The canvass allows fewer attempts than it has
+ * topics, and this topic is the only writer of F-12, so a BEST run must always
+ * spend an attempt on it — by id, never by index.
+ */
+export const BROKER_CANVASS_EVENT_ID = 'event_ep004_broker_canvass';
+export const BROKER_ROUTE_TOPIC_ID = 'topic_ep004_broker_route';
+
+export function chooseCanvassTopic(
+  eventId: string,
+  topicIds: readonly string[],
+  canvassedTopicIds: readonly string[],
+): string | undefined {
+  const remaining = topicIds.filter((topicId) => !canvassedTopicIds.includes(topicId));
+  if (eventId === BROKER_CANVASS_EVENT_ID && remaining.includes(BROKER_ROUTE_TOPIC_ID)) {
+    return BROKER_ROUTE_TOPIC_ID;
+  }
+  return remaining[0];
+}
+
+/**
+ * A BEST run spends its retries: returning to the strip would abandon the node
+ * and drop the run to a worse ending. Retry only when the screen still offers it.
+ */
+export const DEAD_SCENE_RETRY_ACTION_ID = 'RETRY';
+export const DEAD_SCENE_RETURN_ACTION_ID = 'RETURN';
+
+export function chooseDeadSceneAction(
+  actionIds: readonly string[],
+): string | undefined {
+  if (actionIds.includes(DEAD_SCENE_RETRY_ACTION_ID)) return DEAD_SCENE_RETRY_ACTION_ID;
+  return actionIds.find((actionId) => actionId === DEAD_SCENE_RETURN_ACTION_ID)
+    ?? actionIds[0];
 }
 
 /** Prefer a reward the run has not claimed yet (BLK-1 detection, not avoidance). */

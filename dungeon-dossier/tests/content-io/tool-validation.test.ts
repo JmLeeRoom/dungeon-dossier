@@ -1,4 +1,5 @@
-import { readFile } from 'node:fs/promises';
+import type { Dirent } from 'node:fs';
+import { readdir, readFile } from 'node:fs/promises';
 import { URL } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
@@ -19,12 +20,46 @@ async function fixtureBundle(): Promise<ToolContentFile[]> {
     contentFile('common/balance.json'),
     contentFile('cases/tutorial/case.json'),
     contentFile('cases/tutorial/dialogue.json'),
+    // The join validator resolves each encounter to its own dialogue file, so a
+    // bundle without them is a case falling back to its embedded dialogue.
+    contentFile('cases/tutorial/dialogue/enc_tutorial_slime.json'),
+    contentFile('cases/tutorial/dialogue/enc_tutorial_harpy.json'),
+    contentFile('cases/tutorial/dialogue/enc_tutorial_minotaur.json'),
   ]);
+}
+
+/** Mirrors the file selection of tools/validate so the gate and the test agree. */
+async function contentPaths(directory = ''): Promise<readonly string[]> {
+  const entries: Dirent[] = await readdir(new URL(directory, CONTENT_ROOT), {
+    withFileTypes: true,
+  });
+  const paths: string[] = [];
+  for (const entry of entries) {
+    const relativePath = `${directory}${entry.name}`;
+    if (entry.isDirectory()) paths.push(...await contentPaths(`${relativePath}/`));
+    else if (entry.name.endsWith('.json')) paths.push(relativePath);
+  }
+  return paths.filter(
+    (relativePath) =>
+      !relativePath.startsWith('ai-cache/') &&
+      !/^common\/strings\.[a-z0-9-]+\.json$/u.test(relativePath),
+  );
 }
 
 describe('tools/validate Zod and Tier-1 bridge', () => {
   it('accepts the checked-in minimal content bundle', async () => {
     expect(validateContentFiles(await fixtureBundle())).toEqual([]);
+  });
+
+  it('joins every checked-in case with the dialogue its encounters load', async () => {
+    const files = await Promise.all((await contentPaths()).map(contentFile));
+    const problems = validateContentFiles(files);
+
+    expect(files.some((file) => file.relativePath.includes('/dialogue/'))).toBe(true);
+    expect(
+      problems,
+      problems.map((problem) => `${problem.relativePath}: ${problem.message}`).join('\n'),
+    ).toEqual([]);
   });
 
   it('reports cross-file and case reference failures', async () => {

@@ -2,6 +2,7 @@ import { Container, Graphics, Sprite } from 'pixi.js';
 import type { PartnerCooldownView, SuspectStatePart } from '../../dto';
 import { ASSET_DIMENSIONS } from '../core/assetDimensions';
 import { createPixelText } from '../core/pixelText';
+import { createSceneShake, dampedShakeOffset, type ShakeProfile } from '../core/shake';
 import { UI_PALETTE } from './theme';
 
 export interface SuspectStatePartsBounds {
@@ -39,6 +40,11 @@ export interface PortraitOptions {
 export interface PortraitController {
   readonly view: Container;
   readonly statePart: SuspectStatePart;
+  /** True while a state-transition shake is still running. */
+  readonly shaking: boolean;
+  /** Restarts the damped shake for a state the suspect just entered. */
+  playTransitionShake(to: SuspectStatePart): void;
+  update(deltaMS: number): void;
 }
 
 const STATE_PART_TINTS: Readonly<Record<SuspectStatePart, number>> = {
@@ -47,7 +53,21 @@ const STATE_PART_TINTS: Readonly<Record<SuspectStatePart, number>> = {
   lose: UI_PALETTE.blue,
 };
 
-export function createPortrait(options: PortraitOptions = {}): Container {
+/**
+ * Losing the suspect is the loudest beat in an encounter, so it shakes harder
+ * and longer than merely rattling them.
+ */
+export const PORTRAIT_SHAKE_PROFILES: Readonly<Record<SuspectStatePart, ShakeProfile>> = {
+  base: { durationMs: 400, amplitude: 10, oscillations: 5 },
+  upset: { durationMs: 400, amplitude: 10, oscillations: 5 },
+  lose: { durationMs: 550, amplitude: 12, oscillations: 5 },
+};
+
+export function portraitShakeOffset(elapsedMs: number, to: SuspectStatePart): number {
+  return dampedShakeOffset(elapsedMs, PORTRAIT_SHAKE_PROFILES[to]);
+}
+
+export function createPortrait(options: PortraitOptions = {}): PortraitController {
   const width = options.width ?? SUSPECT_PORTRAIT_SIZE.width;
   const height = options.height ?? SUSPECT_PORTRAIT_SIZE.height;
   const statePart = options.statePart ?? 'base';
@@ -98,7 +118,26 @@ export function createPortrait(options: PortraitOptions = {}): Container {
     label.position.set(width / 2, height - 5);
     view.addChild(label);
   }
-  return view;
+
+  // The resting x is captured on each play, not here: the screen positions the
+  // portrait after construction, and a re-mount can move it.
+  let shake = createSceneShake(view, PORTRAIT_SHAKE_PROFILES[statePart]);
+
+  return {
+    view,
+    statePart,
+    get shaking(): boolean {
+      return shake.active;
+    },
+    playTransitionShake(to): void {
+      shake.release();
+      shake = createSceneShake(view, PORTRAIT_SHAKE_PROFILES[to]);
+      shake.play();
+    },
+    update(deltaMS): void {
+      shake.update(deltaMS);
+    },
+  };
 }
 
 export interface PartnerPortraitOptions {
@@ -152,8 +191,8 @@ export function createPartnerPortrait(
     options.usedUrl === undefined
       ? undefined
       : createPortrait({ width, height, label: options.label, baseUrl: options.usedUrl });
-  artwork.addChild(basePortrait);
-  if (usedPortrait !== undefined) artwork.addChild(usedPortrait);
+  artwork.addChild(basePortrait.view);
+  if (usedPortrait !== undefined) artwork.addChild(usedPortrait.view);
 
   const dim = new Graphics()
     .rect(0, 0, width, height)
@@ -166,8 +205,8 @@ export function createPartnerPortrait(
   const render = (): void => {
     const ready = cooldown.state === 'base';
     if (usedPortrait !== undefined) {
-      basePortrait.visible = ready;
-      usedPortrait.visible = !ready;
+      basePortrait.view.visible = ready;
+      usedPortrait.view.visible = !ready;
     }
     artwork.alpha = ready ? 1 : 0.7;
     dim.visible = !ready;

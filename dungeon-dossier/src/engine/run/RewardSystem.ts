@@ -18,6 +18,8 @@ export interface RewardSelectionInput {
   readonly seedStream: number;
   /** Rewards already claimed this run; deprioritized so choices stay fresh. */
   readonly excludeRewardIds?: readonly string[];
+  /** Relic/enhancement reference ids the run already holds. */
+  readonly ownedReferenceIds?: readonly string[];
   readonly evaluateCondition?: RewardConditionEvaluator;
 }
 
@@ -62,6 +64,15 @@ function conditionsMet(
   });
 }
 
+/** RELIC/ENHANCEMENT grant a reference id once; a second grant is a no-op. */
+function isOwnedCollectible(
+  reward: RewardDefinition,
+  ownedReferenceIds: ReadonlySet<string>,
+): boolean {
+  if (reward.type !== 'RELIC' && reward.type !== 'ENHANCEMENT') return false;
+  return reward.reference_id !== undefined && ownedReferenceIds.has(reward.reference_id);
+}
+
 function eligibleReward(
   reward: RewardDefinition,
   input: RewardSelectionInput,
@@ -100,33 +111,33 @@ export function selectRewardChoices(
   const choiceCount = input.boss
     ? catalogue.selection.boss_choices
     : catalogue.selection.battle_choices;
-  const eligible = catalogue.rewards.filter((reward) => eligibleReward(reward, input));
+  const owned = new Set(input.ownedReferenceIds ?? []);
+  // A collectible the run already holds can never be granted twice, so offering
+  // it would spend the player's pick on nothing. It is removed from the pool
+  // outright rather than being allowed through as a last-resort backfill.
+  const offerable = catalogue.rewards.filter(
+    (reward) => eligibleReward(reward, input) && !isOwnedCollectible(reward, owned),
+  );
   const excluded = new Set(input.excludeRewardIds ?? []);
-  const fresh = eligible.filter((reward) => !excluded.has(reward.reward_id));
-  // A drained pool backfills with repeatable rewards first: re-claiming a
-  // RESOURCE or CARD grants again, while an owned ENHANCEMENT/RELIC would be
-  // a silent no-op pick. Only fall back to the full pool as a last resort.
-  const repeatable = eligible.filter(
+  const fresh = offerable.filter((reward) => !excluded.has(reward.reward_id));
+  // A drained pool backfills with repeatable rewards only: re-claiming a
+  // RESOURCE or CARD grants again.
+  const repeatable = offerable.filter(
     (reward) =>
       !excluded.has(reward.reward_id) ||
       reward.type === 'RESOURCE' ||
       reward.type === 'CARD',
   );
-  const candidates = fresh.length >= choiceCount
-    ? fresh
-    : repeatable.length >= choiceCount
-      ? repeatable
-      : eligible;
-  if (candidates.length < choiceCount) {
-    throw new Error(
-      `Reward pool has ${candidates.length.toString()} eligible entries for ${choiceCount.toString()} choices.`,
-    );
-  }
+  const candidates = fresh.length >= choiceCount ? fresh : repeatable;
+  // An exhausted tier yields no reward screen at all. Padding the row with
+  // owned collectibles would spend the pick on nothing, and throwing would turn
+  // a drained pool into a dead run at the node boundary.
+  const offeredCount = Math.min(choiceCount, candidates.length);
 
   const remaining = [...candidates];
   const choices: RewardDefinition[] = [];
   let seedStream = input.seedStream;
-  while (choices.length < choiceCount) {
+  while (choices.length < offeredCount) {
     const random = nextRewardRandom(seedStream);
     seedStream = random.seedStream;
     const index = weightedIndex(remaining, random.value);

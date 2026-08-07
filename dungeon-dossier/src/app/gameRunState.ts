@@ -6,6 +6,7 @@ import type {
 import type { EncounterOutcome } from '../engine/encounter';
 import {
   createRunState,
+  runResourceBoundsFromBalance,
   evaluateEnding,
   type EncounterGradeMetrics,
   type EncounterRunProjection,
@@ -51,6 +52,7 @@ export function createInitialGameRunState(
     dp: balance.dp.initial,
     trust: 0,
     flags: runtimeFlagDefaults(flags),
+    resourceBounds: runResourceBoundsFromBalance(balance),
     deck: {
       drawPile: startingDeck,
       hand: [],

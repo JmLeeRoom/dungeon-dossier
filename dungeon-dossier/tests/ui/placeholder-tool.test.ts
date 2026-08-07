@@ -102,7 +102,7 @@ describe('tools/placeholder CLI', () => {
       ['bg/배경_심문실_시안.png', 1280, 800],
       ['bg/배경_심문실_세피아.png', 1280, 800],
       ['bg/배경_심문실_마젠타.png', 1280, 800],
-      ['fg/전경_책상_기본.png', 1280, 236],
+      ['fg/전경_책상_기본.png', 1280, 321],
       ['portraits/portrait_물컹이_base.png', 512, 512],
       ['portraits/portrait_하피_base.png', 512, 512],
       ['portraits/portrait_미노타우로스_base.png', 512, 512],

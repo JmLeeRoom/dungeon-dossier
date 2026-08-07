@@ -1,18 +1,20 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
+  CardsSchema,
   FlagsSchema,
   GradesSchema,
   CaseSchema,
   RewardsSchema,
   RunStripSchema,
+  type ActionIntent,
 } from '../../src/engine/domain';
 import {
   completeEventNode,
   createNodeStrip,
   createRunState,
 } from '../../src/engine/run';
-import { createRunSession } from '../../src/app/createRunSession';
+import { createRunSession, type RunSession } from '../../src/app/createRunSession';
 import { SaveRepository } from '../../src/app/save';
 
 function common(file: string): unknown {
@@ -20,6 +22,26 @@ function common(file: string): unknown {
     new URL(`../../content/common/${file}`, import.meta.url),
     'utf8',
   )) as unknown;
+}
+
+const CARD_INTENTS: Readonly<Record<string, ActionIntent>> = Object.fromEntries(
+  CardsSchema.parse(common('cards.json')).cards.map((card) => [card.card_id, card.intent]),
+);
+
+function eligibleCardId(
+  run: RunSession,
+  option: Readonly<{ eligible_intents: readonly ActionIntent[] }>,
+): string {
+  const deck = run.snapshot.deck;
+  const owned = [...deck.drawPile, ...deck.hand, ...deck.discardPile, ...deck.exhaustPile];
+  const allowed = new Set<ActionIntent>(option.eligible_intents);
+  const cardId = owned.find(
+    (candidate) =>
+      allowed.size === 0 ||
+      (CARD_INTENTS[candidate] !== undefined && allowed.has(CARD_INTENTS[candidate])),
+  );
+  if (cardId === undefined) throw new Error('No eligible card for the enhancement option.');
+  return cardId;
 }
 
 function caseContent(directory: string): ReturnType<typeof CaseSchema.parse> {
@@ -422,12 +444,39 @@ describe('app run session', () => {
             eventDefinition: event,
             placement: { ...event.answer_mapping },
           });
-        } else {
+        } else if (event.pattern === 'C') {
           run.finishEvent({
             eventDefinition: event,
             investigatedSpotIds: event.spots
               .slice(0, event.attempt_limit)
               .map((spot) => spot.spot_id),
+          });
+        } else if (event.pattern === 'D') {
+          // The run starts with the full deck, so the first option always has a
+          // legal target and the authored fallback stays untested here.
+          const option = event.options[0];
+          if (option === undefined) throw new Error(`Event ${event.event_id} has no option.`);
+          run.finishEvent({
+            eventDefinition: event,
+            cardIntentsById: CARD_INTENTS,
+            optionId: option.option_id,
+            tunedCardId: eligibleCardId(run, option),
+          });
+        } else if (event.pattern === 'E') {
+          run.finishEvent({
+            eventDefinition: event,
+            canvassedTopicIds: event.topics
+              .slice(0, event.attempt_limit)
+              .map((topic) => topic.topic_id),
+          });
+        } else {
+          const held = new Set(run.snapshot.acquiredEvidenceIds);
+          run.finishEvent({
+            eventDefinition: event,
+            collectedTargetIds: event.targets
+              .filter((target) => !held.has(target.evidence_id))
+              .slice(0, event.attempt_limit)
+              .map((target) => target.target_id),
           });
         }
         continue;
@@ -473,17 +522,21 @@ describe('app run session', () => {
     expect(run.snapshot.dp).toBeGreaterThanOrEqual(230);
   });
 
-  it('makes the ep004 ticket-trade choices set opposite F-12 values', () => {
+  it('sets F-12 only when the ep004 canvass actually asks about the route', () => {
     const flags = FlagsSchema.parse(common('flags.json'));
     const ep004 = caseContent('ep004');
-    const ticketTrade = ep004.events_noncombat.find(
-      (event) => event.event_id === 'event_ep004_ticket_trade',
+    const canvass = ep004.events_noncombat.find(
+      (event) => event.event_id === 'event_ep004_broker_canvass',
     );
-    if (ticketTrade?.pattern !== 'A') throw new Error('Missing ep004 ticket-trade event.');
+    if (canvass?.pattern !== 'E') throw new Error('Missing ep004 canvass event.');
+    // The attempt limit is deliberately smaller than the topic list, so the
+    // player cannot simply take every branch.
+    expect(canvass.attempt_limit).toBeLessThan(canvass.topics.length);
+
     const strip = [{
-      nodeId: 'test_ticket_trade',
+      nodeId: 'test_broker_canvass',
       kind: 'EVENT',
-      ref: 'event_ep004_ticket_trade',
+      ref: 'event_ep004_broker_canvass',
       caseDirectory: 'ep004',
     }] as const;
     const stateFor = () => createRunState({
@@ -494,20 +547,22 @@ describe('app run session', () => {
       deck: { drawPile: [], hand: [], discardPile: [], exhaustPile: [] },
     });
 
-    const questioned = completeEventNode(stateFor(), {
+    const askedRoute = completeEventNode(stateFor(), {
       strip,
       flagDefinitions: flags.flags,
-      eventDefinition: ticketTrade,
-      choiceId: 'choice_ep004_question_broker',
+      eventDefinition: canvass,
+      canvassedTopicIds: ['topic_ep004_broker_route'],
     });
-    expect(questioned.state.flags['F-12']).toBe(true);
+    expect(askedRoute.state.flags['F-12']).toBe(true);
 
-    const bought = completeEventNode(stateFor(), {
+    const askedElsewhere = completeEventNode(stateFor(), {
       strip,
       flagDefinitions: flags.flags,
-      eventDefinition: ticketTrade,
-      choiceId: 'choice_ep004_buy_vip_ticket',
+      eventDefinition: canvass,
+      canvassedTopicIds: ['topic_ep004_night_shift', 'topic_ep004_vip_car'],
     });
-    expect(bought.state.flags['F-12']).toBe(false);
+    // flags.json re-affirms what the topic set; with the route untouched there
+    // is nothing to re-affirm, so the flag is never written at all.
+    expect(askedElsewhere.state.flags['F-12']).not.toBe(true);
   });
 });

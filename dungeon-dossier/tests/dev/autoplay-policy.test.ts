@@ -3,8 +3,9 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import {
-  TICKET_TRADE_CHOICE_ID,
-  TICKET_TRADE_EVENT_ID,
+  BROKER_CANVASS_EVENT_ID,
+  BROKER_ROUTE_TOPIC_ID,
+  chooseCanvassTopic,
   bestFillerSubmission,
   chooseEventChoice,
   chooseReward,
@@ -314,30 +315,48 @@ describe('autoplay best plan', () => {
 });
 
 describe('autoplay event choice', () => {
-  it('picks the ticket-trade broker choice by id, never by index', () => {
-    const choice = chooseEventChoice(TICKET_TRADE_EVENT_ID, [
-      'choice_ep004_buy_vip_ticket',
-      TICKET_TRADE_CHOICE_ID,
-    ]);
-    expect(choice).toBe(TICKET_TRADE_CHOICE_ID);
-    expect(TICKET_TRADE_CHOICE_ID).toBe('choice_ep004_question_broker');
+  it('takes the first offered choice for a plain pattern A node', () => {
+    expect(chooseEventChoice('event_any', ['choice_a', 'choice_b'])).toBe('choice_a');
   });
 
-  it('targets a choice that actually exists in the authored ep004 event', () => {
+  it('reports no choice rather than guessing when a node offers none', () => {
+    expect(chooseEventChoice('event_any', [])).toBeUndefined();
+  });
+});
+
+describe('autoplay canvass topic', () => {
+  it('spends an attempt on the route topic by id, never by index', () => {
+    const topic = chooseCanvassTopic(
+      BROKER_CANVASS_EVENT_ID,
+      ['topic_ep004_night_shift', BROKER_ROUTE_TOPIC_ID, 'topic_ep004_vip_car'],
+      [],
+    );
+    expect(topic).toBe(BROKER_ROUTE_TOPIC_ID);
+    expect(BROKER_ROUTE_TOPIC_ID).toBe('topic_ep004_broker_route');
+  });
+
+  it('falls back to the first remaining topic elsewhere', () => {
+    expect(chooseCanvassTopic('event_other', ['topic_a', 'topic_b'], [])).toBe('topic_a');
+    expect(chooseCanvassTopic('event_other', ['topic_a', 'topic_b'], ['topic_a'])).toBe(
+      'topic_b',
+    );
+  });
+
+  it('never repeats a topic the run already canvassed', () => {
+    expect(
+      chooseCanvassTopic(BROKER_CANVASS_EVENT_ID, [BROKER_ROUTE_TOPIC_ID], [BROKER_ROUTE_TOPIC_ID]),
+    ).toBeUndefined();
+  });
+
+  it('targets a topic that actually exists in the authored ep004 event', () => {
     const event = ep004Case.events_noncombat.find(
-      (candidate) => candidate.event_id === TICKET_TRADE_EVENT_ID,
+      (candidate) => candidate.event_id === BROKER_CANVASS_EVENT_ID,
     );
     expect(event).toBeDefined();
-    expect(event?.pattern).toBe('A');
-    if (event?.pattern !== 'A') return;
-    expect(event.choices.map((candidate) => candidate.choice_id)).toContain(
-      TICKET_TRADE_CHOICE_ID,
-    );
-  });
-
-  it('falls back to the first choice for every other event', () => {
-    expect(chooseEventChoice('event_other', ['choice_a', 'choice_b'])).toBe('choice_a');
-    expect(chooseEventChoice('event_other', [])).toBeUndefined();
+    if (event?.pattern !== 'E') throw new Error('ep004 canvass must be pattern E');
+    expect(event.topics.map((topic) => topic.topic_id)).toContain(BROKER_ROUTE_TOPIC_ID);
+    // Fewer attempts than topics is what makes the guard meaningful.
+    expect(event.attempt_limit).toBeLessThan(event.topics.length);
   });
 });
 

@@ -32,6 +32,8 @@ import {
   serializeAssetManifest,
   serializePortraitPartsManifest,
   serializeWorkbenchState,
+  setSlotAspectLock,
+  setSlotSize,
   toggleSlotLock,
   validatePngDescriptor,
   validateSlotImageDimensions,
@@ -91,7 +93,7 @@ describe('planner workbench canonical slots', () => {
       'suspect-base': { x: 212, y: 34, width: 216, height: 216 },
       'suspect-state-parts': { x: 212, y: 34, width: 216, height: 216 },
       'suspect-lose-parts': { x: 212, y: 34, width: 216, height: 216 },
-      'fg-desk': { x: 0, y: 282, width: 640, height: 118 },
+      'fg-desk': { x: 0, y: 239, width: 640, height: 161 },
       'card-base': { x: 256, y: 371, width: 128, height: 145 },
       'card-art-1': { x: 176, y: 336, width: 64, height: 64 },
       'card-art-2': { x: 248, y: 336, width: 64, height: 64 },
@@ -381,6 +383,7 @@ describe('workbench transform controller', () => {
       rotation: 0,
       scaleX: 0.5,
       scaleY: 0.25,
+      preserveAspectRatio: true,
     });
   });
 
@@ -434,7 +437,14 @@ describe('workbench transform controller', () => {
     expect(manifest.slots['card-base']).toEqual({
       dimension: 'card_base',
       image: null,
-      transform: { x: 256, y: 371, rotation: Math.PI / 4, scaleX: 0.2, scaleY: 0.2 },
+      transform: {
+        x: 256,
+        y: 371,
+        rotation: Math.PI / 4,
+        scaleX: 0.2,
+        scaleY: 0.2,
+        preserveAspectRatio: true,
+      },
       isLocked: true,
     });
     expect(manifest.slots['partner-used']?.dimension).toBe('partner');
@@ -524,6 +534,7 @@ describe('workbench persistence normalization', () => {
       rotation: Math.PI / 3,
       scaleX: 0.5,
       scaleY: 0.25,
+      preserveAspectRatio: true,
     });
     expect(persisted.locks['ev-3']).toBe(true);
     expect(persisted).not.toHaveProperty('geometry');
@@ -531,5 +542,69 @@ describe('workbench persistence normalization', () => {
 
     storage.values.set(WORKBENCH_STORAGE_KEY, '{broken');
     expect(loadWorkbenchState(storage)).toEqual(createInitialWorkbenchState());
+  });
+});
+
+describe('workbench aspect lock', () => {
+  it('locks every slot except the deliberately unlocked desk plate', () => {
+    const state = createInitialWorkbenchState();
+    expect(state.aspectLocks['fg-desk']).toBe(false);
+    expect(state.aspectLocks['card-base']).toBe(true);
+    expect(state.aspectLocks['bg-room']).toBe(true);
+  });
+
+  it('derives the opposite edge while locked and frees both edges when unlocked', () => {
+    const state = createInitialWorkbenchState();
+    // evidence is 128x128, so a locked width change must mirror into the height.
+    const locked = setSlotSize(state, 'ev-1', { width: 64 });
+    expect(locked.geometry['ev-1']).toMatchObject({ width: 64, height: 64 });
+
+    const unlocked = setSlotAspectLock(state, 'ev-1', false);
+    const distorted = setSlotSize(unlocked, 'ev-1', { width: 64, height: 16 });
+    expect(distorted.geometry['ev-1']).toMatchObject({ width: 64, height: 16 });
+  });
+
+  it('records an explicit rect in the manifest only for unlocked slots', () => {
+    const state = createInitialWorkbenchState();
+    const desk = buildSlotTransform(state, 'fg-desk');
+    expect(desk.preserveAspectRatio).toBe(false);
+    expect(desk.customWidth).toBe(640);
+    expect(desk.customHeight).toBe(161);
+
+    const card = buildSlotTransform(state, 'card-base');
+    expect(card.preserveAspectRatio).toBe(true);
+    expect(card.customWidth).toBeUndefined();
+    expect(card.customHeight).toBeUndefined();
+  });
+
+  it('constrains a corner drag to the source ratio while locked', () => {
+    const state = createInitialWorkbenchState();
+    const startRect = state.geometry['ev-1'];
+    const dragged = applyWorkbenchDrag(state, 'ev-1', {
+      mode: 'scale',
+      startPoint: { x: startRect.x + startRect.width, y: startRect.y + startRect.height },
+      currentPoint: { x: startRect.x + 80, y: startRect.y + 20 },
+      startRect,
+      startRotation: 0,
+    });
+    const result = dragged.geometry['ev-1'];
+    expect(result.width).toBe(result.height);
+
+    const free = applyWorkbenchDrag(setSlotAspectLock(state, 'ev-1', false), 'ev-1', {
+      mode: 'scale',
+      startPoint: { x: startRect.x + startRect.width, y: startRect.y + startRect.height },
+      currentPoint: { x: startRect.x + 80, y: startRect.y + 20 },
+      startRect,
+      startRotation: 0,
+    });
+    expect(free.geometry['ev-1'].width).not.toBe(free.geometry['ev-1'].height);
+  });
+
+  it('round-trips the aspect lock through localStorage', () => {
+    const state = setSlotAspectLock(createInitialWorkbenchState(), 'card-base', false);
+    const restored = normalizeWorkbenchState(JSON.parse(serializeWorkbenchState(state)) as unknown);
+    expect(restored.aspectLocks['card-base']).toBe(false);
+    expect(restored.aspectLocks['fg-desk']).toBe(false);
+    expect(restored.aspectLocks['ev-1']).toBe(true);
   });
 });

@@ -42,7 +42,6 @@ export function createCardDetailModal(
   view.addChild(backdrop);
 
   const artwork = createCardArtwork(face, {
-    detailed: true,
     ...(options.attachments === undefined ? {} : { attachments: options.attachments }),
     ...(options.resolveLayerUrl === undefined ? {} : { resolveLayerUrl: options.resolveLayerUrl }),
   });

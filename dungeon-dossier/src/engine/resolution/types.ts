@@ -34,14 +34,9 @@ export type Procedure = (typeof PROCEDURES)[number];
 export const HYPOTHESIS_RESULTS = ['NOT_APPLICABLE', 'CLEARED', 'REMAINING'] as const;
 export type HypothesisResult = (typeof HYPOTHESIS_RESULTS)[number];
 
-export type InvalidReason =
-  | 'INCOMPATIBLE_TARGET'
-  | 'TARGET_NOT_EXPOSED'
-  | 'MISSING_TARGET'
-  | 'MISSING_EVIDENCE'
-  | 'MISSING_PROOF_RULE'
-  | 'RESERVED_INTENT'
-  | 'SILENCE';
+import type { InvalidReason } from '../domain/vocabulary';
+
+export type { InvalidReason };
 
 export type TargetKind = 'CLAIM' | 'ROUTE' | 'EVIDENCE' | 'SELF' | 'SPECIAL';
 

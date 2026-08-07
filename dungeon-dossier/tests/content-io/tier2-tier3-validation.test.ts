@@ -3,10 +3,23 @@ import { URL } from 'node:url';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { validateCaseTier2AndTier3 } from '../../src/content-io/ContentSemanticValidator';
 import { validateContentFiles } from '../../src/content-io/ToolContentValidator';
-import { CaseSchema, type CaseDefinition } from '../../src/engine/domain';
+import {
+  CaseSchema,
+  RunStripSchema,
+  type CaseDefinition,
+  type RunStripDefinition,
+} from '../../src/engine/domain';
 
 const CASE_SOURCE = 'cases/tutorial/case.json';
+const CASE_DIRECTORIES = ['tutorial', 'ep001', 'ep004'] as const;
 let tutorial: CaseDefinition;
+let shippedCases: readonly (readonly [string, CaseDefinition])[];
+let runStrip: RunStripDefinition;
+
+async function readContent(relativePath: string): Promise<unknown> {
+  const source = await readFile(new URL(`../../content/${relativePath}`, import.meta.url), 'utf8');
+  return JSON.parse(source) as unknown;
+}
 
 function cloneCase(): CaseDefinition {
   return structuredClone(tutorial);
@@ -19,13 +32,28 @@ function messages(caseDefinition: CaseDefinition): string {
 }
 
 beforeAll(async () => {
-  const source = await readFile(new URL('../../content/cases/tutorial/case.json', import.meta.url), 'utf8');
-  tutorial = CaseSchema.parse(JSON.parse(source) as unknown);
+  shippedCases = await Promise.all(
+    CASE_DIRECTORIES.map(async (directory) => {
+      const relativePath = `cases/${directory}/case.json`;
+      return [relativePath, CaseSchema.parse(await readContent(relativePath))] as const;
+    }),
+  );
+  tutorial = CaseSchema.parse(await readContent(CASE_SOURCE));
+  runStrip = RunStripSchema.parse(await readContent('common/run-strip.json'));
 });
 
 describe('content validation T2/T3', () => {
   it('accepts the checked-in reachable, solvable tutorial case', () => {
     expect(validateCaseTier2AndTier3(tutorial, CASE_SOURCE)).toEqual([]);
+  });
+
+  it('accepts every shipped case against the canonical run-order frontier', () => {
+    for (const [relativePath, caseDefinition] of shippedCases) {
+      expect(
+        validateCaseTier2AndTier3(caseDefinition, relativePath, { runOrder: runStrip }),
+        relativePath,
+      ).toEqual([]);
+    }
   });
 
   it('connects T2/T3 failures to the tools/validate build gate', () => {

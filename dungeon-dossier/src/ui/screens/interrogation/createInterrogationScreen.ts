@@ -1,7 +1,10 @@
 import { Container, Graphics, Sprite } from 'pixi.js';
 import type { StatementTokenView, SuspectStatePart } from '../../../dto';
+import { ASSET_DIMENSIONS } from '../../core/assetDimensions';
+import { DEFAULT_TARGET_SCALE } from '../../core/integerScale';
 import { bindSecondaryKeyboardInput } from '../../core/input';
 import { createPixelText } from '../../core/pixelText';
+import { createSceneShake, type ShakeProfile } from '../../core/shake';
 import { createDossierScreen } from '../dossier';
 import {
   coercionWarningSlipCount,
@@ -15,6 +18,7 @@ import {
   createTagChip,
   createTypewriter,
   deriveFacetTagChipState,
+  SUSPECT_PORTRAIT_SIZE,
   UI_PALETTE,
   type CardDetailModalController,
   type CardAttachments,
@@ -23,6 +27,8 @@ import {
   type EvidenceTrayController,
   type TagChipController,
 } from '../../widgets';
+import { createJudgmentBanner, type JudgmentBannerController } from './judgmentBanner';
+import { createPulseRings, createPunishJuice, PUNISH_TIMELINE } from './punishJuice';
 import {
   canSubmitInterrogationSelection,
   type InterrogationAssetLookup,
@@ -30,6 +36,7 @@ import {
   type InterrogationCardView,
   type InterrogationScreenModel,
   type InterrogationSelection,
+  type JudgmentFeedbackView,
 } from './model';
 
 type PublicFacet = StatementTokenView['facet'];
@@ -38,9 +45,30 @@ const FACETS: readonly PublicFacet[] = ['WHO', 'WHEN', 'WHERE', 'WHAT', 'HOW', '
 
 const STAGE_WIDTH = 640;
 const STAGE_HEIGHT = 400;
-const DESK_TOP = 282;
-const TAG_ROW_Y = 250;
+/**
+ * Desk height in the 640x400 grid, rounded up so the plate always reaches the
+ * stage floor. The authored 1280x321 plate is 160.5 logical units tall; rounding
+ * down would leave a 1px gap, so it is drawn one HD pixel taller instead.
+ */
+export const DESK_LOGICAL_HEIGHT = Math.ceil(
+  ASSET_DIMENSIONS.desk_foreground.height / DEFAULT_TARGET_SCALE,
+);
+export const DESK_TOP = STAGE_HEIGHT - DESK_LOGICAL_HEIGHT;
 const TAG_ROW_HEIGHT = 26;
+/** Clearance between the tag chips and the desk edge they sit above. */
+const TAG_ROW_GAP = 8;
+export const TAG_ROW_Y = DESK_TOP - TAG_ROW_HEIGHT - TAG_ROW_GAP;
+/**
+ * On-desk widget offsets, measured from the desk edge rather than the stage
+ * floor. The values reproduce the placements the screen already used, so a
+ * taller plate adds headroom above the widgets instead of shifting them.
+ */
+export const DESK_TYPEWRITER_INSET = 49;
+export const DESK_TRAY_INSET = 53;
+export const DESK_PARTNER_INSET = 57;
+export const DESK_ACTION_INSET = 57;
+export const DESK_SECURE_INSET = 83;
+export const DESK_DOSSIER_INSET = 105;
 const CARD_HAND_SPACING = 76;
 const DEFAULT_BACKGROUND_ASSET_KEY = '배경/심문실/시안';
 const CARD_BASE_ASSET_KEY = 'card/기본/템플릿';
@@ -66,6 +94,11 @@ export interface InterrogationScreenServices {
   readonly inputTarget?: EventTarget;
 }
 
+export interface SuspectStateTransition {
+  readonly from: SuspectStatePart;
+  readonly to: SuspectStatePart;
+}
+
 export interface InterrogationScreenController {
   readonly view: Container;
   readonly selection: InterrogationSelection;
@@ -73,6 +106,13 @@ export interface InterrogationScreenController {
   appendStatementChunk(chunk: string): void;
   finishStatement(): void;
   useFallbackStatement(text: string): void;
+  /** Shows the assembled judgment line above the evidence tray. */
+  showJudgmentFeedback(feedback: JudgmentFeedbackView): void;
+  clearJudgmentFeedback(): void;
+  /** Impact juice for a coercion spike. A non-positive delta is ignored. */
+  playCoercionRise(coercionDelta: number): void;
+  /** Shakes the portrait for a state change the suspect just entered. */
+  playSuspectTransition(transition: SuspectStateTransition): void;
   update(elapsedMs: number): void;
   openDossier(): void;
   destroy(): void;
@@ -136,15 +176,17 @@ function addBackground(
     view.addChild(background);
     return;
   }
+  const roomTop = 26;
+  const floorBandTop = DESK_TOP - 72;
   const background = new Graphics()
     .rect(0, 0, STAGE_WIDTH, STAGE_HEIGHT)
     .fill(0x111b1c)
-    .rect(0, 26, STAGE_WIDTH, 256)
+    .rect(0, roomTop, STAGE_WIDTH, DESK_TOP - roomTop)
     .fill(0x192626)
-    .rect(0, 210, STAGE_WIDTH, 72)
+    .rect(0, floorBandTop, STAGE_WIDTH, DESK_TOP - floorBandTop)
     .fill(0x25302b)
-    .moveTo(0, 210)
-    .lineTo(STAGE_WIDTH, 210)
+    .moveTo(0, floorBandTop)
+    .lineTo(STAGE_WIDTH, floorBandTop)
     .stroke({ color: UI_PALETTE.panelLight, width: 2 });
   for (let x = 0; x < STAGE_WIDTH; x += 40) {
     background.moveTo(x, 26).lineTo(x, DESK_TOP).stroke({ color: 0x203130, width: 1 });
@@ -152,20 +194,24 @@ function addBackground(
   view.addChild(background);
 }
 
-/** The 1280x236 desk plate, drawn at half scale over the stage floor. */
+/**
+ * The authored 1280x321 desk plate. It is the one asset that deliberately
+ * releases its aspect lock: 321 halves to 160.5, so the plate is drawn one HD
+ * pixel taller to sit flush against the stage floor.
+ */
 function addDeskForeground(view: Container, assets: InterrogationAssetLookup | undefined): void {
   const deskUrl = assets?.resolveUrl('전경/책상/기본');
   if (deskUrl !== undefined) {
     const desk = Sprite.from(deskUrl);
     desk.position.set(0, DESK_TOP);
     desk.width = STAGE_WIDTH;
-    desk.height = STAGE_HEIGHT - DESK_TOP;
+    desk.height = DESK_LOGICAL_HEIGHT;
     view.addChild(desk);
     return;
   }
   view.addChild(
     new Graphics()
-      .rect(0, DESK_TOP, STAGE_WIDTH, STAGE_HEIGHT - DESK_TOP)
+      .rect(0, DESK_TOP, STAGE_WIDTH, DESK_LOGICAL_HEIGHT)
       .fill({ color: UI_PALETTE.panel, alpha: 0.88 })
       .moveTo(0, DESK_TOP)
       .lineTo(STAGE_WIDTH, DESK_TOP)
@@ -173,7 +219,26 @@ function addDeskForeground(view: Container, assets: InterrogationAssetLookup | u
   );
 }
 
-function addHud(view: Container, model: InterrogationScreenModel, assets: InterrogationAssetLookup | undefined): void {
+interface HudAnchors {
+  /** Centre of the 16x16 coercion icon, in stage coordinates. */
+  readonly coercionAnchor: Readonly<{ x: number; y: number }>;
+  readonly coercionIcon?: Container;
+}
+
+const COERCION_ICON_POSITION = { x: 326, y: 5 } as const;
+const HUD_ICON_SIZE = 16;
+const SUSPECT_PORTRAIT_POSITION = { x: 212, y: 34 } as const;
+const LOSE_SCENE_SHAKE: ShakeProfile = {
+  durationMs: 400,
+  amplitude: 6,
+  oscillations: 5,
+};
+
+function addHud(
+  view: Container,
+  model: InterrogationScreenModel,
+  assets: InterrogationAssetLookup | undefined,
+): HudAnchors {
   const hud = new Container();
   const plate = new Graphics().rect(0, 0, STAGE_WIDTH, 26).fill({ color: UI_PALETTE.deepInk, alpha: 0.94 });
   const suspectPlate = new Graphics()
@@ -206,17 +271,19 @@ function addHud(view: Container, model: InterrogationScreenModel, assets: Interr
   hud.addChild(plate, suspectPlate, suspect, composure, coercion);
 
   // The 32x32 source icons render as 16x16 anchors for each gauge.
+  let coercionIcon: Sprite | undefined;
   for (const [key, x] of [
     ['아이콘/평정심/기본', 139],
-    ['아이콘/강압/기본', 326],
+    ['아이콘/강압/기본', COERCION_ICON_POSITION.x],
   ] as const) {
     const url = assets?.resolveUrl(key);
     if (url === undefined) continue;
     const icon = Sprite.from(url);
-    icon.position.set(x, 5);
-    icon.width = 16;
-    icon.height = 16;
+    icon.position.set(x, COERCION_ICON_POSITION.y);
+    icon.width = HUD_ICON_SIZE;
+    icon.height = HUD_ICON_SIZE;
     hud.addChild(icon);
+    if (x === COERCION_ICON_POSITION.x) coercionIcon = icon;
   }
 
   const slips = coercionWarningSlipCount(model.dto.resources.coercion, model.coercionMax);
@@ -236,6 +303,13 @@ function addHud(view: Container, model: InterrogationScreenModel, assets: Interr
   turn.position.set(552, 9);
   hud.addChild(turn);
   view.addChild(hud);
+  return {
+    coercionAnchor: {
+      x: COERCION_ICON_POSITION.x + HUD_ICON_SIZE / 2,
+      y: COERCION_ICON_POSITION.y + HUD_ICON_SIZE / 2,
+    },
+    ...(coercionIcon === undefined ? {} : { coercionIcon }),
+  };
 }
 
 /**
@@ -317,9 +391,14 @@ export function createInterrogationScreen(
   services: InterrogationScreenServices = {},
 ): InterrogationScreenController {
   const view = new Container();
-  addBackground(view, services.assets, model.backgroundAssetKey);
-  addHud(view, model, services.assets);
-  addStatusStrip(view, model);
+  // Everything the screen owns lives under `content` so impact shakes can move
+  // the whole scene while full-screen overlays (juice, dossier, card modal)
+  // stay pinned to the stage.
+  const content = new Container();
+  view.addChild(content);
+  addBackground(content, services.assets, model.backgroundAssetKey);
+  const hudAnchors = addHud(content, model, services.assets);
+  addStatusStrip(content, model);
 
   const suspectStatePart = model.suspectStatePart;
   const baseUrl =
@@ -337,10 +416,20 @@ export function createInterrogationScreen(
     ...(baseUrl === undefined ? {} : { baseUrl }),
     ...(statePartsUrl === undefined ? {} : { statePartsUrl }),
   });
-  portrait.position.set(212, 34);
-  view.addChild(portrait);
+  portrait.view.position.set(SUSPECT_PORTRAIT_POSITION.x, SUSPECT_PORTRAIT_POSITION.y);
+  content.addChild(portrait.view);
 
   const tagControllers = new Map<PublicFacet, TagChipController>();
+  // The tag row now overlaps the suspect's lower body on purpose: desk, chips,
+  // and portrait stack into a foreground diorama. A rule marks where that
+  // foreground begins so the chips never read as floating over the portrait.
+  content.addChild(
+    new Graphics()
+      .moveTo(0, TAG_ROW_Y - 2)
+      .lineTo(STAGE_WIDTH, TAG_ROW_Y - 2)
+      .stroke({ color: UI_PALETTE.parchmentDark, width: 1, alpha: 0.7 }),
+  );
+
   const tagBounds = new Map<PublicFacet, { x: number; y: number; width: number; height: number }>();
   FACETS.forEach((facet, index) => {
     const width = index === FACETS.length - 1 ? 101 : 99;
@@ -361,10 +450,10 @@ export function createInterrogationScreen(
       controller.view.addChild(shield);
     }
     tagControllers.set(facet, controller);
-    view.addChild(controller.view);
+    content.addChild(controller.view);
   });
 
-  addDeskForeground(view, services.assets);
+  addDeskForeground(content, services.assets);
 
   const typewriter = createTypewriter({
     width: 320,
@@ -372,9 +461,9 @@ export function createInterrogationScreen(
     intervalMs: 28,
     ...(callbacks.onKeystroke === undefined ? {} : { onKeystroke: callbacks.onKeystroke }),
   });
-  typewriter.view.position.set(164, 288);
+  typewriter.view.position.set(164, DESK_TOP + DESK_TYPEWRITER_INSET);
   typewriter.useFallback(firstStatementText(model));
-  view.addChild(typewriter.view);
+  content.addChild(typewriter.view);
 
   let selectedCardId: string | undefined;
   let selectedFacet: PublicFacet | undefined;
@@ -491,8 +580,11 @@ export function createInterrogationScreen(
       onOpenDossier: openDossier,
     },
   );
-  evidenceTray.view.position.set(6, 292);
-  view.addChild(evidenceTray.view);
+  evidenceTray.view.position.set(6, DESK_TOP + DESK_TRAY_INSET);
+  content.addChild(evidenceTray.view);
+
+  const judgmentBanner: JudgmentBannerController = createJudgmentBanner();
+  content.addChild(judgmentBanner.view);
 
   const initialAttachments = Object.fromEntries(
     visibleCards.map((card) => {
@@ -548,28 +640,53 @@ export function createInterrogationScreen(
     ...(partnerBaseUrl === undefined ? {} : { baseUrl: partnerBaseUrl }),
     ...(partnerUsedUrl === undefined ? {} : { usedUrl: partnerUsedUrl }),
   });
-  partner.view.position.set(546, 296);
-  view.addChild(partner.view);
+  partner.view.position.set(546, DESK_TOP + DESK_PARTNER_INSET);
+  content.addChild(partner.view);
 
   const submitButton = createActionButton('제출 / RETURN', 82, 22, () => {
     const selection = selectionSnapshot();
     if (canSubmitInterrogationSelection(model.cards, selection)) callbacks.onSubmit?.(selection);
   });
-  submitButton.view.position.set(452, 296);
-  view.addChild(submitButton.view);
+  submitButton.view.position.set(452, DESK_TOP + DESK_ACTION_INSET);
+  content.addChild(submitButton.view);
 
   const secureButton = createActionButton('진술 확보', 78, 18, () => callbacks.onSecureStatement?.());
-  secureButton.view.position.set(452, 322);
+  secureButton.view.position.set(452, DESK_TOP + DESK_SECURE_INSET);
   secureButton.setEnabled(model.canSecureStatement === true);
-  view.addChild(secureButton.view);
+  content.addChild(secureButton.view);
 
   const dossierButton = createActionButton('조서 열기', 72, 18, openDossier);
-  dossierButton.view.position.set(452, 344);
-  view.addChild(dossierButton.view);
+  dossierButton.view.position.set(452, DESK_TOP + DESK_DOSSIER_INSET);
+  content.addChild(dossierButton.view);
 
   // The fan is the topmost desk interaction layer. A lifted right-hand card
   // must not lose pointer events to the dossier/submit controls beneath it.
-  view.addChild(cardFan.linkView, cardFan.view);
+  content.addChild(cardFan.linkView, cardFan.view);
+
+  // Above the whole scene but below the dossier and card modal, which are
+  // added to `view` only while they are open.
+  const punish = createPunishJuice(
+    { width: STAGE_WIDTH, height: STAGE_HEIGHT },
+    {
+      shakeTarget: content,
+      ...(hudAnchors.coercionIcon === undefined
+        ? {}
+        : { pulseTarget: hudAnchors.coercionIcon }),
+    },
+  );
+  view.addChild(punish.view);
+
+  // Losing the suspect reuses the coercion spike's vocabulary: a scene kick
+  // plus the same expanding rings, centred on the portrait.
+  const loseShake = createSceneShake(content, LOSE_SCENE_SHAKE);
+  const loseRings = createPulseRings({ radius: 48, colour: UI_PALETTE.red, lineWidth: 2 });
+  loseRings.setCentre(
+    SUSPECT_PORTRAIT_POSITION.x + SUSPECT_PORTRAIT_SIZE.width / 2,
+    SUSPECT_PORTRAIT_POSITION.y + SUSPECT_PORTRAIT_SIZE.height / 2,
+  );
+  loseRings.update(PUNISH_TIMELINE.ringDurationMs);
+  let loseRingsElapsedMs: number = PUNISH_TIMELINE.ringDurationMs;
+  view.addChild(loseRings.view);
 
   let unbindKeyboard = (): void => undefined;
   const inputTarget = services.inputTarget ?? (typeof window === 'undefined' ? undefined : window);
@@ -606,8 +723,32 @@ export function createInterrogationScreen(
     useFallbackStatement(text): void {
       typewriter.useFallback(text);
     },
+    showJudgmentFeedback(feedback): void {
+      judgmentBanner.show(feedback);
+    },
+    clearJudgmentFeedback(): void {
+      judgmentBanner.clear();
+    },
+    playCoercionRise(delta): void {
+      punish.play(delta, hudAnchors.coercionAnchor);
+    },
+    playSuspectTransition(transition): void {
+      if (transition.from === transition.to) return;
+      portrait.playTransitionShake(transition.to);
+      if (transition.to !== 'lose') return;
+      loseShake.play();
+      loseRingsElapsedMs = 0;
+      loseRings.update(0);
+    },
     update(elapsedMs): void {
       typewriter.update(elapsedMs);
+      punish.update(elapsedMs);
+      portrait.update(elapsedMs);
+      loseShake.update(elapsedMs);
+      if (loseRingsElapsedMs < PUNISH_TIMELINE.ringDurationMs) {
+        loseRingsElapsedMs += Math.max(0, elapsedMs);
+        loseRings.update(loseRingsElapsedMs);
+      }
     },
     openDossier,
     destroy(): void {
@@ -616,6 +757,8 @@ export function createInterrogationScreen(
       unbindKeyboard();
       closeCardModal();
       cardFan.destroy();
+      loseShake.release();
+      punish.destroy();
       if (dossierView !== undefined) dossierView.destroy({ children: true });
     },
   };

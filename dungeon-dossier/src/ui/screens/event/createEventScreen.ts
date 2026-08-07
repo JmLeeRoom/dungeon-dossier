@@ -7,6 +7,17 @@ export interface EventScreenCallbacks {
   readonly onChoice?: (choiceId: string) => void;
   readonly onPlacementSubmit?: (placement: Readonly<Record<string, string>>) => void;
   readonly onInvestigate?: (spotId: string) => void;
+  /** Pattern D: highlights an option or a target card without committing. */
+  readonly onSelectTuning?: (selection: {
+    readonly optionId?: string;
+    readonly cardId?: string;
+  }) => void;
+  /** Pattern D: commits the highlighted option onto the highlighted card. */
+  readonly onApplyTuning?: (optionId: string, cardId: string) => void;
+  /** Pattern E */
+  readonly onCanvass?: (topicId: string) => void;
+  /** Pattern F */
+  readonly onCollect?: (targetId: string) => void;
   readonly onContinue?: () => void;
 }
 
@@ -21,26 +32,54 @@ function action(
   y: number,
   width: number,
   callback: () => void,
+  enabled = true,
 ): EventActionControl {
   const view = new Container();
   view.position.set(x, y);
   view.eventMode = 'static';
-  view.cursor = 'pointer';
+  view.cursor = enabled ? 'pointer' : 'default';
   view.addChild(new Graphics().roundRect(0, 0, width, 34, 3).fill(UI_PALETTE.panel).stroke({
-    color: UI_PALETTE.parchmentDark,
+    color: enabled ? UI_PALETTE.parchmentDark : UI_PALETTE.muted,
     width: 1,
   }));
-  const text = createPixelText(label, { fontSize: 9, fill: UI_PALETTE.paper, wordWrap: true, wordWrapWidth: width - 12, align: 'center' });
+  const text = createPixelText(label, {
+    fontSize: 9,
+    fill: enabled ? UI_PALETTE.paper : UI_PALETTE.muted,
+    wordWrap: true,
+    wordWrapWidth: width - 12,
+    align: 'center',
+  });
   text.anchor.set(0.5);
   text.position.set(width / 2, 17);
   view.addChild(text);
-  view.on('pointertap', callback);
+  // A disabled action swallows the tap: the run layer would throw on an
+  // unaffordable choice and the error would never reach the player.
+  if (enabled) view.on('pointertap', callback);
   return {
     view,
     setLabel(nextLabel): void {
       text.text = nextLabel;
     },
   };
+}
+
+/** Shared attempt counter for the three limited-probe patterns (C, E, F). */
+function attemptFooter(
+  used: number,
+  limit: number,
+  costs: readonly { readonly label: string }[],
+  noun: string,
+): Container {
+  const costLabel = costs.map((cost) => cost.label).join(' · ');
+  const text = createPixelText(
+    costLabel === ''
+      ? `${noun} 횟수 ${String(used)}/${String(limit)}`
+      : `${noun} 횟수 ${String(used)}/${String(limit)}   |   회당 ${costLabel}`,
+    { fontSize: 9, fill: UI_PALETTE.amber },
+  );
+  text.anchor.set(1, 0);
+  text.position.set(592, 344);
+  return text;
 }
 
 export function createEventScreen(model: EventSceneModel, callbacks: EventScreenCallbacks = {}): Container {
@@ -64,17 +103,20 @@ export function createEventScreen(model: EventSceneModel, callbacks: EventScreen
         y,
         500,
         () => callbacks.onChoice?.(choice.choiceId),
+        choice.affordable,
       ).view);
       const costLabels = choice.costs.map((cost) => cost.label).join(' · ');
       const gainLabels = choice.gains.map((gain) => gain.label).join(' · ');
-      const parts = [
-        ...(costLabels === '' ? [] : [`비용 ${costLabels}`]),
-        ...(gainLabels === '' ? [] : [`획득 ${gainLabels}`]),
-      ];
+      const parts = choice.affordable
+        ? [
+            ...(costLabels === '' ? [] : [`비용 ${costLabels}`]),
+            ...(gainLabels === '' ? [] : [`획득 ${gainLabels}`]),
+          ]
+        : [choice.blockedReason ?? '자원 부족'];
       if (parts.length > 0) {
         const detail = createPixelText(parts.join('   |   '), {
           fontSize: 8,
-          fill: UI_PALETTE.amber,
+          fill: choice.affordable ? UI_PALETTE.amber : UI_PALETTE.red,
           wordWrap: true,
           wordWrapWidth: 500,
         });
@@ -122,16 +164,191 @@ export function createEventScreen(model: EventSceneModel, callbacks: EventScreen
       160,
       () => callbacks.onPlacementSubmit?.({ ...placement }),
     ).view);
-  } else {
+  } else if (model.pattern === 'C') {
+    const exhausted = model.attemptsUsed >= model.attemptLimit;
     model.spots.forEach((spot, index) => {
-      const disabled = spot.discovered || model.attemptsUsed >= model.attemptLimit;
-      view.addChild(action(`${spot.label}${disabled ? '  [조사 완료]' : ''}`, 70, 150 + index * 50, 500, () => {
-        if (!disabled) callbacks.onInvestigate?.(spot.spotId);
-      }).view);
+      const y = 142 + index * 54;
+      const disabled = spot.discovered || exhausted || !spot.affordable;
+      const suffix = spot.discovered
+        ? '  [조사 완료]'
+        : exhausted
+          ? '  [횟수 소진]'
+          : spot.affordable
+            ? ''
+            : '  [자원 부족]';
+      view.addChild(action(
+        `${spot.label}${suffix}`,
+        70,
+        y,
+        500,
+        () => callbacks.onInvestigate?.(spot.spotId),
+        !disabled,
+      ).view);
+      // Pattern C used to give no feedback at all: the player probed a spot and
+      // could not tell what, if anything, it had turned up.
+      if (spot.discovered && spot.findings.length > 0) {
+        const findings = createPixelText(
+          `발견 · ${spot.findings.map((finding) => finding.label).join(' · ')}`,
+          { fontSize: 8, fill: UI_PALETTE.cyan, wordWrap: true, wordWrapWidth: 500 },
+        );
+        findings.position.set(76, y + 36);
+        view.addChild(findings);
+      }
     });
-    const attempts = createPixelText(`조사 횟수 ${model.attemptsUsed}/${model.attemptLimit}`, { fontSize: 9, fill: UI_PALETTE.amber });
-    attempts.position.set(438, 330);
+    const attemptCostLabel = model.attemptCosts.map((cost) => cost.label).join(' · ');
+    const attempts = createPixelText(
+      attemptCostLabel === ''
+        ? `조사 횟수 ${model.attemptsUsed}/${model.attemptLimit}`
+        : `조사 횟수 ${model.attemptsUsed}/${model.attemptLimit}   |   회당 ${attemptCostLabel}`,
+      { fontSize: 9, fill: UI_PALETTE.amber },
+    );
+    attempts.anchor.set(1, 0);
+    attempts.position.set(592, 344);
     view.addChild(attempts);
+    if (exhausted) {
+      view.addChild(action('조사 종료', 48, 336, 140, () => callbacks.onContinue?.()).view);
+    }
+  } else if (model.pattern === 'D') {
+    if (model.fallbackNotice !== undefined) {
+      const notice = createPixelText(model.fallbackNotice, {
+        fontSize: 10,
+        fill: UI_PALETTE.amber,
+        wordWrap: true,
+        wordWrapWidth: 460,
+        align: 'center',
+      });
+      notice.anchor.set(0.5, 0);
+      notice.position.set(320, 180);
+      view.addChild(notice);
+      view.addChild(action('계속', 240, 300, 160, () => callbacks.onContinue?.()).view);
+      return view;
+    }
+    const selectedOption = model.options.find(
+      (option) => option.optionId === model.selectedOptionId,
+    );
+    const eligible = new Set(selectedOption?.eligibleCardIds ?? []);
+    const columnLabel = (text: string, x: number): void => {
+      const label = createPixelText(text, { fontSize: 9, fill: UI_PALETTE.cyan });
+      label.position.set(x, 118);
+      view.addChild(label);
+    };
+    columnLabel('강화 방식', 52);
+    columnLabel('대상 카드', 336);
+
+    model.options.forEach((option, index) => {
+      const y = 136 + index * 52;
+      const chosen = option.optionId === model.selectedOptionId;
+      view.addChild(action(
+        `${chosen ? '▶ ' : ''}${option.label}`,
+        52,
+        y,
+        260,
+        () => callbacks.onSelectTuning?.({ optionId: option.optionId }),
+        option.affordable,
+      ).view);
+      const detail = option.affordable
+        ? [...option.tuning, ...option.costs].map((entry) => entry.label).join(' · ')
+        : option.blockedReason ?? '자원 부족';
+      const text = createPixelText(detail, {
+        fontSize: 8,
+        fill: option.affordable ? UI_PALETTE.amber : UI_PALETTE.red,
+        wordWrap: true,
+        wordWrapWidth: 260,
+      });
+      text.position.set(56, y + 36);
+      view.addChild(text);
+    });
+
+    model.cards.forEach((card, index) => {
+      const y = 136 + index * 32;
+      if (y > 290) return;
+      const chosen = card.cardId === model.selectedCardId;
+      // Until an option is picked every card is offered; afterwards only the
+      // ones that option is allowed to touch stay live.
+      const selectable = selectedOption === undefined || eligible.has(card.cardId);
+      const banked = card.existingTuning.map((entry) => entry.label).join(' ');
+      view.addChild(action(
+        `${chosen ? '▶ ' : ''}${card.label}${banked === '' ? '' : `  (${banked})`}`,
+        336,
+        y,
+        252,
+        () => callbacks.onSelectTuning?.({ cardId: card.cardId }),
+        selectable,
+      ).view);
+    });
+
+    const ready =
+      model.selectedOptionId !== undefined && model.selectedCardId !== undefined;
+    view.addChild(action(
+      '강화 적용',
+      240,
+      330,
+      160,
+      () => {
+        if (model.selectedOptionId === undefined || model.selectedCardId === undefined) return;
+        callbacks.onApplyTuning?.(model.selectedOptionId, model.selectedCardId);
+      },
+      ready,
+    ).view);
+  } else if (model.pattern === 'E') {
+    const exhausted = model.attemptsUsed >= model.attemptLimit;
+    model.topics.forEach((topic, index) => {
+      const y = 136 + index * 54;
+      const disabled = topic.canvassed || exhausted || !topic.affordable;
+      const suffix = topic.canvassed
+        ? '  [탐문 완료]'
+        : exhausted
+          ? '  [횟수 소진]'
+          : topic.affordable
+            ? ''
+            : '  [자원 부족]';
+      view.addChild(action(
+        `${topic.label}${suffix}`,
+        70,
+        y,
+        500,
+        () => callbacks.onCanvass?.(topic.topicId),
+        !disabled,
+      ).view);
+      if (topic.reveal !== undefined) {
+        const reveal = createPixelText(`“${topic.reveal}”`, {
+          fontSize: 8,
+          fill: UI_PALETTE.cyan,
+          wordWrap: true,
+          wordWrapWidth: 500,
+        });
+        reveal.position.set(76, y + 36);
+        view.addChild(reveal);
+      }
+    });
+    view.addChild(attemptFooter(model.attemptsUsed, model.attemptLimit, model.attemptCosts, '탐문'));
+    view.addChild(action('탐문 종료', 48, 336, 140, () => callbacks.onContinue?.()).view);
+  } else {
+    const exhausted = model.attemptsUsed >= model.attemptLimit;
+    model.targets.forEach((target, index) => {
+      const y = 136 + index * 44;
+      const disabled =
+        target.collected || target.alreadyHeld || exhausted || !target.affordable;
+      const suffix = target.collected
+        ? '  [수집 완료]'
+        : target.alreadyHeld
+          ? '  [이미 확보]'
+          : exhausted
+            ? '  [횟수 소진]'
+            : target.affordable
+              ? ''
+              : '  [자원 부족]';
+      view.addChild(action(
+        `[${target.grade}] ${target.label}${suffix}`,
+        70,
+        y,
+        500,
+        () => callbacks.onCollect?.(target.targetId),
+        !disabled,
+      ).view);
+    });
+    view.addChild(attemptFooter(model.attemptsUsed, model.attemptLimit, model.attemptCosts, '감식'));
+    view.addChild(action('감식 종료', 48, 336, 140, () => callbacks.onContinue?.()).view);
   }
   return view;
 }

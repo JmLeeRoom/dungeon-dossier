@@ -19,15 +19,22 @@ export const CARD_SIZE = ASSET_DIMENSIONS.card_base;
 const ILLUST = ASSET_DIMENSIONS.card_illust;
 const EVIDENCE = ASSET_DIMENSIONS.evidence;
 
+/** Outer padding shared by the copy zones and the right-aligned illustration. */
+const CARD_MARGIN = 40;
+
 export const CARD_LAYER_RECTS: Readonly<Record<CardLayerId, CardLayerRect>> = {
   base: { x: 0, y: 0, width: CARD_SIZE.width, height: CARD_SIZE.height },
+  // Right-aligned so the left column can own the intent label without the two
+  // ever overlapping at fan scale.
   illust: {
-    x: (CARD_SIZE.width - ILLUST.width) / 2,
+    x: CARD_SIZE.width - ILLUST.width - CARD_MARGIN,
     y: 176,
     width: ILLUST.width,
     height: ILLUST.height,
   },
-  stamp: { x: 408, y: 493, width: 192, height: 192 },
+  // Left column, under the intent label and beside the illustration. It used
+  // to sit bottom-right, which is now the permanent description block.
+  stamp: { x: CARD_MARGIN, y: 240, width: 192, height: 192 },
   post: { x: 0, y: 0, width: CARD_SIZE.width, height: CARD_SIZE.height },
   evidence: {
     x: (CARD_SIZE.width - EVIDENCE.width) / 2,
@@ -37,8 +44,55 @@ export const CARD_LAYER_RECTS: Readonly<Record<CardLayerId, CardLayerRect>> = {
   },
 };
 
+export type CardCopyZoneId = 'cpBadge' | 'ordinal' | 'title' | 'intent' | 'description';
+
+/**
+ * The three fixed reading zones of a card face, in the same authored 640x725
+ * space as CARD_LAYER_RECTS: cost badge top-left, illustration right, and a
+ * permanent description block across the bottom.
+ */
+export const CARD_COPY_RECTS: Readonly<Record<CardCopyZoneId, CardLayerRect>> = {
+  cpBadge: { x: CARD_MARGIN, y: 44, width: 88, height: 56 },
+  ordinal: { x: CARD_SIZE.width - CARD_MARGIN - 48, y: 44, width: 48, height: 44 },
+  title: { x: 140, y: 44, width: 460, height: 96 },
+  intent: { x: CARD_MARGIN, y: 192, width: 264, height: 44 },
+  description: { x: CARD_MARGIN, y: 470, width: 560, height: 215 },
+};
+
+/**
+ * Authored sizes, not display sizes. The hand renders a card at
+ * CARD_FAN_SCALE, so 40 here is the 8px the interrogation screen shows.
+ */
+export const CARD_COPY_FONT_SIZES = {
+  title: 40,
+  cpBadge: 35,
+  ordinal: 35,
+  intent: 30,
+  description: 40,
+} as const;
+
+export const CARD_COPY_LINE_HEIGHTS = {
+  title: 44,
+  description: 46,
+} as const;
+
 /** Cards render at a fifth of their authored size inside the 640x400 grid. */
 export const CARD_FAN_SCALE = 0.2;
+
+/** Authored copy size as it actually lands on the 640x400 stage. */
+export function cardCopyDisplayFontSize(
+  authoredFontSize: number,
+  scale: number = CARD_FAN_SCALE,
+): number {
+  return authoredFontSize * scale;
+}
+
+/** Lines of description that fit the fixed block before it overflows. */
+export function cardDescriptionLineCapacity(
+  lineHeight: number = CARD_COPY_LINE_HEIGHTS.description,
+): number {
+  return Math.max(0, Math.floor(CARD_COPY_RECTS.description.height / lineHeight));
+}
 export const CARD_FAN_WIDTH = CARD_SIZE.width * CARD_FAN_SCALE;
 export const CARD_FAN_HEIGHT = CARD_SIZE.height * CARD_FAN_SCALE;
 

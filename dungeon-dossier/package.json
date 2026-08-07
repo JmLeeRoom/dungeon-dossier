@@ -15,7 +15,7 @@
     "lint": "eslint . --max-warnings 0",
     "arch": "depcruise --config dependency-cruiser.config.cjs src",
     "test": "vitest run",
-    "test:gates": "vitest run tests/ai tests/ai-contract tests/app tests/arch tests/audio tests/content tests/content-io tests/dev tests/e2e tests/engine tests/judgment tests/leakage tests/schema tests/ui",
+    "test:gates": "vitest run tests/ai tests/ai-contract tests/app tests/arch tests/audio tests/content tests/content-io tests/dev tests/e2e tests/engine tests/judgment tests/leakage tests/schema tests/tools tests/ui",
     "test:e2e": "vitest run tests/e2e",
     "autoplay": "vite --open \"/?autoplay=1&mode=watch\"",
     "autoplay:video": "vite --open \"/?autoplay=true&mode=video\"",
@@ -25,7 +25,10 @@
     "palette:check": "node tools/palette-check/index.mjs",
     "simulate:smoke": "vitest run tests/routes/smoke-best.test.ts tests/flags tests/replay",
     "simulate:full": "vitest run tests/routes tests/flags tests/replay",
-    "check": "pnpm lint && pnpm arch && pnpm typecheck && pnpm test && pnpm content:validate && pnpm palette:check && pnpm simulate:smoke && pnpm build"
+    "check": "pnpm lint && pnpm arch && pnpm typecheck && pnpm test && pnpm content:validate && pnpm palette:check && pnpm simulate:smoke && pnpm build",
+    "e2e:install": "playwright install --with-deps chromium",
+    "e2e:browser": "playwright test",
+    "e2e:browser:turbo": "playwright test --project=chromium-dpr1 br04"
   },
   "dependencies": {
     "howler": "2.2.4",
@@ -34,6 +37,7 @@
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
+    "@playwright/test": "1.56.0",
     "@types/howler": "2.2.13",
     "@types/node": "22.20.1",
     "@types/pngjs": "6.0.5",

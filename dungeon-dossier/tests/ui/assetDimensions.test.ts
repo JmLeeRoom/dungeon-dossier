@@ -78,7 +78,7 @@ describe('standard asset dimensions', () => {
     ]);
     expect(ASSET_DIMENSIONS).toEqual({
       bg_interrogation: { width: 1280, height: 800 },
-      desk_foreground: { width: 1280, height: 236 },
+      desk_foreground: { width: 1280, height: 321 },
       suspect_base: { width: 512, height: 512 },
       suspect_state_parts: { width: 512, height: 512 },
       partner: { width: 512, height: 512 },
@@ -97,8 +97,12 @@ describe('standard asset dimensions', () => {
     expect(matchesAssetDimension('evidence', { width: 128, height: 128 })).toBe(true);
     expect(matchesAssetDimension('evidence', { width: 64, height: 64 })).toBe(false);
     expect(matchesAssetAspectRatio('evidence', { width: 64, height: 64 })).toBe(true);
-    expect(matchesAssetAspectRatio('desk_foreground', { width: 640, height: 118 })).toBe(true);
-    expect(matchesAssetAspectRatio('desk_foreground', { width: 640, height: 120 })).toBe(false);
+    expect(matchesAssetAspectRatio('bg_interrogation', { width: 640, height: 400 })).toBe(true);
+    expect(matchesAssetAspectRatio('bg_interrogation', { width: 640, height: 402 })).toBe(false);
+    // The 1280x321 desk plate is the deliberate exception: an odd authored height
+    // has no aspect-true integer rectangle in the 640-wide grid.
+    expect(matchesAssetAspectRatio('desk_foreground', { width: 640, height: 160 })).toBe(false);
+    expect(matchesAssetAspectRatio('desk_foreground', { width: 640, height: 161 })).toBe(false);
     expect(assetAspectRatio('bg_interrogation')).toBe(1.6);
     expect(() => assertAssetDimension('icon_composure', { width: 32, height: 32 })).not.toThrow();
     expect(() => assertAssetDimension('icon_composure', { width: 16, height: 16 })).toThrow(
@@ -106,16 +110,27 @@ describe('standard asset dimensions', () => {
     );
   });
 
-  it('keeps every workbench slot rectangle aspect-true to its source asset', () => {
+  it('keeps every aspect-locked workbench slot rectangle true to its source asset', () => {
     for (const definition of CANONICAL_SLOTS) {
-      expect(
-        matchesAssetAspectRatio(definition.dimension, definition.defaultRect),
-        `${definition.id} (${definition.defaultRect.width}x${definition.defaultRect.height}) vs ${definition.dimension}`,
-      ).toBe(true);
+      if (definition.preserveAspectRatio !== false) {
+        expect(
+          matchesAssetAspectRatio(definition.dimension, definition.defaultRect),
+          `${definition.id} (${definition.defaultRect.width}x${definition.defaultRect.height}) vs ${definition.dimension}`,
+        ).toBe(true);
+      }
       expect(getSlotSourceDimension(definition.id)).toEqual(
         ASSET_DIMENSIONS[definition.dimension],
       );
     }
+  });
+
+  it('opts exactly one slot out of the aspect lock, and states why', () => {
+    const unlocked = CANONICAL_SLOTS.filter(
+      (definition) => definition.preserveAspectRatio === false,
+    );
+    expect(unlocked.map((definition) => definition.id)).toEqual(['fg-desk']);
+    // 321 / 2 = 160.5, so the plate is placed one HD pixel taller than aspect-true.
+    expect(unlocked[0]?.defaultRect).toEqual({ x: 0, y: 239, width: 640, height: 161 });
   });
 
   it('ships every checked-in PNG at its declared source size', async () => {
@@ -198,7 +213,14 @@ describe('asset manifest schema', () => {
     expect(manifest.slots['bg-room']).toEqual({
       dimension: 'bg_interrogation',
       image: null,
-      transform: { x: 0, y: 0, rotation: 0, scaleX: 0.5, scaleY: 0.5 },
+      transform: {
+        x: 0,
+        y: 0,
+        rotation: 0,
+        scaleX: 0.5,
+        scaleY: 0.5,
+        preserveAspectRatio: true,
+      },
       isLocked: false,
     });
     expect(manifest.slots['icon-composure']?.transform).toEqual({
@@ -207,6 +229,7 @@ describe('asset manifest schema', () => {
       rotation: 0,
       scaleX: 0.5,
       scaleY: 0.5,
+      preserveAspectRatio: true,
     });
     expect(parseAssetManifest(manifest)).toEqual(manifest);
   });

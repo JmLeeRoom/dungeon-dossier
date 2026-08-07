@@ -4,6 +4,7 @@ export * from './CaseRepository';
 export * from './ContentSemanticValidator';
 export * from './EncounterBalance';
 export * from './FallbackRepository';
+export * from './JudgmentUiMapRepository';
 export * from './RuntimeJsonRepository';
 export * from './RunCatalogRepository';
 export * from './RunStripRepository';

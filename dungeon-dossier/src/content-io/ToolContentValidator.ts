@@ -1,5 +1,9 @@
 import type { ZodType } from 'zod';
 import {
+  RESOLUTION_CODES,
+  type InvalidReason,
+} from '../engine/domain/vocabulary';
+import {
   BalanceSchema,
   CardsSchema,
   CaseSchema,
@@ -12,6 +16,7 @@ import {
   RewardsSchema,
   RunStripSchema,
   type CaseDefinition,
+  type DialogueDefinition,
 } from './schemas';
 import { validateCaseTier2AndTier3 } from './ContentSemanticValidator';
 import { SchemaValidator, type ValidationIssue } from './SchemaValidator';
@@ -436,6 +441,370 @@ function validateCommonReferences(
   return problems;
 }
 
+/**
+ * `Resolution.reactionKey` is the invalid reason when one is set and the
+ * resolution code otherwise, so both enums bound what the resolver can ask the
+ * dialogue for. The resolver publishes the reasons as a type only, so this
+ * record re-states them; a new reason breaks compilation here instead of
+ * silently shrinking the required set.
+ */
+const INVALID_REASON_REACTION_KEYS: Readonly<Record<InvalidReason, true>> = {
+  INCOMPATIBLE_TARGET: true,
+  TARGET_NOT_EXPOSED: true,
+  MISSING_TARGET: true,
+  MISSING_EVIDENCE: true,
+  MISSING_PROOF_RULE: true,
+  RESERVED_INTENT: true,
+  SILENCE: true,
+};
+
+const EMITTABLE_REACTION_KEYS: ReadonlySet<string> = new Set<string>([
+  ...RESOLUTION_CODES,
+  ...Object.keys(INVALID_REASON_REACTION_KEYS),
+]);
+
+const DIALOGUE_KEY_SECTIONS = ['speaker_profiles', 'statements', 'reactions'] as const;
+
+type JoinIssueCode = 'DUPLICATE_ID' | 'MISSING_FALLBACK' | 'UNRESOLVED_REFERENCE';
+
+interface EncounterJoinView {
+  readonly encounterId: string;
+  readonly targetEntity: string;
+  readonly claimIds: ReadonlySet<string>;
+  readonly flowReactionKeys: ReadonlySet<string>;
+}
+
+interface CaseJoinView {
+  readonly relativePath: string;
+  readonly directory: string;
+  readonly definition: CaseDefinition;
+  readonly rawDialogue: JsonObject | undefined;
+  readonly encounters: readonly EncounterJoinView[];
+  readonly entityIds: ReadonlySet<string>;
+  readonly claimIds: ReadonlySet<string>;
+}
+
+interface DialogueJoinSource {
+  readonly relativePath: string;
+  /** Issue-location prefix; dialogue embedded in a case sits under `$.dialogue`. */
+  readonly locationPrefix: string;
+  /** Pre-parse object, because trimmed id keys collapse during parsing. */
+  readonly rawSections: JsonObject | undefined;
+  readonly definition: DialogueDefinition;
+  readonly caseView: CaseJoinView;
+  /** Encounters this source is authored for. */
+  readonly scope: readonly EncounterJoinView[];
+  /** Encounters that load this source at runtime, per createEncounterSession. */
+  readonly served: readonly EncounterJoinView[];
+  readonly scopeLabel: string;
+}
+
+interface DialogueFileReference {
+  readonly directory: string;
+  readonly encounterId: string;
+  readonly file: ValidatedFile;
+}
+
+function joinProblem(
+  relativePath: string,
+  code: JoinIssueCode,
+  location: string,
+  message: string,
+): ToolValidationProblem {
+  return {
+    kind: 'tier1',
+    relativePath,
+    message: `[${code}] ${location === '' ? '$' : `$.${location}`}: ${message}`,
+  };
+}
+
+function encounterJoinViews(
+  definition: CaseDefinition,
+): readonly EncounterJoinView[] {
+  return definition.encounters.map((encounter) => ({
+    encounterId: encounter.encounter_id,
+    targetEntity: encounter.target_entity,
+    claimIds: new Set(encounter.rounds.flatMap((round) => round.statement_claims)),
+    flowReactionKeys: new Set(encounter.flow_nodes.map((node) => node.reaction_key)),
+  }));
+}
+
+function caseJoinView(file: ValidatedFile, directory: string): CaseJoinView {
+  const definition = file.data as CaseDefinition;
+  return {
+    relativePath: file.relativePath,
+    directory,
+    definition,
+    rawDialogue: asObject(asObject(file.value)?.dialogue),
+    encounters: encounterJoinViews(definition),
+    entityIds: new Set(definition.entities.map((entity) => entity.entity_id)),
+    claimIds: new Set(definition.claims.map((claim) => claim.claim_id)),
+  };
+}
+
+function duplicateKeyProblems(source: DialogueJoinSource): ToolValidationProblem[] {
+  const problems: ToolValidationProblem[] = [];
+  for (const section of DIALOGUE_KEY_SECTIONS) {
+    const raw = asObject(source.rawSections?.[section]);
+    if (!raw) continue;
+    const firstSpelling = new Map<string, string>();
+    for (const key of Object.keys(raw)) {
+      const id = key.trim();
+      const previous = firstSpelling.get(id);
+      if (previous === undefined) {
+        firstSpelling.set(id, key);
+        continue;
+      }
+      problems.push(
+        joinProblem(
+          source.relativePath,
+          'DUPLICATE_ID',
+          `${source.locationPrefix}${section}.${id}`,
+          `Duplicate ${section} key: "${previous}" and "${key}" resolve to ${id}`,
+        ),
+      );
+    }
+  }
+  return problems;
+}
+
+function speakerJoinProblems(source: DialogueJoinSource): ToolValidationProblem[] {
+  const problems: ToolValidationProblem[] = [];
+  const interrogated = new Set(source.scope.map((encounter) => encounter.targetEntity));
+  for (const entityId of Object.keys(source.definition.speaker_profiles)) {
+    if (!source.caseView.entityIds.has(entityId)) {
+      problems.push(
+        joinProblem(
+          source.relativePath,
+          'UNRESOLVED_REFERENCE',
+          `${source.locationPrefix}speaker_profiles.${entityId}`,
+          `Unresolved entity reference: ${entityId}`,
+        ),
+      );
+      continue;
+    }
+    if (!interrogated.has(entityId)) {
+      problems.push(
+        joinProblem(
+          source.relativePath,
+          'UNRESOLVED_REFERENCE',
+          `${source.locationPrefix}speaker_profiles.${entityId}`,
+          `Speaker profile is never interrogated by ${source.scopeLabel}: ${entityId}`,
+        ),
+      );
+    }
+  }
+  for (const encounter of source.served) {
+    const authored =
+      source.definition.speaker_profiles[encounter.targetEntity] ??
+      source.caseView.definition.dialogue.speaker_profiles[encounter.targetEntity];
+    if (authored !== undefined) continue;
+    problems.push(
+      joinProblem(
+        source.relativePath,
+        'MISSING_FALLBACK',
+        `${source.locationPrefix}speaker_profiles.${encounter.targetEntity}`,
+        `Encounter ${encounter.encounterId} has no speaker profile: ${encounter.targetEntity}`,
+      ),
+    );
+  }
+  return problems;
+}
+
+function statementJoinProblems(source: DialogueJoinSource): ToolValidationProblem[] {
+  const problems: ToolValidationProblem[] = [];
+  const presented = new Set(
+    source.scope.flatMap((encounter) => [...encounter.claimIds]),
+  );
+  for (const claimId of Object.keys(source.definition.statements)) {
+    if (!source.caseView.claimIds.has(claimId)) {
+      problems.push(
+        joinProblem(
+          source.relativePath,
+          'UNRESOLVED_REFERENCE',
+          `${source.locationPrefix}statements.${claimId}`,
+          `Unresolved claim reference: ${claimId}`,
+        ),
+      );
+      continue;
+    }
+    if (!presented.has(claimId)) {
+      problems.push(
+        joinProblem(
+          source.relativePath,
+          'UNRESOLVED_REFERENCE',
+          `${source.locationPrefix}statements.${claimId}`,
+          `Claim is never presented by ${source.scopeLabel}: ${claimId}`,
+        ),
+      );
+    }
+  }
+  for (const encounter of source.served) {
+    for (const claimId of encounter.claimIds) {
+      if (source.definition.statements[claimId] !== undefined) continue;
+      problems.push(
+        joinProblem(
+          source.relativePath,
+          'MISSING_FALLBACK',
+          `${source.locationPrefix}statements.${claimId}.fallback`,
+          `Encounter ${encounter.encounterId} presents a claim with no statement: ${claimId}`,
+        ),
+      );
+    }
+  }
+  return problems;
+}
+
+function reactionJoinProblems(source: DialogueJoinSource): ToolValidationProblem[] {
+  const problems: ToolValidationProblem[] = [];
+  const authored = new Set(Object.keys(source.definition.reactions));
+  // Flow nodes name their own reaction keys, so they widen what may be
+  // authored without widening what the resolver asks for after an action.
+  const flowKeys = new Set(
+    source.scope.flatMap((encounter) => [...encounter.flowReactionKeys]),
+  );
+  for (const reactionKey of authored) {
+    if (EMITTABLE_REACTION_KEYS.has(reactionKey) || flowKeys.has(reactionKey)) continue;
+    problems.push(
+      joinProblem(
+        source.relativePath,
+        'UNRESOLVED_REFERENCE',
+        `${source.locationPrefix}reactions.${reactionKey}`,
+        `No resolution code, invalid reason, or flow node of ${source.scopeLabel} emits this reaction key: ${reactionKey}`,
+      ),
+    );
+  }
+  if (source.served.length === 0) return problems;
+  for (const reactionKey of EMITTABLE_REACTION_KEYS) {
+    if (authored.has(reactionKey)) continue;
+    problems.push(
+      joinProblem(
+        source.relativePath,
+        'MISSING_FALLBACK',
+        `${source.locationPrefix}reactions.${reactionKey}`,
+        `Resolver can emit this reaction key but ${source.scopeLabel} has no line: ${reactionKey}`,
+      ),
+    );
+  }
+  return problems;
+}
+
+function dialogueJoinSources(
+  caseView: CaseJoinView,
+  caseScopeFile: ValidatedFile | undefined,
+  encounterScopeFiles: readonly DialogueFileReference[],
+): readonly DialogueJoinSource[] {
+  const dedicated = new Map(
+    encounterScopeFiles.map((reference) => [reference.encounterId, reference.file]),
+  );
+  const caseScopeLabel = `case ${caseView.directory}`;
+  const sources: DialogueJoinSource[] = [{
+    relativePath: caseView.relativePath,
+    locationPrefix: 'dialogue.',
+    rawSections: caseView.rawDialogue,
+    definition: caseView.definition.dialogue,
+    caseView,
+    scope: caseView.encounters,
+    served: caseView.encounters.filter(
+      (encounter) => !dedicated.has(encounter.encounterId),
+    ),
+    scopeLabel: caseScopeLabel,
+  }];
+  if (caseScopeFile !== undefined) {
+    sources.push({
+      relativePath: caseScopeFile.relativePath,
+      locationPrefix: '',
+      rawSections: asObject(caseScopeFile.value),
+      definition: caseScopeFile.data as DialogueDefinition,
+      caseView,
+      scope: caseView.encounters,
+      // FallbackRepository.load() backs the developer console only; the session
+      // falls back to the case-embedded dialogue, never to this file.
+      served: [],
+      scopeLabel: caseScopeLabel,
+    });
+  }
+  for (const encounter of caseView.encounters) {
+    const file = dedicated.get(encounter.encounterId);
+    if (file === undefined) continue;
+    sources.push({
+      relativePath: file.relativePath,
+      locationPrefix: '',
+      rawSections: asObject(file.value),
+      definition: file.data as DialogueDefinition,
+      caseView,
+      scope: [encounter],
+      served: [encounter],
+      scopeLabel: encounter.encounterId,
+    });
+  }
+  return sources;
+}
+
+function validateDialogueJoins(files: readonly ValidatedFile[]): ToolValidationProblem[] {
+  const caseViews = new Map<string, CaseJoinView>();
+  const caseScopeFiles = new Map<string, ValidatedFile>();
+  const encounterScopeFiles: DialogueFileReference[] = [];
+
+  for (const file of files) {
+    const path = normalisePath(file.relativePath);
+    if (file.kind === 'case') {
+      const directory = path.match(/^cases\/([a-z0-9_-]+)\/case\.json$/u)?.[1];
+      if (directory !== undefined) caseViews.set(directory, caseJoinView(file, directory));
+      continue;
+    }
+    if (file.kind !== 'dialogue') continue;
+    const caseScope = path.match(/^cases\/([a-z0-9_-]+)\/dialogue\.json$/u)?.[1];
+    if (caseScope !== undefined) {
+      caseScopeFiles.set(caseScope, file);
+      continue;
+    }
+    const encounterScope = path.match(
+      /^cases\/([a-z0-9_-]+)\/dialogue\/([a-z0-9_-]+)\.json$/u,
+    );
+    const directory = encounterScope?.[1];
+    const encounterId = encounterScope?.[2];
+    if (directory !== undefined && encounterId !== undefined) {
+      encounterScopeFiles.push({ directory, encounterId, file });
+    }
+  }
+
+  const problems: ToolValidationProblem[] = [];
+  for (const [directory, caseView] of caseViews) {
+    const encounterIds = new Set(
+      caseView.encounters.map((encounter) => encounter.encounterId),
+    );
+    const owned = encounterScopeFiles.filter(
+      (reference) => reference.directory === directory,
+    );
+    for (const reference of owned) {
+      if (encounterIds.has(reference.encounterId)) continue;
+      problems.push(
+        joinProblem(
+          reference.file.relativePath,
+          'UNRESOLVED_REFERENCE',
+          '',
+          `Dialogue file name does not match an encounter of case ${directory}: ${reference.encounterId}`,
+        ),
+      );
+    }
+    const sources = dialogueJoinSources(
+      caseView,
+      caseScopeFiles.get(directory),
+      owned.filter((reference) => encounterIds.has(reference.encounterId)),
+    );
+    for (const source of sources) {
+      problems.push(
+        ...duplicateKeyProblems(source),
+        ...speakerJoinProblems(source),
+        ...statementJoinProblems(source),
+        ...reactionJoinProblems(source),
+      );
+    }
+  }
+  return problems;
+}
+
 export function validateContentFiles(
   files: readonly ToolContentFile[],
 ): readonly ToolValidationProblem[] {
@@ -476,5 +845,6 @@ export function validateContentFiles(
     );
   }
   problems.push(...validateCommonReferences(validated, definitions));
+  problems.push(...validateDialogueJoins(validated));
   return problems;
 }

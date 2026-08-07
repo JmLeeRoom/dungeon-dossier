@@ -126,15 +126,29 @@ export type AutoplayScene = AutoplayScenePresentation & (
   | {
       readonly kind: 'EVENT';
       readonly eventId: string;
-      readonly pattern: 'A' | 'B' | 'C';
+      readonly pattern: 'A' | 'B' | 'C' | 'D' | 'E' | 'F';
       readonly choiceIds: readonly string[];
       readonly answerMapping: Readonly<Record<string, string>>;
       readonly spotIds: readonly string[];
       readonly discoveredSpotIds: readonly string[];
       readonly attemptLimit: number;
+      /** Pattern D: tuning options and the cards each one may target. */
+      readonly tuningOptionIds: readonly string[];
+      readonly tuningCardIdsByOption: Readonly<Record<string, readonly string[]>>;
+      /** Pattern E */
+      readonly topicIds: readonly string[];
+      readonly canvassedTopicIds: readonly string[];
+      /** Pattern F */
+      readonly collectTargetIds: readonly string[];
+      readonly collectedTargetIds: readonly string[];
       choose(choiceId: string): void;
       submitPlacement(mapping: Readonly<Record<string, string>>): void;
       investigate(spotId: string): void;
+      applyTuning(optionId: string, cardId: string): void;
+      canvass(topicId: string): void;
+      collect(targetId: string): void;
+      /** Ends a limited-probe node early; patterns D/E/F only. */
+      finish(): void;
     }
   | {
       readonly kind: 'EVENT_RESULT';
@@ -171,6 +185,13 @@ export type AutoplayScene = AutoplayScenePresentation & (
       readonly kind: 'ENDING';
       readonly endingId: string;
       restart(): void;
+    }
+  | {
+      readonly kind: 'DEAD_SCENE';
+      readonly reason: string;
+      /** Only the actions the player may actually take right now. */
+      readonly actionIds: readonly string[];
+      act(actionId: string): void;
     }
 );
 

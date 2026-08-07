@@ -7,3 +7,4 @@ export * from './integerScale';
 export * from './pixelText';
 export * from './runtimeAssetRegistry';
 export * from './sceneManager';
+export * from './shake';

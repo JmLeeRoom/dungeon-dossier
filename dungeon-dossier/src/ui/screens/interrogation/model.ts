@@ -17,6 +17,28 @@ export interface InterrogationTurnView {
   readonly limit: number;
 }
 
+export const JUDGMENT_FEEDBACK_TONES = [
+  'CONTRADICTION',
+  'SUPPORT',
+  'MISS',
+  'INVALID',
+] as const;
+export type JudgmentFeedbackTone = (typeof JUDGMENT_FEEDBACK_TONES)[number];
+
+/**
+ * Fully localized judgment copy. The app layer owns every string-key lookup so
+ * the screen only ever receives display text.
+ */
+export interface JudgmentFeedbackView {
+  readonly tone: JudgmentFeedbackTone;
+  readonly headline: string;
+  readonly statementQuote: string;
+  readonly evidenceQuote: string;
+  readonly detail: string;
+  /** The assembled single-line banner copy. */
+  readonly text: string;
+}
+
 /**
  * Presentation-only values that are not part of the engine's public knowledge
  * projection. The UI still receives the game state exclusively through

@@ -1,4 +1,10 @@
-import type { CaseDefinition, Condition, EvidenceDefinition, ProofRule } from '../engine/domain';
+import type {
+  CaseDefinition,
+  Condition,
+  EncounterDefinition,
+  EvidenceDefinition,
+  ProofRule,
+} from '../engine/domain';
 
 export type SemanticValidationTier = 'tier2' | 'tier3';
 
@@ -6,6 +12,25 @@ export interface SemanticValidationProblem {
   readonly kind: SemanticValidationTier;
   readonly relativePath: string;
   readonly message: string;
+}
+
+/** One stop of the canonical run order; only the content reference is needed. */
+export interface RunOrderNode {
+  readonly ref: string;
+}
+
+/** Structural projection of the run strip; a parsed `RunStripDefinition` satisfies it. */
+export interface RunOrder {
+  readonly nodes: readonly RunOrderNode[];
+}
+
+export interface SemanticValidationOptions {
+  /**
+   * Supplying the canonical run order enables the acquisition frontier pass.
+   * Without it the reachability tier stays a whole-case approximation, which
+   * accepts proof paths the player could not have walked yet.
+   */
+  readonly runOrder?: RunOrder;
 }
 
 type JsonObject = Record<string, unknown>;
@@ -309,9 +334,168 @@ function aiContractProblems(
   return problems;
 }
 
+/** Everything the player has unlocked up to, and including, the current run node. */
+interface AcquisitionFrontier {
+  /** Evidence handed over directly, independently of its authored acquire node. */
+  readonly grantedEvidenceIds: Set<string>;
+  /** Acquire origins already passed: flow/event nodes, opened routes, set flags. */
+  readonly unlockedOriginIds: Set<string>;
+  /** Routes opened so far; kept apart because unlock chains must be re-expanded. */
+  readonly openedRouteIds: Set<string>;
+}
+
+/** One encounter stop of the run order, with the state the player holds there. */
+interface FrontierStop {
+  readonly orderIndex: number;
+  readonly encounterIndex: number;
+  readonly encounter: EncounterDefinition;
+  readonly acquirableEvidenceIds: ReadonlySet<string>;
+}
+
+/**
+ * Run effects are authored at several nesting depths (choices, spots, topics,
+ * modifiers, outcomes), so the frontier harvests them structurally rather than
+ * teaching this pass every event pattern shape.
+ */
+function collectFrontierEffects(value: unknown, frontier: AcquisitionFrontier): void {
+  if (Array.isArray(value)) {
+    value.forEach((child) => { collectFrontierEffects(child, frontier); });
+    return;
+  }
+  if (value === null || typeof value !== 'object') return;
+  const object = value as JsonObject;
+  const target = object.target;
+  if (typeof target === 'string') {
+    if (object.type === 'GRANT_EVIDENCE') frontier.grantedEvidenceIds.add(target);
+    if (object.type === 'OPEN_ROUTE') {
+      frontier.openedRouteIds.add(target);
+      frontier.unlockedOriginIds.add(target);
+    }
+    if (object.type === 'SET_FLAG') frontier.unlockedOriginIds.add(target);
+  }
+  Object.values(object).forEach((child) => { collectFrontierEffects(child, frontier); });
+}
+
+/**
+ * Replays the canonical run order and records, for every encounter stop, the
+ * evidence a player could already be holding when that encounter is played.
+ */
+function walkRunOrder(
+  caseDefinition: CaseDefinition,
+  runOrder: RunOrder,
+): Readonly<{ stops: readonly FrontierStop[]; complete: ReadonlySet<string> }> {
+  const encounterIndexById = new Map(
+    caseDefinition.encounters.map((encounter, index) => [encounter.encounter_id, index]),
+  );
+  const eventById = new Map(caseDefinition.events_noncombat.map((event) => [event.event_id, event]));
+  const frontier: AcquisitionFrontier = {
+    grantedEvidenceIds: new Set<string>(),
+    unlockedOriginIds: new Set<string>(),
+    openedRouteIds: new Set<string>(),
+  };
+
+  const settleRoutes = (): void => {
+    // Opening one route also unlocks whatever it chains into.
+    const opened = routeReachability(caseDefinition, [...frontier.openedRouteIds]).reachable;
+    opened.forEach((routeId) => frontier.unlockedOriginIds.add(routeId));
+  };
+  const snapshot = (): ReadonlySet<string> => new Set([
+    ...frontier.grantedEvidenceIds,
+    ...caseDefinition.evidence
+      .filter((evidence) => frontier.unlockedOriginIds.has(evidence.acquire.node))
+      .map((evidence) => evidence.evidence_id),
+  ]);
+
+  const stops: FrontierStop[] = [];
+  for (const [orderIndex, orderNode] of runOrder.nodes.entries()) {
+    const event = eventById.get(orderNode.ref);
+    if (event !== undefined) {
+      frontier.unlockedOriginIds.add(event.node);
+      collectFrontierEffects(event, frontier);
+      // Pattern F hands over its sweep targets without an explicit run effect.
+      if (event.pattern === 'F') {
+        event.targets.forEach((target) => frontier.grantedEvidenceIds.add(target.evidence_id));
+      }
+      settleRoutes();
+      continue;
+    }
+
+    const encounterIndex = encounterIndexById.get(orderNode.ref);
+    const encounter = encounterIndex === undefined
+      ? undefined
+      : caseDefinition.encounters[encounterIndex];
+    // Strip nodes owned by another case carry no state for this one.
+    if (encounterIndex === undefined || encounter === undefined) continue;
+
+    const { outcomes, ...duringEncounter } = encounter;
+    for (const flowNode of encounter.flow_nodes) {
+      frontier.unlockedOriginIds.add(flowNode.node_id);
+      flowNode.open_route_ids.forEach((routeId) => {
+        frontier.openedRouteIds.add(routeId);
+        frontier.unlockedOriginIds.add(routeId);
+      });
+    }
+    collectFrontierEffects(duringEncounter, frontier);
+    settleRoutes();
+    stops.push({ orderIndex, encounterIndex, encounter, acquirableEvidenceIds: snapshot() });
+
+    // Outcome payouts settle after the encounter, so they feed later nodes only.
+    collectFrontierEffects(outcomes, frontier);
+    for (const outcome of outcomes) {
+      outcome.rewards?.evidence?.forEach((evidenceId) => frontier.grantedEvidenceIds.add(evidenceId));
+      Object.keys(outcome.rewards?.flags ?? {}).forEach((flagId) =>
+        frontier.unlockedOriginIds.add(flagId));
+    }
+    settleRoutes();
+  }
+  return { stops, complete: snapshot() };
+}
+
+/**
+ * Judges every required objective against the state frontier at its own run
+ * position. The whole-case reachability pass above cannot see time, so it
+ * accepts proof paths fed by evidence that only unlocks at a later node.
+ */
+function acquisitionFrontierProblems(
+  caseDefinition: CaseDefinition,
+  relativePath: string,
+  runOrder: RunOrder,
+  rulesByClaim: ReadonlyMap<string, readonly ProofRule[]>,
+): readonly SemanticValidationProblem[] {
+  const problems: SemanticValidationProblem[] = [];
+  const { stops, complete } = walkRunOrder(caseDefinition, runOrder);
+
+  for (const stop of stops) {
+    for (const [objectiveIndex, objective] of stop.encounter.objectives.required.entries()) {
+      const claimId = objective.claim_id;
+      if (claimId === undefined) continue;
+      const sets = (rulesByClaim.get(claimId) ?? [])
+        .flatMap(ruleEvidenceSets)
+        .filter((set) => set.length > 0);
+      const held = stop.acquirableEvidenceIds;
+      if (sets.some((set) => set.every((evidenceId) => held.has(evidenceId)))) continue;
+      // Sets that never become acquirable belong to NO_SOLVABLE_PATH, not here.
+      const deferred = sets.filter((set) => set.every((evidenceId) => complete.has(evidenceId)));
+      if (deferred.length === 0) continue;
+      const pending = [
+        ...new Set(deferred.flat().filter((evidenceId) => !held.has(evidenceId))),
+      ].sort();
+      problems.push(problem(
+        'tier2', relativePath, 'PROOF_PATH_NOT_YET_ACQUIRABLE',
+        `encounters.${stop.encounterIndex.toString()}.objectives.required.${objectiveIndex.toString()}`,
+        `required claim ${claimId} has no guaranteed evidence set acquirable at run node ` +
+        `${(stop.orderIndex + 1).toString()} (${stop.encounter.encounter_id}); ` +
+        `${pending.join(', ')} unlock only later in the run order`,
+      ));
+    }
+  }
+  return problems;
+}
+
 export function validateCaseTier2AndTier3(
   caseDefinition: CaseDefinition,
   relativePath: string,
+  options: SemanticValidationOptions = {},
 ): readonly SemanticValidationProblem[] {
   const problems: SemanticValidationProblem[] = [];
   const requiredClaims = requiredClaimIds(caseDefinition);
@@ -444,5 +628,13 @@ export function validateCaseTier2AndTier3(
     ));
   }
   problems.push(...aiContractProblems(caseDefinition, relativePath));
+  if (options.runOrder !== undefined) {
+    problems.push(...acquisitionFrontierProblems(
+      caseDefinition,
+      relativePath,
+      options.runOrder,
+      rulesByClaim,
+    ));
+  }
   return problems;
 }

@@ -1,7 +1,8 @@
-import type { SaveData } from '../../content-io';
+import { CURRENT_SAVE_VERSION, type SaveData } from '../../content-io';
 import {
   createRunState,
   type NodeDefinition,
+  type RunResourceBounds,
   type RunState,
 } from '../../engine/run';
 import type { SaveRepository } from './SaveRepository';
@@ -139,6 +140,17 @@ export function assertRestoredRunStateSemantics(
   assertKnownIds('enhancements', state.acquiredEnhancementIds, catalog.enhancementIds);
   assertKnownIds('evidence', state.acquiredEvidenceIds, catalog.evidenceIds);
   assertKnownIds('flags', Object.keys(state.flags), catalog.flagIds);
+  assertKnownIds('card tuning', Object.keys(state.cardTuning), catalog.cardIds);
+  // A grade override for evidence the run never acquired would resurface as a
+  // phantom pouch entry the moment an encounter reads the override map.
+  assertKnownIds(
+    'evidence grades',
+    Object.keys(state.evidenceGradeById),
+    state.acquiredEvidenceIds,
+  );
+  if (!Number.isInteger(state.retryCount) || state.retryCount < 0) {
+    throw new Error('Saved retry count must be a non-negative integer.');
+  }
 }
 
 /**
@@ -197,7 +209,7 @@ export function toRunSaveData(
   metadata: RunSaveMetadata,
 ): SaveData {
   return {
-    save_version: 1,
+    save_version: CURRENT_SAVE_VERSION,
     case_id: metadata.caseId,
     content_version: metadata.contentVersion,
     run_seed: state.runSeed,
@@ -232,6 +244,20 @@ export function toRunSaveData(
       pending_reward_ids: [...state.pendingRewardIds],
       claimed_reward_ids: [...state.claimedRewardIds],
       acquired_evidence_ids: [...state.acquiredEvidenceIds],
+      card_tuning: Object.fromEntries(
+        Object.entries(state.cardTuning).map(([cardId, tuning]) => [
+          cardId,
+          {
+            cp_delta: tuning.cpDelta,
+            composure_damage_delta: tuning.composureDamageDelta,
+            coercion_delta: tuning.coercionDelta,
+          },
+        ]),
+      ),
+      canvassed_topic_ids: [...state.canvassedTopicIds],
+      evidence_grade_by_id: { ...state.evidenceGradeById },
+      open_route_ids: [...state.openRouteIds],
+      retry_count: state.retryCount,
       grade_history: state.gradeHistory.map((record) => ({
         node_id: record.nodeId,
         outcome: record.outcome,
@@ -246,8 +272,16 @@ export function toRunSaveData(
   };
 }
 
-export function restoreRunState(save: SaveData): RunState {
+/**
+ * Bounds are derived from balance.json rather than persisted, so a rebalanced
+ * ceiling applies to a save in flight instead of being frozen at write time.
+ */
+export function restoreRunState(
+  save: SaveData,
+  resourceBounds: RunResourceBounds = {},
+): RunState {
   const initial = createRunState({
+    resourceBounds,
     runSeed: save.run_seed,
     stress: save.resources.stress,
     dp: save.resources.dp,
@@ -275,6 +309,20 @@ export function restoreRunState(save: SaveData): RunState {
     pendingRewardIds: [...save.run.pending_reward_ids],
     claimedRewardIds: [...save.run.claimed_reward_ids],
     acquiredEvidenceIds: [...save.run.acquired_evidence_ids],
+    cardTuning: Object.fromEntries(
+      Object.entries(save.run.card_tuning).map(([cardId, tuning]) => [
+        cardId,
+        {
+          cpDelta: tuning.cp_delta,
+          composureDamageDelta: tuning.composure_damage_delta,
+          coercionDelta: tuning.coercion_delta,
+        },
+      ]),
+    ),
+    canvassedTopicIds: [...save.run.canvassed_topic_ids],
+    evidenceGradeById: { ...save.run.evidence_grade_by_id },
+    openRouteIds: [...save.run.open_route_ids],
+    retryCount: save.run.retry_count,
     gradeHistory: save.run.grade_history.map((record) => ({
       nodeId: record.node_id,
       outcome: record.outcome,

@@ -775,6 +775,72 @@ image-slot[data-locked] {
   font-size: 10px;
 }
 
+.character-parts {
+  display: grid;
+  gap: 9px;
+  margin: 11px 15px 0;
+}
+
+.character-part {
+  display: grid;
+  grid-template-columns: 74px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  padding: 8px;
+  border: 1px solid var(--line-soft);
+  background: #111215;
+}
+
+.character-part[hidden] {
+  display: none;
+}
+
+/* The slot element positions itself absolutely on the stage; inside the panel
+   it has to sit in normal flow at a fixed preview size. */
+.character-part image-slot {
+  position: relative;
+  width: 74px;
+  height: 74px;
+}
+
+.character-part-meta {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.character-part-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  color: #f0e9d7;
+  font: 800 10px/1.2 ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+
+.character-part-title code {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.character-part-status {
+  color: var(--muted);
+  font-size: 9px;
+}
+
+.character-part .geometry-grid {
+  margin-bottom: 0;
+}
+
+/* `display: grid` above outranks the UA `[hidden]` rule, so a hidden offset
+   editor would otherwise stay on screen and accept edits nothing records. */
+.character-part .geometry-grid[hidden] {
+  display: none;
+}
+
 .json-heading {
   display: flex;
   align-items: center;
@@ -929,4 +995,60 @@ image-slot[data-locked] {
   .stage-scroll {
     min-height: 430px;
   }
+}
+
+.aspect-control {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 11px;
+}
+
+.aspect-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--cyan);
+  font: 800 9px/1 ui-monospace, SFMono-Regular, Consolas, monospace;
+  cursor: pointer;
+}
+
+.aspect-toggle input {
+  width: 13px;
+  height: 13px;
+  accent-color: var(--cyan);
+  cursor: pointer;
+}
+
+/* Deliberate distortion is legal, so this warns without blocking anything. */
+.aspect-badge {
+  padding: 2px 6px;
+  border: 1px solid #7a5c1f;
+  background: #2a2213;
+  color: #e0b64a;
+  font: 800 9px/1.4 ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+
+.aspect-badge[hidden] {
+  display: none;
+}
+
+.button-save {
+  border-color: var(--gold);
+  background: linear-gradient(180deg, var(--gold-bright), var(--gold));
+  color: #17140d;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.button-save:hover:not(:disabled) {
+  background: var(--gold-bright);
+}
+
+/* A second click is a second disk write, so the button is physically blocked. */
+.button-save:disabled {
+  opacity: 0.55;
+  cursor: progress;
+  filter: saturate(0.4);
 }

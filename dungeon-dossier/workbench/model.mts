@@ -14,11 +14,47 @@ import {
 export const STAGE_WIDTH = 640;
 export const STAGE_HEIGHT = 400;
 
+/**
+ * The storage slot, not the document version: bumping this would strand every
+ * planner's saved layout, so migrations key off the document's own `version`.
+ */
 export const WORKBENCH_STORAGE_KEY = 'dungeon-dossier.asset-workbench.v2';
-export const WORKBENCH_STATE_VERSION = 2;
+export const WORKBENCH_STATE_VERSION = 3;
 export const PORTRAIT_PARTS_JSON_NAME = 'portrait_용의자.state-parts.json';
 export const ASSET_MANIFEST_JSON_NAME = 'asset_manifest.json';
 export const SUSPECT_STATE_PART_NAMES = ['upset', 'lose'] as const;
+
+/** Every portrait checked into `assets/portraits/`. */
+export const WORKBENCH_CHARACTERS = [
+  '물컹이',
+  '하피',
+  '미노타우로스',
+  '고블린',
+  '오크',
+  '서큐버스',
+  '드워프',
+  '사이클롭스',
+  '켄타우로스',
+  '타락한_용사',
+  '김태훈',
+  '김_인턴',
+] as const;
+export type WorkbenchCharacter = (typeof WORKBENCH_CHARACTERS)[number];
+
+export const DEFAULT_WORKBENCH_CHARACTER: WorkbenchCharacter = '물컹이';
+/** The only character with a fourth sheet: the partner's cooldown portrait. */
+export const PARTNER_CHARACTER: WorkbenchCharacter = '김_인턴';
+
+export const CHARACTER_PART_NAMES = ['base', 'upset', 'lose', 'used'] as const;
+export type CharacterPartName = (typeof CHARACTER_PART_NAMES)[number];
+
+const SHARED_CHARACTER_PART_NAMES: readonly CharacterPartName[] = ['base', 'upset', 'lose'];
+
+/**
+ * Offsets are authored-space pixels against a 512x512 base, exactly as the
+ * sidecar stores them. One base frame in any direction is the useful range.
+ */
+export const CHARACTER_PART_OFFSET_LIMIT = ASSET_DIMENSIONS.suspect_base.width;
 
 export interface Rect {
   readonly x: number;
@@ -72,6 +108,12 @@ export interface SlotDefinition {
   readonly downloadName: string;
   /** Authored PNG size this slot must be filled with. */
   readonly dimension: AssetDimensionId;
+  /**
+   * Omit (or set true) to keep the authored aspect ratio locked. Set false for
+   * slots whose stage rect deliberately deviates, such as the 1280x321 desk
+   * plate that cannot land on an integer height in the 640x400 grid.
+   */
+  readonly preserveAspectRatio?: boolean;
 }
 
 /**
@@ -119,11 +161,14 @@ export const CANONICAL_SLOTS: readonly SlotDefinition[] = [
   {
     id: 'fg-desk',
     label: '책상 전경',
-    description: '투명 PNG 전경 레이어',
-    defaultRect: { x: 0, y: 282, width: 640, height: 118 },
+    description: '투명 PNG 전경 레이어 · 1280×321 저작, 640×161 배치(의도적 절상)',
+    defaultRect: { x: 0, y: 239, width: 640, height: 161 },
     layer: 30,
     downloadName: '전경_책상_기본.png',
     dimension: 'desk_foreground',
+    // 321 / 2 = 160.5. Rounding down would leave a 1px gap at the stage floor,
+    // so the plate is placed at 161 and its aspect lock is released.
+    preserveAspectRatio: false,
   },
   {
     id: 'card-base',
@@ -231,13 +276,23 @@ export interface SlotImageState {
   readonly originalName: string;
 }
 
+/** One character's portrait sheets and their offsets against the base frame. */
+export interface CharacterPartsState {
+  readonly images: Readonly<Partial<Record<CharacterPartName, SlotImageState>>>;
+  readonly offsets: Readonly<Partial<Record<CharacterPartName, Point>>>;
+}
+
 export interface WorkbenchState {
   readonly version: typeof WORKBENCH_STATE_VERSION;
   readonly geometry: Readonly<Record<SlotId, Rect>>;
   /** Radians, normalized to [0, 2π). */
   readonly rotation: Readonly<Record<SlotId, number>>;
   readonly locks: Readonly<Record<SlotId, boolean>>;
+  /** False lets a slot be resized off its authored aspect ratio on purpose. */
+  readonly aspectLocks: Readonly<Record<SlotId, boolean>>;
   readonly images: Readonly<Partial<Record<SlotId, SlotImageState>>>;
+  readonly activeCharacter: WorkbenchCharacter;
+  readonly characters: Readonly<Record<WorkbenchCharacter, CharacterPartsState>>;
 }
 
 /** LocalStorage keeps the same explicit transform fields as asset_manifest.json. */
@@ -245,7 +300,37 @@ export interface WorkbenchStorageDocument {
   readonly version: typeof WORKBENCH_STATE_VERSION;
   readonly transforms: Readonly<Record<SlotId, AssetTransform>>;
   readonly locks: Readonly<Record<SlotId, boolean>>;
+  readonly aspectLocks: Readonly<Record<SlotId, boolean>>;
   readonly images: Readonly<Partial<Record<SlotId, SlotImageState>>>;
+  readonly activeCharacter: WorkbenchCharacter;
+  readonly characters: Readonly<Record<WorkbenchCharacter, CharacterPartsState>>;
+}
+
+/**
+ * The interchange shape actually checked into `assets/portraits/`. Both state
+ * parts declare the `suspect-state-parts` slot and there are no stage fields,
+ * so a workbench export diffs clean against a generated sidecar.
+ */
+export interface CharacterStatePartEntry {
+  readonly state: (typeof SUSPECT_STATE_PART_NAMES)[number];
+  readonly slot: 'suspect-state-parts';
+  readonly image: string;
+  readonly origin: 'suspect-base';
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+}
+
+export interface CharacterPartsManifest {
+  readonly schema_version: '2.0';
+  readonly base: Readonly<{
+    slot: 'suspect-base';
+    image: string;
+    width: number;
+    height: number;
+  }>;
+  readonly state_parts: readonly CharacterStatePartEntry[];
 }
 
 export interface FileDescriptor {
@@ -357,13 +442,27 @@ export function createDefaultLocks(): Record<SlotId, boolean> {
   return fromEntriesBySlot(() => false);
 }
 
+/** Aspect stays locked unless the slot catalogue opts out (see `fg-desk`). */
+export function createDefaultAspectLocks(): Record<SlotId, boolean> {
+  return fromEntriesBySlot((definition) => definition.preserveAspectRatio !== false);
+}
+
+export function createDefaultCharacters(): Record<WorkbenchCharacter, CharacterPartsState> {
+  return Object.fromEntries(
+    WORKBENCH_CHARACTERS.map((character) => [character, { images: {}, offsets: {} }]),
+  ) as Record<WorkbenchCharacter, CharacterPartsState>;
+}
+
 export function createInitialWorkbenchState(): WorkbenchState {
   return {
     version: WORKBENCH_STATE_VERSION,
     geometry: createDefaultGeometry(),
     rotation: createDefaultRotation(),
     locks: createDefaultLocks(),
+    aspectLocks: createDefaultAspectLocks(),
     images: {},
+    activeCharacter: DEFAULT_WORKBENCH_CHARACTER,
+    characters: createDefaultCharacters(),
   };
 }
 
@@ -525,15 +624,25 @@ export function applyWorkbenchDrag(
       input.startRotation + (currentAngle - startAngle),
     );
   }
-  return withSlotRect(
-    state,
-    id,
-    scaleRotatedRectFromHandle(
-      input.startRect,
-      input.startRotation,
-      input.currentPoint,
-    ),
+  const scaled = scaleRotatedRectFromHandle(
+    input.startRect,
+    input.startRotation,
+    input.currentPoint,
   );
+  if (!state.aspectLocks[id]) return withSlotRect(state, id, scaled);
+  // A locked slot follows whichever edge the planner pulled furthest, so a corner
+  // drag still feels direct while the authored ratio survives.
+  const source = getSlotSourceDimension(id);
+  const aspect = source.width / source.height;
+  const widthDelta = Math.abs(scaled.width - input.startRect.width);
+  const heightDelta = Math.abs(scaled.height - input.startRect.height);
+  const width = widthDelta >= heightDelta
+    ? scaled.width
+    : Math.max(1, Math.round(scaled.height * aspect));
+  const height = widthDelta >= heightDelta
+    ? Math.max(1, Math.round(scaled.width / aspect))
+    : scaled.height;
+  return withSlotRect(state, id, { ...scaled, width, height });
 }
 
 export function withSlotLock(
@@ -724,27 +833,357 @@ export function serializePortraitPartsManifest(
   return `${JSON.stringify(buildPortraitPartsManifest(geometry), null, 2)}\n`;
 }
 
+const CHARACTER_SET: ReadonlySet<string> = new Set(WORKBENCH_CHARACTERS);
+const CHARACTER_PART_SET: ReadonlySet<string> = new Set(CHARACTER_PART_NAMES);
+
+export function isWorkbenchCharacter(value: string): value is WorkbenchCharacter {
+  return CHARACTER_SET.has(value);
+}
+
+export function isCharacterPartName(value: string): value is CharacterPartName {
+  return CHARACTER_PART_SET.has(value);
+}
+
+/** `used` exists only for the partner; every other character has three sheets. */
+export function characterPartNames(
+  character: WorkbenchCharacter,
+): readonly CharacterPartName[] {
+  return character === PARTNER_CHARACTER
+    ? [...SHARED_CHARACTER_PART_NAMES, 'used']
+    : SHARED_CHARACTER_PART_NAMES;
+}
+
+export function hasCharacterPart(
+  character: WorkbenchCharacter,
+  part: CharacterPartName,
+): boolean {
+  return characterPartNames(character).includes(part);
+}
+
+/**
+ * Only the two sidecar state parts have an offset. `base` is the origin they
+ * are measured from, and the partner's `used` sheet is placed by its stage
+ * slot, so neither would survive an export round trip.
+ */
+export function characterPartHasOffset(part: CharacterPartName): boolean {
+  return (SUSPECT_STATE_PART_NAMES as readonly string[]).includes(part);
+}
+
+/**
+ * Which canonical stage slot a character part borrows for its PNG contract.
+ * Reusing the slot ids keeps one dimension check and one download name for
+ * both the stage preview and the character panel.
+ */
+const CHARACTER_PART_SLOT_IDS = {
+  base: 'suspect-base',
+  upset: 'suspect-state-parts',
+  lose: 'suspect-lose-parts',
+  used: 'partner-used',
+} as const satisfies Readonly<Record<CharacterPartName, SlotId>>;
+
+export function characterPartSlotId(part: CharacterPartName): SlotId {
+  return CHARACTER_PART_SLOT_IDS[part];
+}
+
+export interface SlotCharacterBinding {
+  readonly part: CharacterPartName;
+  /** Absent means the binding follows whichever character is selected. */
+  readonly character?: WorkbenchCharacter;
+}
+
+/**
+ * The stage slots that show a character rather than a standalone asset. The
+ * partner pair is pinned because those two sheets are always the partner's,
+ * whatever the planner is currently editing.
+ */
+export const SLOT_CHARACTER_BINDINGS: Readonly<
+  Partial<Record<SlotId, SlotCharacterBinding>>
+> = {
+  'suspect-base': { part: 'base' },
+  'suspect-state-parts': { part: 'upset' },
+  'suspect-lose-parts': { part: 'lose' },
+  'partner-base': { part: 'base', character: PARTNER_CHARACTER },
+  'partner-used': { part: 'used', character: PARTNER_CHARACTER },
+};
+
+export function resolveSlotBinding(
+  state: WorkbenchState,
+  id: SlotId,
+): Readonly<{ character: WorkbenchCharacter; part: CharacterPartName }> | undefined {
+  const binding = SLOT_CHARACTER_BINDINGS[id];
+  if (binding === undefined) return undefined;
+  return {
+    character: binding.character ?? state.activeCharacter,
+    part: binding.part,
+  };
+}
+
+export function getCharacterPartImage(
+  state: WorkbenchState,
+  character: WorkbenchCharacter,
+  part: CharacterPartName,
+): SlotImageState | undefined {
+  return state.characters[character].images[part];
+}
+
+export function getCharacterPartOffset(
+  state: WorkbenchState,
+  character: WorkbenchCharacter,
+  part: CharacterPartName,
+): Point {
+  return state.characters[character].offsets[part] ?? { x: 0, y: 0 };
+}
+
+function withCharacterParts(
+  state: WorkbenchState,
+  character: WorkbenchCharacter,
+  parts: CharacterPartsState,
+): WorkbenchState {
+  return { ...state, characters: { ...state.characters, [character]: parts } };
+}
+
+export function withActiveCharacter(
+  state: WorkbenchState,
+  character: WorkbenchCharacter,
+): WorkbenchState {
+  if (state.activeCharacter === character) return state;
+  return { ...state, activeCharacter: character };
+}
+
+export function withCharacterPartImage(
+  state: WorkbenchState,
+  character: WorkbenchCharacter,
+  part: CharacterPartName,
+  image: SlotImageState,
+): WorkbenchState {
+  if (!isPngDataUrl(image.dataUrl)) {
+    throw new Error('Only PNG data URLs can be stored in a workbench slot.');
+  }
+  if (!hasCharacterPart(character, part)) return state;
+  const current = state.characters[character];
+  return withCharacterParts(state, character, {
+    ...current,
+    images: { ...current.images, [part]: { ...image } },
+  });
+}
+
+export function withoutCharacterPartImage(
+  state: WorkbenchState,
+  character: WorkbenchCharacter,
+  part: CharacterPartName,
+): WorkbenchState {
+  const current = state.characters[character];
+  if (current.images[part] === undefined) return state;
+  const images = { ...current.images };
+  delete images[part];
+  return withCharacterParts(state, character, { ...current, images });
+}
+
+export function withCharacterPartOffset(
+  state: WorkbenchState,
+  character: WorkbenchCharacter,
+  part: CharacterPartName,
+  requestedX: number,
+  requestedY: number,
+): WorkbenchState {
+  if (!hasCharacterPart(character, part) || !characterPartHasOffset(part)) return state;
+  const limit = CHARACTER_PART_OFFSET_LIMIT;
+  const offset = {
+    x: clamp(finiteInteger(requestedX, 0), -limit, limit),
+    y: clamp(finiteInteger(requestedY, 0), -limit, limit),
+  };
+  const current = state.characters[character];
+  return withCharacterParts(state, character, {
+    ...current,
+    offsets: { ...current.offsets, [part]: offset },
+  });
+}
+
+/** Binding-aware read used by both the stage preview and the asset manifest. */
+export function resolveStageSlotImage(
+  state: WorkbenchState,
+  id: SlotId,
+): SlotImageState | undefined {
+  const binding = resolveSlotBinding(state, id);
+  if (binding === undefined) return state.images[id];
+  return getCharacterPartImage(state, binding.character, binding.part) ?? state.images[id];
+}
+
+/** Binding-aware write: dropping a PNG on a bound slot edits that character. */
+export function withStageSlotImage(
+  state: WorkbenchState,
+  id: SlotId,
+  image: SlotImageState,
+): WorkbenchState {
+  const binding = resolveSlotBinding(state, id);
+  return binding === undefined
+    ? withSlotImage(state, id, image)
+    : withCharacterPartImage(state, binding.character, binding.part, image);
+}
+
+export function withoutStageSlotImage(state: WorkbenchState, id: SlotId): WorkbenchState {
+  const binding = resolveSlotBinding(state, id);
+  return binding === undefined
+    ? withoutSlotImage(state, id)
+    : withoutCharacterPartImage(state, binding.character, binding.part);
+}
+
+export function characterPartFileName(
+  character: WorkbenchCharacter,
+  part: CharacterPartName,
+): string {
+  return `portrait_${character}_${part}.png`;
+}
+
+export function characterPartsJsonName(character: WorkbenchCharacter): string {
+  return `portrait_${character}.state-parts.json`;
+}
+
+export function buildCharacterPartsManifest(
+  state: WorkbenchState,
+  character: WorkbenchCharacter,
+): CharacterPartsManifest {
+  const source = ASSET_DIMENSIONS.suspect_state_parts;
+  return {
+    schema_version: '2.0',
+    base: {
+      slot: 'suspect-base',
+      image: characterPartFileName(character, 'base'),
+      width: ASSET_DIMENSIONS.suspect_base.width,
+      height: ASSET_DIMENSIONS.suspect_base.height,
+    },
+    state_parts: SUSPECT_STATE_PART_NAMES.map((part) => {
+      const offset = getCharacterPartOffset(state, character, part);
+      return {
+        state: part,
+        slot: 'suspect-state-parts',
+        image: characterPartFileName(character, part),
+        origin: 'suspect-base',
+        x: offset.x,
+        y: offset.y,
+        width: source.width,
+        height: source.height,
+      };
+    }),
+  };
+}
+
+export function serializeCharacterPartsManifest(
+  state: WorkbenchState,
+  character: WorkbenchCharacter,
+): string {
+  return `${JSON.stringify(buildCharacterPartsManifest(state, character), null, 2)}\n`;
+}
+
+/** Reads `portrait_<name>_base.png` back into the character it belongs to. */
+export function characterFromPartsManifest(input: unknown): WorkbenchCharacter | undefined {
+  if (!isRecord(input) || !isRecord(input.base)) return undefined;
+  const image = input.base.image;
+  if (typeof image !== 'string') return undefined;
+  const match = /^portrait_(?<name>.+)_base\.png$/u.exec(image);
+  const name = match?.groups?.['name'];
+  return name !== undefined && isWorkbenchCharacter(name) ? name : undefined;
+}
+
+/**
+ * Folds a checked-in sidecar back into editable state. Images are not carried:
+ * the JSON only names its PNGs, which the planner drops separately.
+ */
+export function withImportedCharacterParts(
+  state: WorkbenchState,
+  character: WorkbenchCharacter,
+  input: unknown,
+): WorkbenchState {
+  if (!isRecord(input) || input.schema_version !== '2.0') {
+    throw new Error('schema_version 2.0 사이드카 JSON만 가져올 수 있습니다.');
+  }
+  const entries = input.state_parts;
+  if (!Array.isArray(entries)) {
+    throw new Error('state_parts 배열을 찾지 못했습니다.');
+  }
+  let next = state;
+  for (const entry of entries) {
+    if (!isRecord(entry)) continue;
+    const part = entry.state;
+    if (typeof part !== 'string' || !isCharacterPartName(part)) continue;
+    const current = getCharacterPartOffset(next, character, part);
+    next = withCharacterPartOffset(
+      next,
+      character,
+      part,
+      finiteInteger(entry.x, current.x),
+      finiteInteger(entry.y, current.y),
+    );
+  }
+  return next;
+}
+
 export function buildSlotTransform(state: WorkbenchState, id: SlotId): AssetTransform {
   const rect = state.geometry[id];
   const scale = getSlotScale(state, id);
+  const preserveAspectRatio = state.aspectLocks[id];
   return {
     x: rect.x,
     y: rect.y,
     rotation: state.rotation[id],
     scaleX: scale.scaleX,
     scaleY: scale.scaleY,
+    preserveAspectRatio,
+    // An unlocked slot records its exact on-stage rect so the renderer never has
+    // to reconstruct a distorted size from two independently rounded scales.
+    ...(preserveAspectRatio
+      ? {}
+      : { customWidth: rect.width, customHeight: rect.height }),
+  };
+}
+
+export function setSlotAspectLock(
+  state: WorkbenchState,
+  id: SlotId,
+  preserveAspectRatio: boolean,
+): WorkbenchState {
+  return { ...state, aspectLocks: { ...state.aspectLocks, [id]: preserveAspectRatio } };
+}
+
+/**
+ * Resizes a slot to an explicit on-stage size. A locked slot derives the missing
+ * edge from its authored aspect ratio, so callers may pass either edge alone.
+ */
+export function setSlotSize(
+  state: WorkbenchState,
+  id: SlotId,
+  size: Readonly<{ width?: number; height?: number }>,
+): WorkbenchState {
+  const rect = state.geometry[id];
+  const source = getSlotSourceDimension(id);
+  const aspect = source.width / source.height;
+  const requestedWidth = finitePositiveNumber(size.width, rect.width);
+  const requestedHeight = finitePositiveNumber(size.height, rect.height);
+  const locked = state.aspectLocks[id];
+  const width = locked && size.width === undefined
+    ? Math.max(1, Math.round(requestedHeight * aspect))
+    : Math.max(1, Math.round(requestedWidth));
+  const height = locked && size.width !== undefined
+    ? Math.max(1, Math.round(requestedWidth / aspect))
+    : Math.max(1, Math.round(requestedHeight));
+  return {
+    ...state,
+    geometry: { ...state.geometry, [id]: { ...rect, width, height } },
   };
 }
 
 export function buildAssetManifest(state: WorkbenchState): AssetManifest {
   const slots: Record<string, AssetManifestSlot> = {};
   for (const definition of CANONICAL_SLOTS) {
+    const binding = resolveSlotBinding(state, definition.id);
     slots[definition.id] = {
       dimension: definition.dimension,
       image:
-        state.images[definition.id] === undefined
+        resolveStageSlotImage(state, definition.id) === undefined
           ? null
-          : canonicalDownloadName(definition.id),
+          : binding === undefined
+            ? canonicalDownloadName(definition.id)
+            : characterPartFileName(binding.character, binding.part),
       transform: buildSlotTransform(state, definition.id),
       isLocked: state.locks[definition.id],
     };
@@ -818,6 +1257,15 @@ export function normalizeWorkbenchState(input: unknown): WorkbenchState {
     }
   }
 
+  // Absent in v2 documents; the catalogue default reproduces their geometry.
+  const aspectLocks = createDefaultAspectLocks();
+  if (isRecord(input.aspectLocks)) {
+    for (const id of SLOT_IDS) {
+      const stored = input.aspectLocks[id];
+      if (typeof stored === 'boolean') aspectLocks[id] = stored;
+    }
+  }
+
   const images: Partial<Record<SlotId, SlotImageState>> = {};
   if (isRecord(input.images)) {
     for (const id of SLOT_IDS) {
@@ -835,13 +1283,148 @@ export function normalizeWorkbenchState(input: unknown): WorkbenchState {
     }
   }
 
+  const activeCharacter =
+    typeof input.activeCharacter === 'string' && isWorkbenchCharacter(input.activeCharacter)
+      ? input.activeCharacter
+      : DEFAULT_WORKBENCH_CHARACTER;
+
+  const characters = createDefaultCharacters();
+  if (isRecord(input.characters)) {
+    for (const character of WORKBENCH_CHARACTERS) {
+      const raw = input.characters[character];
+      if (!isRecord(raw)) continue;
+      characters[character] = {
+        images: readPartImages(raw.images, character),
+        offsets: readPartOffsets(raw.offsets, character),
+      };
+    }
+  }
+
+  const migrated = migrateSuspectSlotsToCharacter(
+    input,
+    { geometry, images },
+    characters,
+    activeCharacter,
+  );
+
   return {
     version: WORKBENCH_STATE_VERSION,
     geometry,
     rotation,
     locks,
-    images,
+    aspectLocks,
+    images: migrated.images,
+    activeCharacter,
+    characters: migrated.characters,
   };
+}
+
+function readPartImages(
+  input: unknown,
+  character: WorkbenchCharacter,
+): Partial<Record<CharacterPartName, SlotImageState>> {
+  const images: Partial<Record<CharacterPartName, SlotImageState>> = {};
+  if (!isRecord(input)) return images;
+  for (const part of characterPartNames(character)) {
+    const raw = input[part];
+    if (
+      isRecord(raw) &&
+      isPngDataUrl(raw.dataUrl) &&
+      typeof raw.originalName === 'string'
+    ) {
+      images[part] = { dataUrl: raw.dataUrl, originalName: raw.originalName };
+    }
+  }
+  return images;
+}
+
+function readPartOffsets(
+  input: unknown,
+  character: WorkbenchCharacter,
+): Partial<Record<CharacterPartName, Point>> {
+  const offsets: Partial<Record<CharacterPartName, Point>> = {};
+  if (!isRecord(input)) return offsets;
+  const limit = CHARACTER_PART_OFFSET_LIMIT;
+  for (const part of characterPartNames(character)) {
+    if (!characterPartHasOffset(part)) continue;
+    const raw = input[part];
+    if (!isRecord(raw)) continue;
+    offsets[part] = {
+      x: clamp(finiteInteger(raw.x, 0), -limit, limit),
+      y: clamp(finiteInteger(raw.y, 0), -limit, limit),
+    };
+  }
+  return offsets;
+}
+
+/**
+ * v2 held one anonymous suspect in the stage slots. Its sheets and its
+ * state-part offset become the default character so an existing planner's work
+ * survives the upgrade instead of reappearing as an empty roster.
+ */
+function migrateSuspectSlotsToCharacter(
+  input: Record<string, unknown>,
+  current: Readonly<{
+    geometry: Record<SlotId, Rect>;
+    images: Partial<Record<SlotId, SlotImageState>>;
+  }>,
+  characters: Record<WorkbenchCharacter, CharacterPartsState>,
+  activeCharacter: WorkbenchCharacter,
+): Readonly<{
+  images: Partial<Record<SlotId, SlotImageState>>;
+  characters: Record<WorkbenchCharacter, CharacterPartsState>;
+}> {
+  const version = typeof input.version === 'number' ? input.version : 0;
+  if (version >= WORKBENCH_STATE_VERSION) {
+    return { images: current.images, characters };
+  }
+
+  const images = { ...current.images };
+  const target = activeCharacter;
+  const migratedImages = { ...characters[target].images };
+  const migratedOffsets = { ...characters[target].offsets };
+  for (const [slotId, part] of [
+    ['suspect-base', 'base'],
+    ['suspect-state-parts', 'upset'],
+    ['suspect-lose-parts', 'lose'],
+    ['partner-base', 'base'],
+    ['partner-used', 'used'],
+  ] as const) {
+    const image = images[slotId];
+    if (image === undefined) continue;
+    delete images[slotId];
+    const owner = SLOT_CHARACTER_BINDINGS[slotId]?.character ?? target;
+    if (owner === target) {
+      migratedImages[part] ??= image;
+      continue;
+    }
+    characters[owner] = {
+      ...characters[owner],
+      images: { ...characters[owner].images, [part]: characters[owner].images[part] ?? image },
+    };
+  }
+
+  // v2 stored the overlay offset as a stage rectangle; the sidecar wants it in
+  // authored pixels, so scale by however far the base slot was itself scaled.
+  const base = current.geometry['suspect-base'];
+  const scale = base.width > 0 ? ASSET_DIMENSIONS.suspect_base.width / base.width : 1;
+  const limit = CHARACTER_PART_OFFSET_LIMIT;
+  for (const [slotId, part] of [
+    ['suspect-state-parts', 'upset'],
+    ['suspect-lose-parts', 'lose'],
+  ] as const) {
+    if (migratedOffsets[part] !== undefined) continue;
+    const rect = current.geometry[slotId];
+    const offset = {
+      x: clamp(Math.round((rect.x - base.x) * scale), -limit, limit),
+      y: clamp(Math.round((rect.y - base.y) * scale), -limit, limit),
+    };
+    if (offset.x === 0 && offset.y === 0) continue;
+    migratedOffsets[part] = offset;
+  }
+
+  characters[target] = { images: migratedImages, offsets: migratedOffsets };
+  return { images, characters };
 }
 
 export function serializeWorkbenchState(state: WorkbenchState): string {
@@ -853,7 +1436,10 @@ export function serializeWorkbenchState(state: WorkbenchState): string {
     version: WORKBENCH_STATE_VERSION,
     transforms,
     locks: normalized.locks,
+    aspectLocks: normalized.aspectLocks,
     images: normalized.images,
+    activeCharacter: normalized.activeCharacter,
+    characters: normalized.characters,
   };
   return JSON.stringify(document);
 }
@@ -873,4 +1459,111 @@ export function saveWorkbenchState(
   state: WorkbenchState,
 ): void {
   storage.setItem(WORKBENCH_STORAGE_KEY, serializeWorkbenchState(state));
+}
+
+/**
+ * Category prefix of an authored filename to the folder it belongs in.
+ *
+ * The runtime registry keys every PNG as `category/name/state` derived from the
+ * filename alone and throws on a collision, so a file written to `assets/`
+ * root would collide with the same file under its folder and stop the game
+ * from booting. Routing is therefore mandatory, not cosmetic.
+ *
+ * Mirrors `tools/placeholder/placeholders.json`; a drift test pins them together.
+ */
+export const ASSET_CATEGORY_DIRECTORIES = {
+  '배경': 'bg',
+  '전경': 'fg',
+  portrait: 'portraits',
+  card: 'cards',
+  ev: 'evidence',
+  '아이콘': 'ui',
+  placeholder: 'ui',
+  dead: 'dead',
+} as const satisfies Readonly<Record<string, string>>;
+
+/** The folders a save may write into. Deliberately the map's values, not a
+ * listing of `assets/` — `fonts`, `bgm` and `sfx` are not PNG targets. */
+export const ASSET_WRITE_DIRECTORIES: readonly string[] = Object.freeze(
+  [...new Set(Object.values(ASSET_CATEGORY_DIRECTORIES))].sort(),
+);
+
+/** The only PNG a save may never replace: every missing-asset fallback uses it. */
+export const PROTECTED_ASSET_PATH = 'ui/placeholder_missing_fallback.png';
+
+/** `배경_심문실_시안.png` -> `bg/배경_심문실_시안.png`. */
+export function assetTargetPath(fileName: string): string | undefined {
+  if (!fileName.toLowerCase().endsWith('.png')) return undefined;
+  const stem = fileName.slice(0, -'.png'.length);
+  const segments = stem.split('_');
+  // `parseAssetFilename` requires category_name_state, so anything shorter would
+  // crash the registry on the next boot even if it landed in the right folder.
+  if (segments.length < 3) return undefined;
+  const category = segments[0];
+  if (category === undefined) return undefined;
+  const directory = (ASSET_CATEGORY_DIRECTORIES as Readonly<Record<string, string>>)[category];
+  return directory === undefined ? undefined : `${directory}/${fileName}`;
+}
+
+export interface WorkbenchSaveFile {
+  readonly path: string;
+  readonly dataUrl: string;
+}
+
+export interface WorkbenchSaveRequest {
+  readonly manifest: AssetManifest;
+  readonly files: readonly WorkbenchSaveFile[];
+}
+
+/** Filename a slot writes under, honouring character binding like the download does. */
+export function stageSlotFileName(state: WorkbenchState, id: SlotId): string {
+  const binding = resolveSlotBinding(state, id);
+  return binding === undefined
+    ? canonicalDownloadName(id)
+    : characterPartFileName(binding.character, binding.part);
+}
+
+/**
+ * Collects every filled slot into one save request. Empty slots, unroutable
+ * filenames and the protected fallback are dropped here so the server never
+ * has to reason about intent — only about safety.
+ */
+export function collectWorkbenchSaveRequest(state: WorkbenchState): WorkbenchSaveRequest {
+  const byPath = new Map<string, WorkbenchSaveFile>();
+  for (const definition of CANONICAL_SLOTS) {
+    const image = resolveStageSlotImage(state, definition.id);
+    if (image === undefined || !isPngDataUrl(image.dataUrl)) continue;
+    const target = assetTargetPath(stageSlotFileName(state, definition.id));
+    if (target === undefined || target === PROTECTED_ASSET_PATH) continue;
+    // Several slots can bind to the same character part; the last one wins, and
+    // deduping here keeps the request free of the duplicates the server rejects.
+    byPath.set(target, { path: target, dataUrl: image.dataUrl });
+  }
+  return {
+    manifest: buildAssetManifest(state),
+    files: [...byPath.values()].sort((left, right) => left.path.localeCompare(right.path)),
+  };
+}
+
+export interface WorkbenchSaveSuccess {
+  readonly assetsRoot: string;
+  readonly savedFiles: readonly string[];
+  readonly skippedFiles: readonly string[];
+}
+
+export function formatSaveSuccess(result: WorkbenchSaveSuccess): string {
+  const saved = result.savedFiles.length;
+  const skipped = result.skippedFiles.length;
+  // Never claim the game reflects this: only the PNGs matter and the game tab
+  // keeps its already-booted registry until it reloads.
+  const head = `✅ PM 알림: ${String(saved)}개 에셋이 ${result.assetsRoot}/ 에 저장되었습니다.`;
+  const tail = ' 게임 탭은 새로고침해야 반영됩니다.';
+  return skipped === 0
+    ? `${head}${tail}`
+    : `${head} ${String(skipped)}개는 변경이 없어 건너뛰었습니다.${tail}`;
+}
+
+export function describeSaveError(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  return typeof error === 'string' ? error : '알 수 없는 오류';
 }

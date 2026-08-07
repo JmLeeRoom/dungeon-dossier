@@ -2,6 +2,7 @@ import { describe, expect, expectTypeOf, it } from 'vitest';
 
 import {
   CardsSchema,
+  CURRENT_SAVE_VERSION,
   FlagsSchema,
   JudgmentUiMapSchema,
   PublicClaimSchema,
@@ -132,7 +133,7 @@ describe('domain content schemas', () => {
   it('stores runtime save state only', () => {
     const save = {
       $schema: '../schemas/save.schema.json',
-      save_version: 1,
+      save_version: CURRENT_SAVE_VERSION,
       case_id: 'sample-case',
       content_version: '1.0.0',
       run_seed: 42,

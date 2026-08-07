@@ -3,69 +3,282 @@
   "schema_version": "1.0",
   "flags": [
     {
-      "flag_id": "F-01", "description_key": "flag.false_confession", "default_value": false,
-      "set_by": [{ "encounter": "enc_tutorial_slime", "outcome": "COERCED_CONFESSION", "value": true }],
-      "consumed_by": [{ "encounter": "enc_ep001_goblin", "apply": { "type": "MODIFY_SHIELDS", "delta": 1 } }]
+      "flag_id": "F-01",
+      "description_key": "flag.false_confession",
+      "default_value": false,
+      "set_by": [
+        {
+          "encounter": "enc_tutorial_slime",
+          "outcome": "COERCED_CONFESSION",
+          "value": true
+        }
+      ],
+      "consumed_by": [
+        {
+          "encounter": "enc_ep001_goblin",
+          "apply": {
+            "type": "MODIFY_SHIELDS",
+            "delta": 1
+          }
+        }
+      ]
     },
     {
-      "flag_id": "F-02", "description_key": "flag.patient_questioning", "default_value": false,
-      "set_by": [{ "encounter": "enc_tutorial_slime", "outcome": "BEST_RESOLUTION", "value": true }],
-      "consumed_by": [{ "encounter": "enc_tutorial_harpy", "apply": { "type": "ADJUST_RESOURCE", "resource": "trust", "delta": 1 } }]
+      "flag_id": "F-02",
+      "description_key": "flag.patient_questioning",
+      "default_value": false,
+      "set_by": [
+        {
+          "encounter": "enc_tutorial_slime",
+          "outcome": "BEST_RESOLUTION",
+          "value": true
+        }
+      ],
+      "consumed_by": [
+        {
+          "encounter": "enc_tutorial_harpy",
+          "apply": {
+            "type": "ADJUST_RESOURCE",
+            "resource": "trust",
+            "delta": 1
+          }
+        }
+      ]
     },
     {
-      "flag_id": "F-03", "description_key": "flag.roster_preserved", "default_value": false,
-      "set_by": [{ "event": "event_tutorial_choice", "choice": "choice_tutorial_search", "value": true }],
-      "consumed_by": [{ "encounter": "enc_tutorial_harpy", "apply": { "type": "GRANT_EVIDENCE", "target": "ev_tutorial_witness_note" } }]
+      "flag_id": "F-03",
+      "description_key": "flag.roster_preserved",
+      "default_value": false,
+      "set_by": [
+        {
+          "event": "event_tutorial_choice",
+          "choice": "choice_tutorial_search",
+          "value": true
+        }
+      ],
+      "consumed_by": [
+        {
+          "encounter": "enc_tutorial_harpy",
+          "apply": {
+            "type": "GRANT_EVIDENCE",
+            "target": "ev_tutorial_witness_note"
+          }
+        }
+      ]
     },
     {
-      "flag_id": "F-04", "description_key": "flag.route_opened", "default_value": false,
-      "set_by": [{ "event": "event_tutorial_placement", "value": true }],
-      "consumed_by": [{ "encounter": "enc_tutorial_minotaur", "apply": { "type": "OPEN_ROUTE", "target": "route_tutorial_minotaur_how" } }]
+      "flag_id": "F-04",
+      "description_key": "flag.route_opened",
+      "default_value": false,
+      "set_by": [
+        {
+          "event": "event_tutorial_placement",
+          "value": true
+        }
+      ],
+      "consumed_by": [
+        {
+          "encounter": "enc_tutorial_minotaur",
+          "apply": {
+            "type": "OPEN_ROUTE",
+            "target": "route_tutorial_minotaur_how"
+          }
+        }
+      ]
     },
     {
-      "flag_id": "F-05", "description_key": "flag.evidence_intact", "default_value": false,
-      "set_by": [{ "encounter": "enc_tutorial_harpy", "outcome": "BEST_RESOLUTION", "value": true }],
-      "consumed_by": [{ "encounter": "enc_tutorial_minotaur", "apply": { "type": "UPGRADE_EVIDENCE", "target": "ev_tutorial_witness_note" } }]
+      "flag_id": "F-05",
+      "description_key": "flag.evidence_intact",
+      "default_value": false,
+      "set_by": [
+        {
+          "encounter": "enc_tutorial_harpy",
+          "outcome": "BEST_RESOLUTION",
+          "value": true
+        }
+      ],
+      "consumed_by": [
+        {
+          "encounter": "enc_tutorial_minotaur",
+          "apply": {
+            "type": "UPGRADE_EVIDENCE",
+            "target": "ev_tutorial_witness_note"
+          }
+        }
+      ]
     },
     {
-      "flag_id": "F-06", "description_key": "flag.partner_trust", "default_value": false,
-      "set_by": [{ "encounter": "enc_tutorial_minotaur", "outcome": "BEST_RESOLUTION", "value": true }],
-      "consumed_by": [{ "encounter": "enc_ep001_goblin", "apply": { "type": "ADJUST_RESOURCE", "resource": "cp", "delta": 1 } }]
+      "flag_id": "F-06",
+      "description_key": "flag.partner_trust",
+      "default_value": false,
+      "set_by": [
+        {
+          "encounter": "enc_tutorial_minotaur",
+          "outcome": "BEST_RESOLUTION",
+          "value": true
+        }
+      ],
+      "consumed_by": [
+        {
+          "encounter": "enc_ep001_goblin",
+          "apply": {
+            "type": "ADJUST_RESOURCE",
+            "resource": "cp",
+            "delta": 1
+          }
+        }
+      ]
     },
     {
-      "flag_id": "F-07", "description_key": "flag.audit_trace", "default_value": false,
-      "set_by": [{ "event": "event_ep001_links", "value": true }],
-      "consumed_by": [{ "encounter": "enc_ep001_orc", "apply": { "type": "GRANT_EVIDENCE", "target": "ev_ep001_seal_residue" } }]
+      "flag_id": "F-07",
+      "description_key": "flag.audit_trace",
+      "default_value": false,
+      "set_by": [
+        {
+          "event": "event_ep001_forensic_sweep",
+          "value": true
+        }
+      ],
+      "consumed_by": [
+        {
+          "encounter": "enc_ep001_orc",
+          "apply": {
+            "type": "GRANT_EVIDENCE",
+            "target": "ev_ep001_seal_residue"
+          }
+        }
+      ]
     },
     {
-      "flag_id": "F-08", "description_key": "flag.no_coercion", "default_value": false,
-      "set_by": [{ "encounter": "enc_ep001_goblin", "outcome": "BEST_RESOLUTION", "value": true }],
-      "consumed_by": [{ "encounter": "enc_ep001_orc", "apply": { "type": "ADJUST_RESOURCE", "resource": "coercion", "delta": -5 } }]
+      "flag_id": "F-08",
+      "description_key": "flag.no_coercion",
+      "default_value": false,
+      "set_by": [
+        {
+          "encounter": "enc_ep001_goblin",
+          "outcome": "BEST_RESOLUTION",
+          "value": true
+        }
+      ],
+      "consumed_by": [
+        {
+          "encounter": "enc_ep001_orc",
+          "apply": {
+            "type": "ADJUST_RESOURCE",
+            "resource": "coercion",
+            "delta": -5
+          }
+        }
+      ]
     },
     {
-      "flag_id": "F-09", "description_key": "flag.warehouse_searched", "default_value": false,
-      "set_by": [{ "event": "event_ep001_warehouse", "value": true }],
-      "consumed_by": [{ "encounter": "enc_ep001_succubus", "apply": { "type": "DRAW_CARD" } }]
+      "flag_id": "F-09",
+      "description_key": "flag.warehouse_searched",
+      "default_value": false,
+      "set_by": [
+        {
+          "event": "event_ep001_warehouse",
+          "value": true
+        }
+      ],
+      "consumed_by": [
+        {
+          "encounter": "enc_ep001_succubus",
+          "apply": {
+            "type": "DRAW_CARD"
+          }
+        }
+      ]
     },
     {
-      "flag_id": "F-10", "description_key": "flag.clean_record", "default_value": false,
-      "set_by": [{ "encounter": "enc_ep001_orc", "outcome": "BEST_RESOLUTION", "value": true }],
-      "consumed_by": [{ "encounter": "enc_ep001_succubus", "apply": { "type": "ADJUST_RESOURCE", "resource": "dp", "delta": 5 } }]
+      "flag_id": "F-10",
+      "description_key": "flag.clean_record",
+      "default_value": false,
+      "set_by": [
+        {
+          "encounter": "enc_ep001_orc",
+          "outcome": "BEST_RESOLUTION",
+          "value": true
+        }
+      ],
+      "consumed_by": [
+        {
+          "encounter": "enc_ep001_succubus",
+          "apply": {
+            "type": "ADJUST_RESOURCE",
+            "resource": "dp",
+            "delta": 5
+          }
+        }
+      ]
     },
     {
-      "flag_id": "F-11", "description_key": "flag.first_case_closed", "default_value": false,
-      "set_by": [{ "encounter": "enc_ep001_succubus", "outcome": "BEST_RESOLUTION", "value": true }],
-      "consumed_by": [{ "encounter": "enc_ep004_dwarf", "apply": { "type": "REDUCE_CP", "delta": -1 } }]
+      "flag_id": "F-11",
+      "description_key": "flag.first_case_closed",
+      "default_value": false,
+      "set_by": [
+        {
+          "encounter": "enc_ep001_succubus",
+          "outcome": "BEST_RESOLUTION",
+          "value": true
+        }
+      ],
+      "consumed_by": [
+        {
+          "encounter": "enc_ep004_dwarf",
+          "apply": {
+            "type": "REDUCE_CP",
+            "delta": -1
+          }
+        }
+      ]
     },
     {
-      "flag_id": "F-12", "description_key": "flag.final_route_ready", "default_value": false,
-      "set_by": [{ "event": "event_ep004_ticket_trade", "choice": "choice_ep004_question_broker", "value": true }],
-      "consumed_by": [{ "encounter": "enc_ep004_fallen_hero", "apply": { "type": "MODIFY_SHIELDS", "delta": -1 } }]
+      "flag_id": "F-12",
+      "description_key": "flag.final_route_ready",
+      "default_value": false,
+      "set_by": [
+        {
+          "event": "event_ep004_broker_canvass",
+          "condition": {
+            "type": "FLAG_EQUALS",
+            "flag_id": "F-12",
+            "value": true
+          },
+          "value": true
+        }
+      ],
+      "consumed_by": [
+        {
+          "encounter": "enc_ep004_fallen_hero",
+          "apply": {
+            "type": "MODIFY_SHIELDS",
+            "delta": -1
+          }
+        }
+      ]
     },
     {
-      "flag_id": "F-13", "description_key": "flag.true_ending", "default_value": false,
-      "set_by": [{ "encounter": "enc_ep004_fallen_hero", "outcome": "BEST_RESOLUTION", "value": true }],
-      "consumed_by": [{ "encounter": "enc_ep004_fallen_hero", "apply": { "type": "ADJUST_RESOURCE", "resource": "trust", "delta": 1 } }]
+      "flag_id": "F-13",
+      "description_key": "flag.true_ending",
+      "default_value": false,
+      "set_by": [
+        {
+          "encounter": "enc_ep004_fallen_hero",
+          "outcome": "BEST_RESOLUTION",
+          "value": true
+        }
+      ],
+      "consumed_by": [
+        {
+          "encounter": "enc_ep004_fallen_hero",
+          "apply": {
+            "type": "ADJUST_RESOURCE",
+            "resource": "trust",
+            "delta": 1
+          }
+        }
+      ]
     }
   ]
 }

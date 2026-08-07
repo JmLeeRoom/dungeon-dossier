@@ -11,6 +11,8 @@ import { t } from '../../app/i18n';
 import { setTypewriterIntervalOverride } from '../../ui/widgets/typewriter';
 import { createAutoplayHud } from './hud';
 import {
+  chooseCanvassTopic,
+  chooseDeadSceneAction,
   chooseEventChoice,
   chooseReward,
   bestFillerSubmission,
@@ -32,6 +34,7 @@ import {
   findRawI18nKeys,
   publishReport,
   VIDEO_DURATION_ACCEPTANCE,
+  VIDEO_TARGET_DURATION_SEC,
   type AutoplayNodeReport,
   type AutoplayReport,
   type AutoplayReportEvidence,
@@ -84,7 +87,7 @@ export const MODE_CONFIGS: Readonly<Record<AutoplayOptions['mode'], ModeConfig>>
     sceneStallMs: 90_000,
     runTimeoutMs: 360_000,
     skipTypewriter: false,
-    targetDurationSec: 150,
+    targetDurationSec: VIDEO_TARGET_DURATION_SEC,
     typewriterIntervalMs: 20,
   },
 };
@@ -152,6 +155,8 @@ interface NodeProgress {
   grade?: string;
   rewardOffered?: readonly string[];
   rewardClaimed?: string;
+  /** Set when the node routed through a defeat screen before continuing. */
+  deadSceneReason?: string;
   readonly warnings: string[];
 }
 
@@ -246,6 +251,9 @@ export function startAutoplay(port: AutoplayPort, options: AutoplayOptions): voi
       ...(progress.rewardClaimed === undefined
         ? {}
         : { rewardClaimed: progress.rewardClaimed }),
+      ...(progress.deadSceneReason === undefined
+        ? {}
+        : { deadSceneReason: progress.deadSceneReason }),
       flagsSet,
       durationMs: Math.round(Date.now() - progress.startedAt),
       warnings: [...progress.warnings],
@@ -578,7 +586,7 @@ export function startAutoplay(port: AutoplayPort, options: AutoplayOptions): voi
             performWithCinematic('연결 배치 제출', () => {
               scene.submitPlacement(scene.answerMapping);
             });
-          } else {
+          } else if (scene.pattern === 'C') {
             const spotId = scene.spotIds.find(
               (candidate) => !scene.discoveredSpotIds.includes(candidate),
             );
@@ -589,6 +597,41 @@ export function startAutoplay(port: AutoplayPort, options: AutoplayOptions): voi
             performWithCinematic('현장 조사', () => {
               scene.investigate(spotId);
             });
+          } else if (scene.pattern === 'D') {
+            const pick = scene.tuningOptionIds
+              .flatMap((optionId) => {
+                const cardId = scene.tuningCardIdsByOption[optionId]?.[0];
+                return cardId === undefined ? [] : [{ optionId, cardId }];
+              })[0];
+            if (pick === undefined) {
+              // No affordable option has a legal target: the node pays its
+              // authored fallback instead, so finishing is the correct move.
+              performWithCinematic('강화 보류', () => { scene.finish(); });
+              break;
+            }
+            performWithCinematic('카드 강화', () => {
+              scene.applyTuning(pick.optionId, pick.cardId);
+            });
+          } else if (scene.pattern === 'E') {
+            const topicId = chooseCanvassTopic(
+              scene.eventId,
+              scene.topicIds,
+              scene.canvassedTopicIds,
+            );
+            if (topicId === undefined) {
+              performWithCinematic('탐문 종료', () => { scene.finish(); });
+              break;
+            }
+            performWithCinematic('탐문', () => { scene.canvass(topicId); });
+          } else {
+            const targetId = scene.collectTargetIds.find(
+              (candidate) => !scene.collectedTargetIds.includes(candidate),
+            );
+            if (targetId === undefined) {
+              performWithCinematic('감식 종료', () => { scene.finish(); });
+              break;
+            }
+            performWithCinematic('증거 감식', () => { scene.collect(targetId); });
           }
           break;
         case 'EVENT_RESULT':
@@ -622,8 +665,27 @@ export function startAutoplay(port: AutoplayPort, options: AutoplayOptions): voi
           endingId = scene.endingId;
           finish();
           break;
+        case 'DEAD_SCENE': {
+          const actionId = chooseDeadSceneAction(scene.actionIds);
+          if (actionId === undefined) {
+            fail(`dead scene ${scene.reason} offers no enabled action`);
+            break;
+          }
+          if (currentNode !== undefined) currentNode.deadSceneReason = scene.reason;
+          performWithCinematic('패배 처리', () => {
+            scene.act(actionId);
+          });
+          break;
+        }
         case 'DIRECTION':
           break;
+        default: {
+          // An unhandled scene must fail loudly. Treating an unknown scene as a
+          // no-op is how D/E/F silently ran as pattern C before.
+          const unreachable: never = scene;
+          fail(`unhandled autoplay scene: ${JSON.stringify(unreachable)}`);
+          break;
+        }
       }
     } catch (error) {
       fail(`action threw on ${scene.kind}: ${errorMessage(error)}`);

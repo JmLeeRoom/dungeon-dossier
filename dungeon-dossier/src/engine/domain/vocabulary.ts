@@ -122,6 +122,22 @@ export const ResolutionCodeSchema = z.enum([
   'R_PROCEDURE_VIOLATION',
 ]);
 export const RESOLUTION_CODES = ResolutionCodeSchema.options;
+
+/**
+ * Why the resolver refused an action. It travels with the resolution codes as
+ * the emittable reaction-key vocabulary, so content validation can enumerate
+ * the set without depending on the resolver itself.
+ */
+export const INVALID_REASONS = [
+  'INCOMPATIBLE_TARGET',
+  'TARGET_NOT_EXPOSED',
+  'MISSING_TARGET',
+  'MISSING_EVIDENCE',
+  'MISSING_PROOF_RULE',
+  'RESERVED_INTENT',
+  'SILENCE',
+] as const;
+export type InvalidReason = (typeof INVALID_REASONS)[number];
 export type ResolutionCode = z.infer<typeof ResolutionCodeSchema>;
 
 export const ContentIdSchema = z.string().trim().min(1).max(160);

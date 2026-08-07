@@ -5,8 +5,10 @@ import {
   CommitmentStateSchema,
   ContentIdSchema,
   FacetSchema,
+  GradeSchema,
 } from '../vocabulary';
 import { PublicClaimSchema, TruthClaimSchema } from './claim';
+import { EventCutscenesSchema } from './cutscene';
 import { DialogueSchema } from './dialogue';
 import { EncounterSchema } from './encounter';
 import { EvidenceSchema } from './evidence';
@@ -103,12 +105,77 @@ export const InquiryRouteSchema = z
   });
 export type InquiryRouteDefinition = z.infer<typeof InquiryRouteSchema>;
 
+/** Run events can spend only the resources that actually live in RunState. */
+export const RunEventCostSchema = z
+  .strictObject({
+    stress: NonNegativeNumberSchema.optional(),
+    dp: NonNegativeNumberSchema.optional(),
+    trust: NonNegativeNumberSchema.optional(),
+  })
+  .refine(
+    (cost) => Object.values(cost).some((value) => value !== undefined && value > 0),
+    { message: 'a run-event cost must spend at least one positive resource amount' },
+  );
+export type RunEventCost = z.infer<typeof RunEventCostSchema>;
+
+/** Flags stay scalar so authoring, runtime FlagStore, and saves share one shape. */
+export const RunFlagValueSchema = z.union([
+  z.boolean(),
+  z.number().finite(),
+  z.string(),
+]);
+
+const NonZeroRunResourceDeltaSchema = z.number().finite().refine(
+  (value) => value !== 0,
+  { message: 'resource adjustment delta must be non-zero' },
+);
+
+/** One effect changes one target. Multiple targets are authored as multiple effects. */
+export const RunEffectSchema = z.discriminatedUnion('type', [
+  z.strictObject({
+    type: z.literal('GRANT_EVIDENCE'),
+    target: ContentIdSchema,
+  }),
+  z.strictObject({
+    type: z.literal('ADJUST_RESOURCE'),
+    resource: z.enum(['stress', 'dp', 'trust']),
+    delta: NonZeroRunResourceDeltaSchema,
+  }),
+  z.strictObject({
+    type: z.literal('UPGRADE_EVIDENCE'),
+    target: ContentIdSchema,
+    /** Explicit destination; semantic validation requires the next authored grade. */
+    to: GradeSchema,
+  }),
+  z.strictObject({
+    type: z.literal('OPEN_ROUTE'),
+    target: ContentIdSchema,
+  }),
+  z.strictObject({
+    type: z.literal('SET_FLAG'),
+    target: ContentIdSchema,
+    value: RunFlagValueSchema,
+  }),
+]);
+export type RunEffect = z.infer<typeof RunEffectSchema>;
+
 const NonCombatBaseShape = {
   event_id: ContentIdSchema,
   node: ContentIdSchema,
   title_key: LocalizationKeySchema,
   description_key: LocalizationKeySchema,
+  /** Optional BEFORE/AFTER cutscenes framing this node. */
+  cutscenes: EventCutscenesSchema.default([]),
 };
+
+/** Bound shared by authored tuning, accumulated RunState tuning, and saves. */
+export const MAX_ABS_CARD_TUNING = 10_000;
+const CardTuningDeltaSchema = z
+  .number()
+  .finite()
+  .min(-MAX_ABS_CARD_TUNING)
+  .max(MAX_ABS_CARD_TUNING);
+const CardCpTuningDeltaSchema = CardTuningDeltaSchema.int().safe();
 
 export const ChoiceEventSchema = z.strictObject({
   ...NonCombatBaseShape,
@@ -169,10 +236,89 @@ export const InvestigationEventSchema = z.strictObject({
   per_attempt_costs: CostSchema,
 });
 
+/** D — card enhancement: permanently tunes one owned card definition. */
+export const EnhanceCardEventSchema = z.strictObject({
+  ...NonCombatBaseShape,
+  pattern: z.literal('D'),
+  /** Required soft-lock fallback when no owned card is eligible. */
+  fallback_gains: z.array(RunEffectSchema).min(1),
+  /** Offered tuning options; the player picks exactly one. */
+  options: z
+    .array(
+      z.strictObject({
+        option_id: ContentIdSchema,
+        label_key: LocalizationKeySchema,
+        /** Deterministic BEST autoplay tie-break only; never reorders gameplay or UI. */
+        autoplay_priority: NonNegativeIntegerSchema.max(10_000).default(0),
+        costs: RunEventCostSchema.optional(),
+        /** Restricts which owned card definitions this option may target. Empty = any. */
+        eligible_intents: z.array(ActionIntentSchema).default([]),
+        tuning: z
+          .strictObject({
+            cp_delta: CardCpTuningDeltaSchema.optional(),
+            composure_damage_delta: CardTuningDeltaSchema.optional(),
+            coercion_delta: CardTuningDeltaSchema.optional(),
+          })
+          .refine(
+            (tuning) =>
+              Object.values(tuning).some(
+                (value) => value !== undefined && value !== 0,
+              ),
+            { message: 'a tuning must change at least one stat' },
+          ),
+        /** Optional narrative/resource payoff committed after the tuning. */
+        effects: z.array(RunEffectSchema).default([]),
+      }),
+    )
+    .min(2),
+});
+
+/** E — canvassing: questioning bystanders opens statement hints and leads. */
+export const CanvassEventSchema = z.strictObject({
+  ...NonCombatBaseShape,
+  pattern: z.literal('E'),
+  attempt_limit: z.number().int().positive(),
+  per_attempt_costs: RunEventCostSchema,
+  topics: z
+    .array(
+      z.strictObject({
+        topic_id: ContentIdSchema,
+        label_key: LocalizationKeySchema,
+        /** Shown after the topic is canvassed; this is the payoff text. */
+        reveal_key: LocalizationKeySchema,
+        effects: z.array(RunEffectSchema).min(1),
+      }),
+    )
+    .min(2),
+});
+
+/** F — forensic collection: sweeping the scene puts new evidence in the pouch. */
+export const CollectEvidenceEventSchema = z.strictObject({
+  ...NonCombatBaseShape,
+  pattern: z.literal('F'),
+  attempt_limit: z.number().int().positive(),
+  per_attempt_costs: RunEventCostSchema,
+  targets: z
+    .array(
+      z.strictObject({
+        target_id: ContentIdSchema,
+        label_key: LocalizationKeySchema,
+        evidence_id: ContentIdSchema,
+        /** Forensic grade granted on collection. */
+        grade: GradeSchema,
+        effects: z.array(RunEffectSchema).default([]),
+      }),
+    )
+    .min(2),
+});
+
 export const NonCombatEventSchema = z.discriminatedUnion('pattern', [
   ChoiceEventSchema,
   PlacementEventSchema,
   InvestigationEventSchema,
+  EnhanceCardEventSchema,
+  CanvassEventSchema,
+  CollectEvidenceEventSchema,
 ]);
 export type NonCombatEventDefinition = z.infer<typeof NonCombatEventSchema>;
 

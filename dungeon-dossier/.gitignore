@@ -26,3 +26,7 @@ Desktop.ini
 
 # Planner workbench state is not runtime content
 .image-slots.state.json
+
+# Playwright release evidence (regenerated per run)
+artifacts/
+playwright-report/

@@ -60,7 +60,7 @@ describe('game-flow presentation adapters', () => {
       expect(stripModel.nodes).toHaveLength(15);
       expect(stripModel.nodes[5]?.status).toBe('CURRENT');
       expect(eventModels.map((event) => event.pattern))
-        .toEqual(['A', 'B', 'C', 'B', 'C', 'C', 'A']);
+        .toEqual(['A', 'B', 'C', 'F', 'C', 'D', 'E']);
       expect(rewardModel.choices).toHaveLength(rewards.rewards.length);
       expect(endingModel.kind).toBe('TRUE');
       expect(rawKeyPaths([stripModel, ...eventModels, rewardModel, endingModel]))

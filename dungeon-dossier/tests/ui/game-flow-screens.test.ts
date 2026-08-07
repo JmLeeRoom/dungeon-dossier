@@ -23,7 +23,10 @@ describe('game completion presentation models', () => {
   it('supports event patterns A, B, and C without encounter imports', () => {
     const choice: EventSceneModel = {
       eventId: 'choice', title: '선택', description: '고른다', pattern: 'A',
-      choices: [{ choiceId: 'a', label: 'A', costs: [], gains: [] }, { choiceId: 'b', label: 'B', costs: [], gains: [] }],
+      choices: [
+        { choiceId: 'a', label: 'A', costs: [], gains: [], affordable: true },
+        { choiceId: 'b', label: 'B', costs: [], gains: [], affordable: false, blockedReason: 'DP 부족 (0/5)' },
+      ],
     };
     const placement: Extract<EventSceneModel, { pattern: 'B' }> = {
       eventId: 'placement', title: '배치', description: '잇는다', pattern: 'B',
@@ -33,7 +36,8 @@ describe('game completion presentation models', () => {
     };
     const investigation: Extract<EventSceneModel, { pattern: 'C' }> = {
       eventId: 'investigation', title: '조사', description: '살핀다', pattern: 'C',
-      spots: [{ spotId: 'cabinet', label: '보관함', discovered: false }], attemptLimit: 2, attemptsUsed: 1,
+      spots: [{ spotId: 'cabinet', label: '보관함', discovered: false, findings: [], affordable: true }],
+      attemptLimit: 2, attemptsUsed: 1, attemptCosts: [],
     };
     expect(choice.pattern).toBe('A');
     expect(createEventScreen).toBeTypeOf('function');

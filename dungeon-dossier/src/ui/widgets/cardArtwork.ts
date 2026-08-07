@@ -7,7 +7,12 @@ import {
   type CardLayerSlot,
 } from './cardLayers';
 import { createPixelText } from '../core/pixelText';
-import { CARD_LAYER_RECTS, CARD_SIZE } from './cardLayout';
+import {
+  CARD_COPY_FONT_SIZES,
+  CARD_COPY_LINE_HEIGHTS,
+  CARD_COPY_RECTS,
+  CARD_LAYER_RECTS,
+} from './cardLayout';
 import { UI_PALETTE } from './theme';
 
 export const CARD_INTENT_COLOURS: Readonly<Record<string, number>> = {
@@ -38,8 +43,6 @@ export type CardLayerUrlResolver = (
 export interface CardArtworkOptions {
   readonly attachments?: CardAttachments;
   readonly resolveLayerUrl?: CardLayerUrlResolver;
-  /** Draws the body copy that only fits in the full-size focus modal. */
-  readonly detailed?: boolean;
 }
 
 export interface CardArtwork {
@@ -51,41 +54,85 @@ function intentColour(intent: string): number {
   return CARD_INTENT_COLOURS[intent] ?? UI_PALETTE.panelLight;
 }
 
+/** Top-left cost chip. The badge plate keeps it legible over any base art. */
+function drawCpBadge(cpCost: number): Container {
+  const rect = CARD_COPY_RECTS.cpBadge;
+  const badge = new Container();
+  badge.addChild(
+    new Graphics()
+      .roundRect(rect.x, rect.y, rect.width, rect.height, 10)
+      .fill(UI_PALETTE.deepInk)
+      .roundRect(rect.x, rect.y, rect.width, rect.height, 10)
+      .stroke({ color: UI_PALETTE.parchmentDark, width: 4 }),
+  );
+  const label = createPixelText(`${cpCost} CP`, {
+    fontSize: CARD_COPY_FONT_SIZES.cpBadge,
+    fill: UI_PALETTE.paper,
+  });
+  label.anchor.set(0.5);
+  label.position.set(rect.x + rect.width / 2, rect.y + rect.height / 2);
+  badge.addChild(label);
+  return badge;
+}
+
+/**
+ * The description is part of the face, not a focus-modal extra: at fan scale
+ * the authored 40px copy lands at exactly 8px, which is the size the hand is
+ * meant to be read at.
+ */
+function drawDescription(description: string): Container {
+  const rect = CARD_COPY_RECTS.description;
+  const body = createPixelText(description, {
+    fontSize: CARD_COPY_FONT_SIZES.description,
+    fill: UI_PALETTE.parchment,
+    wordWrap: true,
+    wordWrapWidth: rect.width,
+    lineHeight: CARD_COPY_LINE_HEIGHTS.description,
+  });
+  body.position.set(rect.x, rect.y);
+  return body;
+}
+
 function drawCardCopy(face: CardArtworkFace): Container {
   const layer = new Container();
-  const rect = CARD_LAYER_RECTS.base;
+  const titleRect = CARD_COPY_RECTS.title;
   const title = createPixelText(face.title, {
-    fontSize: 40,
+    fontSize: CARD_COPY_FONT_SIZES.title,
     fill: UI_PALETTE.paper,
     wordWrap: true,
-    wordWrapWidth: rect.width - 140,
+    wordWrapWidth: titleRect.width,
     align: 'center',
-    lineHeight: 44,
+    lineHeight: CARD_COPY_LINE_HEIGHTS.title,
   });
   title.anchor.set(0.5, 0);
-  title.position.set(rect.width / 2, 44);
+  title.position.set(titleRect.x + titleRect.width / 2, titleRect.y);
   layer.addChild(title);
 
+  layer.addChild(drawCpBadge(face.cpCost));
+
   if (face.ordinal !== undefined) {
+    // The hand slot number moved opposite the cost badge so both stay readable.
+    const rect = CARD_COPY_RECTS.ordinal;
     const ordinal = createPixelText(String(face.ordinal), {
-      fontSize: 35,
-      fill: UI_PALETTE.paper,
+      fontSize: CARD_COPY_FONT_SIZES.ordinal,
+      fill: UI_PALETTE.parchment,
     });
-    ordinal.position.set(40, 44);
+    ordinal.anchor.set(1, 0);
+    ordinal.position.set(rect.x + rect.width, rect.y);
     layer.addChild(ordinal);
   }
 
-  const cost = createPixelText(`${face.cpCost} CP`, {
-    fontSize: 35,
-    fill: UI_PALETTE.parchment,
+  const intentRect = CARD_COPY_RECTS.intent;
+  const intent = createPixelText(face.intent, {
+    fontSize: CARD_COPY_FONT_SIZES.intent,
+    fill: UI_PALETTE.muted,
   });
-  cost.anchor.set(1, 1);
-  cost.position.set(rect.width - 40, rect.height - 40);
-  layer.addChild(cost);
-
-  const intent = createPixelText(face.intent, { fontSize: 30, fill: UI_PALETTE.muted });
-  intent.position.set(40, rect.height - 76);
+  intent.position.set(intentRect.x, intentRect.y);
   layer.addChild(intent);
+
+  if (face.description !== undefined && face.description !== '') {
+    layer.addChild(drawDescription(face.description));
+  }
 
   return layer;
 }
@@ -103,7 +150,14 @@ function drawBaseLayer(face: CardArtworkFace, url: string | undefined): Containe
         .stroke({ color: UI_PALETTE.parchmentDark, width: 4 })
         .rect(24, 24, rect.width - 48, 96)
         .fill(intentColour(face.intent))
-        .rect(24, rect.height - 120, rect.width - 48, 96)
+        // Plate behind the permanent description block so the body copy keeps
+        // its contrast on cards whose base art is missing.
+        .rect(
+          CARD_COPY_RECTS.description.x - 16,
+          CARD_COPY_RECTS.description.y - 14,
+          CARD_COPY_RECTS.description.width + 32,
+          CARD_COPY_RECTS.description.height + 20,
+        )
         .fill(UI_PALETTE.deepInk),
     );
   } else {
@@ -136,20 +190,6 @@ function drawPostPlaceholder(): Graphics {
   return new Graphics()
     .rect(rect.x, rect.y, rect.width, rect.height)
     .fill({ color: UI_PALETTE.cyan, alpha: 0.14 });
-}
-
-function drawDescription(face: CardArtworkFace): Container | undefined {
-  if (face.description === undefined) return undefined;
-  const body = createPixelText(face.description, {
-    fontSize: 30,
-    fill: UI_PALETTE.parchment,
-    wordWrap: true,
-    wordWrapWidth: CARD_SIZE.width - 120,
-    lineHeight: 38,
-  });
-  body.anchor.set(0.5, 0);
-  body.position.set(CARD_SIZE.width / 2, 470);
-  return body;
 }
 
 function drawEvidencePlaceholder(offsetX: number): Container {
@@ -201,10 +241,6 @@ export function createCardArtwork(
         : sprite(url, 'evidence', spread);
     } else if (slot.layer === 'base') {
       child = drawBaseLayer(face, url);
-      if (options.detailed === true) {
-        const description = drawDescription(face);
-        if (description !== undefined) child.addChild(description);
-      }
     } else if (url !== undefined) {
       child = sprite(url, slot.layer);
     } else if (slot.layer === 'illust') {
