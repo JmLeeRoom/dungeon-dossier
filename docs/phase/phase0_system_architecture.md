@@ -55,7 +55,7 @@ Repository root name: `dungeon-dossier/`
    - Audio: howler.js (OGG only)
    - Architecture enforcement: dependency-cruiser + ESLint
    - Package manager: pnpm + lockfile
-   - Runtime: Chrome latest (demo target, fixed); Node 20 LTS for tools/CI
+   - Runtime: Chrome latest (demo target, fixed); Node 22.13+ LTS (22.x) for tools/CI
    - Explicitly NOT used: Redux-class state libraries, React or any UI framework, a server (offline single-player is the P0 definition; the AI key proxy is a separate concern).
 
 6. **Assets & Palette**:
