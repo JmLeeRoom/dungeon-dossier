@@ -81,6 +81,10 @@ export default defineConfig({
     assertDeveloperConsoleTreeShaken(),
     saveWorkbenchAssetsPlugin(),
   ],
+  optimizeDeps: {
+    include: ["howler", "pixi.js", "zod"],
+    holdUntilCrawlEnd: true,
+  },
   server: {
     host: true,
     fs: {
