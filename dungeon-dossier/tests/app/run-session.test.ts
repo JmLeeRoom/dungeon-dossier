@@ -13,6 +13,8 @@ import {
   completeEventNode,
   createNodeStrip,
   createRunState,
+  runEpisodeIds,
+  type NodeDefinition,
 } from '../../src/engine/run';
 import { createRunSession, type RunSession } from '../../src/app/createRunSession';
 import { SaveRepository } from '../../src/app/save';
@@ -70,6 +72,7 @@ describe('app run session', () => {
         dp: 0,
         trust: 0,
         deck: { drawPile: [], hand: [], discardPile: [], exhaustPile: [] },
+        episodeIds: runEpisodeIds(strip),
       }),
       strip,
       flags: flags.flags,
@@ -109,7 +112,15 @@ describe('app run session', () => {
     });
     expect(repository.load()).toMatchObject({
       encounter: null,
-      run: { node_index: 2 },
+      run: {
+        node_index: 2,
+        // Two tutorial stages are done but its BOSS is not, so the episode
+        // block must still show tutorial active and nothing unlocked beyond it.
+        active_episode_id: 'tutorial',
+        unlocked_episode_ids: ['tutorial'],
+        completed_episode_ids: [],
+        route_node_ids: strip.map((node) => node.nodeId),
+      },
     });
   });
 
@@ -141,6 +152,7 @@ describe('app run session', () => {
       dp: reward.amount,
       trust: 0,
       deck: { drawPile: [], hand: [], discardPile: [], exhaustPile: [] },
+      episodeIds: runEpisodeIds(strip),
     });
     const run = createRunSession({
       initialState: {
@@ -210,6 +222,7 @@ describe('app run session', () => {
       dp: 0,
       trust: 0,
       deck: { drawPile: [], hand: [], discardPile: [], exhaustPile: [] },
+      episodeIds: runEpisodeIds(strip),
     });
     const run = createRunSession({
       initialState: { ...initial, pendingRewardIds: [reward.reward_id] },
@@ -275,6 +288,7 @@ describe('app run session', () => {
       dp: 0,
       trust: 0,
       deck: { drawPile: [], hand: [], discardPile: [], exhaustPile: [] },
+      episodeIds: runEpisodeIds(strip),
     });
     const run = createRunSession({
       initialState: {
@@ -338,6 +352,7 @@ describe('app run session', () => {
       dp: 0,
       trust: 0,
       deck: { drawPile: [], hand: [], discardPile: [], exhaustPile: [] },
+      episodeIds: runEpisodeIds(strip),
     });
     const run = createRunSession({
       initialState: initial,
@@ -383,8 +398,9 @@ describe('app run session', () => {
     });
   });
 
-  it('completes all 15 authored nodes with rewards, all event patterns, and F-13', () => {
+  it('completes all 9 resolved nodes with rewards, every routed event pattern, and F-13', () => {
     const strip = createNodeStrip(RunStripSchema.parse(common('run-strip.json')));
+    const episodeIds = runEpisodeIds(strip);
     const flags = FlagsSchema.parse(common('flags.json'));
     const rewards = RewardsSchema.parse(common('rewards.json'));
     const grades = GradesSchema.parse(common('grades.json'));
@@ -413,6 +429,7 @@ describe('app run session', () => {
         dp: 0,
         trust: 0,
         deck: { drawPile: [], hand: [], discardPile: [], exhaustPile: [] },
+        episodeIds,
       }),
       strip,
       flags: flags.flags,
@@ -421,6 +438,28 @@ describe('app run session', () => {
       saveRepository: repository,
       caseIdsByDirectory: caseIds,
     });
+
+    // Episode bookkeeping is sampled after every cleared node so the fog can be
+    // asserted as a trajectory, not just at the final frame.
+    const trail: {
+      nodeId: string;
+      activeEpisodeId: string;
+      unlocked: readonly string[];
+    }[] = [];
+    const recordProgress = (node: NodeDefinition): void => {
+      trail.push({
+        nodeId: node.nodeId,
+        activeEpisodeId: run.snapshot.activeEpisodeId,
+        unlocked: [...run.snapshot.unlockedEpisodeIds],
+      });
+    };
+    const routedEventPatterns: string[] = [];
+    // The canonical route grades exactly the COMBAT and BOSS stage of each
+    // episode; the DP floor below is re-derived from those same encounters.
+    const gradedNodeIds: string[] = [];
+    let encounterDp = 0;
+    let rewardDp = 0;
+    let eventDpDelta = 0;
 
     while (run.snapshot.nodeIndex < strip.length) {
       const node = strip[run.snapshot.nodeIndex];
@@ -432,6 +471,8 @@ describe('app run session', () => {
           (candidate) => candidate.event_id === node.ref,
         );
         if (event === undefined) throw new Error(`Missing event ${node.ref}.`);
+        routedEventPatterns.push(event.pattern);
+        const dpBeforeEvent = run.snapshot.dp;
         if (event.pattern === 'A') {
           const choice = event.choices[0];
           if (choice === undefined) throw new Error(`Event ${event.event_id} has no choice.`);
@@ -479,10 +520,14 @@ describe('app run session', () => {
               .map((target) => target.target_id),
           });
         }
+        eventDpDelta += run.snapshot.dp - dpBeforeEvent;
+        recordProgress(node);
         continue;
       }
 
-      const actIndex = Math.floor(run.snapshot.nodeIndex / 5);
+      // Acts are episodes now: each episode is one act, so the rarity ladder
+      // steps once per episode instead of once per five strip nodes.
+      const actIndex = node.episodeIndex;
       const rarity = (['COMMON', 'UNCOMMON', 'RARE'] as const)[actIndex];
       if (rarity === undefined) throw new Error('Missing reward rarity for act.');
       const encounterDefinition = definition.encounters.find(
@@ -508,18 +553,96 @@ describe('app run session', () => {
           coercion: 0,
         },
       });
+      gradedNodeIds.push(node.nodeId);
+      encounterDp += authoredOutcome.rewards?.dp ?? 0;
       const selected = completion.rewardChoices[0];
       if (selected === undefined) throw new Error('BEST encounter must offer a reward.');
+      if (
+        selected.type === 'RESOURCE' &&
+        selected.resource === 'DP' &&
+        selected.amount !== undefined
+      ) {
+        rewardDp += selected.amount;
+      }
       run.claimReward(selected.reward_id);
+      recordProgress(node);
     }
 
-    expect(run.snapshot.nodeIndex).toBe(15);
-    expect(run.snapshot.completedNodeIds).toHaveLength(15);
+    expect(run.snapshot.nodeIndex).toBe(9);
+    expect(run.snapshot.completedNodeIds).toEqual([
+      'run_tutorial_01',
+      'run_tutorial_02',
+      'run_tutorial_05',
+      'run_ep001_01',
+      'run_ep001_02',
+      'run_ep001_05',
+      'run_ep004_01',
+      'run_ep004_02',
+      'run_ep004_05',
+    ]);
     expect(run.snapshot.pendingRewardIds).toEqual([]);
     expect(run.snapshot.terminal).toBe(true);
     expect(run.snapshot.flags['F-13']).toBe(true);
-    expect(run.snapshot.gradeHistory).toHaveLength(9);
-    expect(run.snapshot.dp).toBeGreaterThanOrEqual(230);
+    // Six graded stages, not nine: each episode contributes one COMBAT and one
+    // BOSS encounter, and its EVENT stage is never graded.
+    expect(gradedNodeIds).toEqual([
+      'run_tutorial_01',
+      'run_tutorial_05',
+      'run_ep001_01',
+      'run_ep001_05',
+      'run_ep004_01',
+      'run_ep004_05',
+    ]);
+    expect(run.snapshot.gradeHistory).toHaveLength(6);
+    // The canonical route pins one event per episode; those are the only
+    // patterns this walkthrough can exercise.
+    expect(routedEventPatterns).toEqual(['A', 'F', 'D']);
+
+    // DP is fully accounted for: authored BEST-outcome payouts on the six graded
+    // encounters, plus the DP rewards actually claimed, plus whatever the three
+    // routed events spent or granted. No other path touches run DP.
+    expect(run.snapshot.dp).toBe(encounterDp + rewardDp + eventDpDelta);
+    // The old floor of 230 was the sum of authored BEST_RESOLUTION dp over the
+    // retired nine-encounter strip. The same sum over the six graded encounters
+    // this route now runs is 20+30 (tutorial) + 20+30 (ep001) + 25+40 (ep004).
+    expect(encounterDp).toBe(165);
+    expect(run.snapshot.dp).toBeGreaterThanOrEqual(165);
+
+    expect(episodeIds).toEqual(['tutorial', 'ep001', 'ep004']);
+    expect(trail.map((entry) => entry.activeEpisodeId)).toEqual([
+      'tutorial',
+      'tutorial',
+      'ep001',
+      'ep001',
+      'ep001',
+      'ep004',
+      'ep004',
+      'ep004',
+      'ep004',
+    ]);
+    expect(trail.map((entry) => entry.unlocked)).toEqual([
+      ['tutorial'],
+      ['tutorial'],
+      ['tutorial', 'ep001'],
+      ['tutorial', 'ep001'],
+      ['tutorial', 'ep001'],
+      ['tutorial', 'ep001', 'ep004'],
+      ['tutorial', 'ep001', 'ep004'],
+      ['tutorial', 'ep001', 'ep004'],
+      ['tutorial', 'ep001', 'ep004'],
+    ]);
+    // The unlock set only ever grew on the two BOSS clears that had a next
+    // episode; no COMBAT or EVENT stage moved the fog.
+    const unlockGrowthNodeIds = trail
+      .filter((entry, index) => entry.unlocked.length > (trail[index - 1]?.unlocked.length ?? 1))
+      .map((entry) => entry.nodeId);
+    expect(unlockGrowthNodeIds).toEqual(['run_tutorial_05', 'run_ep001_05']);
+    expect(
+      strip
+        .filter((node) => unlockGrowthNodeIds.includes(node.nodeId))
+        .map((node) => node.slotRole),
+    ).toEqual(['BOSS', 'BOSS']);
+    expect(run.snapshot.completedEpisodeIds).toEqual(['tutorial', 'ep001', 'ep004']);
   });
 
   it('sets F-12 only when the ep004 canvass actually asks about the route', () => {
@@ -533,18 +656,25 @@ describe('app run session', () => {
     // player cannot simply take every branch.
     expect(canvass.attempt_limit).toBeLessThan(canvass.topics.length);
 
-    const strip = [{
+    // A single-slot stand-in for the ep004 EVENT stage: this test is about the
+    // flag hook, not about routing, so the episode is one node long.
+    const strip: readonly NodeDefinition[] = [{
       nodeId: 'test_broker_canvass',
       kind: 'EVENT',
       ref: 'event_ep004_broker_canvass',
       caseDirectory: 'ep004',
-    }] as const;
+      episodeId: 'ep004',
+      episodeIndex: 0,
+      slotRole: 'EVENT',
+      slotIndex: 0,
+    }];
     const stateFor = () => createRunState({
       runSeed: 1,
       stress: 100,
       dp: 10,
       trust: 0,
       deck: { drawPile: [], hand: [], discardPile: [], exhaustPile: [] },
+      episodeIds: ['ep004'],
     });
 
     const askedRoute = completeEventNode(stateFor(), {

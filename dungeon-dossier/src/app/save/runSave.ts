@@ -1,6 +1,12 @@
-import { CURRENT_SAVE_VERSION, type SaveData } from '../../content-io';
+import {
+  CURRENT_SAVE_VERSION,
+  LEGACY_EPISODE_PLACEHOLDER,
+  type SaveData,
+} from '../../content-io';
 import {
   createRunState,
+  DEFAULT_RETRY_LIMIT,
+  deriveEpisodeProgress,
   type NodeDefinition,
   type RunResourceBounds,
   type RunState,
@@ -10,10 +16,18 @@ import type { SaveRepository } from './SaveRepository';
 export interface RunSaveMetadata {
   readonly caseId: string;
   readonly contentVersion: string;
+  /**
+   * Node IDs of the route this run resolved. Persisting them means a later
+   * candidate-pool edit cannot silently move an in-flight save to a different
+   * set of nodes, which re-deriving from the seed alone would allow.
+   */
+  readonly routeNodeIds: readonly string[];
 }
 
 export interface RestoredRunStateCatalog {
   readonly strip: readonly NodeDefinition[];
+  /** Retries this build allows; a save at the cap is a terminal defeat. */
+  readonly retryLimit?: number;
   readonly cardIds: readonly string[];
   readonly rewardIds: readonly string[];
   readonly relicIds: readonly string[];
@@ -87,10 +101,30 @@ export function assertRestoredRunStateSemantics(
       throw new Error('Saved failed outcome is not attached to the current encounter.');
     }
   }
-  if (state.outcomeHistory.slice(0, -1).some((record) => record.outcome === 'FAILED')) {
-    throw new Error('Saved run continues after a failed encounter.');
+  // A retried failure legitimately leaves earlier FAILED records behind: the
+  // run stayed alive and re-attempted the same node. Only a FAILED that is not
+  // followed by another attempt at the same node means the run should have
+  // ended there.
+  const abandonedFailure = state.outcomeHistory.findIndex(
+    (record, index) =>
+      record.outcome === 'FAILED' &&
+      index < state.outcomeHistory.length - 1 &&
+      state.outcomeHistory[index + 1]?.nodeId !== record.nodeId,
+  );
+  if (abandonedFailure >= 0) {
+    throw new Error('Saved run continues past a failed encounter it never retried.');
   }
-  const expectedTerminal = state.nodeIndex === strip.length || failedAtCurrentNode;
+  const retriesTaken = state.outcomeHistory.filter(
+    (record) => record.outcome === 'FAILED',
+  ).length;
+  if (state.retryCount < (failedAtCurrentNode ? retriesTaken - 1 : retriesTaken)) {
+    throw new Error('Saved retry count is lower than the failures it recorded.');
+  }
+  // Terminal is only forced by a failure the run cannot retry. A retryable
+  // failure is a live run parked at the same node, so it stays non-terminal.
+  const retriesExhausted = state.retryCount >= (catalog.retryLimit ?? DEFAULT_RETRY_LIMIT);
+  const expectedTerminal =
+    state.nodeIndex === strip.length || (failedAtCurrentNode && retriesExhausted);
   if (state.terminal !== expectedTerminal) {
     throw new Error('Saved terminal state is inconsistent with run progress.');
   }
@@ -100,8 +134,27 @@ export function assertRestoredRunStateSemantics(
     .slice(0, processedNodeCount)
     .filter((node) => node.kind !== 'EVENT')
     .map((node) => node.nodeId);
-  const outcomeNodeIds = state.outcomeHistory.map((record) => record.nodeId);
-  const gradeNodeIds = state.gradeHistory.map((record) => record.nodeId);
+  // A retried node legitimately appears more than once in a row. Collapsing
+  // those repeats is what lets the history still be compared against the strip,
+  // and every attempt before the last one must be the failure that caused it.
+  const collapseAttempts = (
+    records: readonly Readonly<{ nodeId: string; outcome: string }>[],
+  ): readonly string[] => {
+    const collapsed: string[] = [];
+    records.forEach((record, index) => {
+      const previous = records[index - 1];
+      if (previous?.nodeId === record.nodeId) {
+        if (previous.outcome !== 'FAILED') {
+          throw new Error('Saved run replayed a node it had already resolved.');
+        }
+        return;
+      }
+      collapsed.push(record.nodeId);
+    });
+    return collapsed;
+  };
+  const outcomeNodeIds = collapseAttempts(state.outcomeHistory);
+  const gradeNodeIds = collapseAttempts(state.gradeHistory);
   if (
     !sameOrderedValues(outcomeNodeIds, expectedEncounterNodeIds) ||
     !sameOrderedValues(gradeNodeIds, expectedEncounterNodeIds)
@@ -258,6 +311,10 @@ export function toRunSaveData(
       evidence_grade_by_id: { ...state.evidenceGradeById },
       open_route_ids: [...state.openRouteIds],
       retry_count: state.retryCount,
+      active_episode_id: state.activeEpisodeId,
+      unlocked_episode_ids: [...state.unlockedEpisodeIds],
+      completed_episode_ids: [...state.completedEpisodeIds],
+      route_node_ids: [...metadata.routeNodeIds],
       grade_history: state.gradeHistory.map((record) => ({
         node_id: record.nodeId,
         outcome: record.outcome,
@@ -279,6 +336,11 @@ export function toRunSaveData(
 export function restoreRunState(
   save: SaveData,
   resourceBounds: RunResourceBounds = {},
+  /**
+   * Resolved route. Supplying it lets a pre-episode (v2) save recover its
+   * episode bookkeeping instead of restoring with the migration placeholder.
+   */
+  strip: readonly NodeDefinition[] = [],
 ): RunState {
   const initial = createRunState({
     resourceBounds,
@@ -323,6 +385,13 @@ export function restoreRunState(
     evidenceGradeById: { ...save.run.evidence_grade_by_id },
     openRouteIds: [...save.run.open_route_ids],
     retryCount: save.run.retry_count,
+    ...(save.run.active_episode_id === LEGACY_EPISODE_PLACEHOLDER && strip.length > 0
+      ? deriveEpisodeProgress(strip, save.run.node_index, save.run.completed_node_ids)
+      : {
+          activeEpisodeId: save.run.active_episode_id,
+          unlockedEpisodeIds: [...save.run.unlocked_episode_ids],
+          completedEpisodeIds: [...save.run.completed_episode_ids],
+        }),
     gradeHistory: save.run.grade_history.map((record) => ({
       nodeId: record.node_id,
       outcome: record.outcome,

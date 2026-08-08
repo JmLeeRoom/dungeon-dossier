@@ -125,6 +125,7 @@ export class RunSession {
       caseId,
       contentVersion:
         this.#options.contentVersionsByDirectory?.[directory] ?? '1.0',
+      routeNodeIds: this.#options.strip.map((node) => node.nodeId),
     });
     this.#state = nextState;
   }

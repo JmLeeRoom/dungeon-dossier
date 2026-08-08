@@ -55,6 +55,7 @@ import type { ActionIntent, CutsceneDefinition } from '../engine/domain';
 import type { EncounterOutcome, OutcomeEvaluation } from '../engine/encounter';
 import {
   createNodeStrip,
+  runEpisodeIds,
   currentRunNode,
   runResourceBoundsFromBalance,
   DEFAULT_RETRY_LIMIT,
@@ -209,8 +210,10 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
   // Presentation-only: a missing map degrades the banner to its tone defaults
   // instead of blocking boot.
   const judgmentUiMap: JudgmentUiMapDefinition | undefined = judgmentUiMapValue;
-  const strip = createNodeStrip(runStripDefinition);
-  const caseDirectories = strip
+  // Resolved after the seed is known so SEEDED_ONE slots vary per run; the
+  // canonical route (every slot's first candidate) is the seedless fallback.
+  const canonicalStrip = createNodeStrip(runStripDefinition);
+  const caseDirectories = canonicalStrip
     .map((node) => node.caseDirectory)
     .filter((directory, index, directories) => directories.indexOf(directory) === index);
   const loadedCases = await Promise.all(
@@ -262,19 +265,31 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
     window.localStorage,
     autoplayRequested,
   );
+  // A resumed run must walk the exact route it was saved on, so the saved seed
+  // wins over the URL seed whenever a save exists.
+  const savedRun = saveRepository.load();
+  const routeSeed = savedRun?.run_seed ?? runSeedOverride ?? DEFAULT_RUN_SEED;
+  const strip = createNodeStrip(runStripDefinition, { seed: routeSeed });
+  const episodeIds = runEpisodeIds(strip);
+
   const freshState = (): RunState => createInitialGameRunState(
     cards,
     balanceRepository.current(),
     runCatalog.flags,
     runSeedOverride,
+    episodeIds,
   );
   let initialState: RunState;
   try {
-    const saved = saveRepository.load();
+    const saved = savedRun;
     if (saved === undefined) {
       initialState = freshState();
     } else {
-      initialState = restoreRunState(saved, runResourceBoundsFromBalance(balanceRepository.current()));
+      initialState = restoreRunState(
+        saved,
+        runResourceBoundsFromBalance(balanceRepository.current()),
+        strip,
+      );
       assertRestoredRunSaveSemantics(saved, initialState, {
         strip,
         cardIds: cards.cards.map((card) => card.card_id),
@@ -529,7 +544,7 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
         handleFlowError(error, continueRun);
       });
     };
-    const model = toRunStripScreenModel(runStripDefinition, runSession.snapshot);
+    const model = toRunStripScreenModel(runStripDefinition, runSession.snapshot, { strip });
     const view = createRunStripScreen(model, { onContinue: continueRun });
     const node = currentRunNode(strip, runSession.snapshot.nodeIndex);
     if (node === null) {

@@ -319,24 +319,51 @@ describe('encounter app session', () => {
       deck: { drawPile: cardIds, hand: [], discardPile: [], exhaustPile: [] },
       flags: Object.fromEntries(flags.flags.map((flag) => [flag.flag_id, true])),
     });
-    const encounterNodes = stripDefinition.nodes.filter(
-      (node) => node.kind !== 'EVENT',
+    // Driven by the authored catalogue, not the resolved route: a route that
+    // stops visiting an encounter must not silently drop it from this gate.
+    const authoredEncounters = Object.entries(definitions).flatMap(
+      ([caseDirectory, definition]) =>
+        definition.encounters.map((encounter) => ({
+          caseDirectory,
+          encounterId: encounter.encounter_id,
+        })),
     );
 
-    for (const node of encounterNodes) {
-      const definition = definitions[node.case_directory];
-      if (definition === undefined) throw new Error(`Missing case ${node.case_directory}.`);
+    for (const node of authoredEncounters) {
+      const definition = definitions[node.caseDirectory];
+      if (definition === undefined) throw new Error(`Missing case ${node.caseDirectory}.`);
       const session = await createEncounterSession({
         caseRepository: { load: async () => definition },
         cardRepository: { load: async () => cardsDefinition },
         balanceRepository: { reload: async () => balance },
-        encounterId: node.ref,
+        encounterId: node.encounterId,
         runState,
         flagDefinitions: flags.flags,
       });
       expect(hasForbiddenPublicKey(session.currentModel().dto)).toBe(false);
       expect(session.coordinator.snapshot.machine.state).toBe('FREE_REVIEW');
     }
-    expect(encounterNodes).toHaveLength(9);
+    expect(authoredEncounters.map((node) => node.encounterId)).toEqual([
+      'enc_tutorial_slime',
+      'enc_tutorial_harpy',
+      'enc_tutorial_minotaur',
+      'enc_ep001_goblin',
+      'enc_ep001_orc',
+      'enc_ep001_succubus',
+      'enc_ep004_dwarf',
+      'enc_ep004_cyclops',
+      'enc_ep004_fallen_hero',
+    ]);
+    expect(authoredEncounters).toHaveLength(9);
+
+    // …and the catalogue must still cover every encounter the strip can route.
+    const routableEncounterRefs = stripDefinition.episodes.flatMap((episode) =>
+      episode.slots
+        .filter((slot) => slot.role !== 'EVENT')
+        .flatMap((slot) => slot.candidates.map((candidate) => candidate.ref)),
+    );
+    expect(routableEncounterRefs.length).toBeGreaterThan(0);
+    const covered = new Set(authoredEncounters.map((node) => node.encounterId));
+    expect(routableEncounterRefs.filter((ref) => !covered.has(ref))).toEqual([]);
   });
 });

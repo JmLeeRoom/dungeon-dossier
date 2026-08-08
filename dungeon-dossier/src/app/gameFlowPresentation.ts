@@ -3,7 +3,14 @@ import type {
   RewardDefinition,
   RunStripDefinition,
 } from '../engine/domain';
-import { createNodeStrip, type CaseGrade, type RunState } from '../engine/run';
+import {
+  createNodeStrip,
+  episodeNodes,
+  runEpisodes,
+  type CaseGrade,
+  type NodeDefinition,
+  type RunState,
+} from '../engine/run';
 import type { EndingKind, EndingScreenModel } from '../ui/screens/ending';
 import type { EventEffectView, EventSceneModel } from '../ui/screens/event';
 import type { RewardScreenModel } from '../ui/screens/reward';
@@ -63,22 +70,62 @@ export function effectLabels(value: unknown): readonly EventEffectView[] {
   return [];
 }
 
+export interface RunStripPresentationOptions {
+  /** Route the run actually resolved. Omitted rebuilds the canonical route. */
+  readonly strip?: readonly NodeDefinition[];
+  /** Show all three stages of the active episode instead of revealing in turn. */
+  readonly revealWholeEpisode?: boolean;
+}
+
+/**
+ * Projects only the active episode. Nodes of later episodes never enter the
+ * model at all, so no label, kind or ref of unseen content can reach the
+ * renderer, the autoplay string sweep or an accessibility reader.
+ */
 export function toRunStripScreenModel(
   definition: RunStripDefinition,
   state: Pick<RunState, 'nodeIndex'>,
+  options: RunStripPresentationOptions = {},
 ): RunStripScreenModel {
-  const strip = createNodeStrip(definition);
+  const strip = options.strip ?? createNodeStrip(definition);
   if (state.nodeIndex >= strip.length) {
     throw new Error('A completed run should render an ending instead of the node strip.');
   }
-  return createRunStripModel(
-    strip.map((node) => ({
-      nodeId: node.nodeId,
-      kind: node.kind,
-      label: t(`node.${node.ref}`, node.ref),
-    })),
-    state.nodeIndex,
+  const episodes = runEpisodes(strip);
+  const activeNode = strip[state.nodeIndex];
+  if (activeNode === undefined) {
+    throw new Error('The run cursor does not point at a resolved node.');
+  }
+  const activeEpisodeIndex = episodes.findIndex(
+    (episode) => episode.episodeId === activeNode.episodeId,
   );
+  const nodes = episodeNodes(strip, activeNode.episodeId).map((node) => ({
+    nodeId: node.nodeId,
+    kind: node.kind,
+    role: node.slotRole,
+    label: t(`node.${node.ref}`, node.ref),
+  }));
+  const clearedEpisodes = episodes.slice(0, Math.max(0, activeEpisodeIndex)).map(
+    (episode, index) => ({
+      episodeId: episode.episodeId,
+      displayIndex: index + 1,
+      label: t(`episode.${episode.episodeId}`, episode.episodeId),
+    }),
+  );
+
+  return createRunStripModel({
+    episodeId: activeNode.episodeId,
+    episodeLabel: t(`episode.${activeNode.episodeId}`, activeNode.episodeId),
+    episodeDisplayIndex: activeEpisodeIndex + 1,
+    episodeCount: episodes.length,
+    nodes,
+    activeSlotIndex: activeNode.slotIndex,
+    clearedEpisodes,
+    hasNextEpisode: activeEpisodeIndex < episodes.length - 1,
+    ...(options.revealWholeEpisode === undefined
+      ? {}
+      : { revealWholeEpisode: options.revealWholeEpisode }),
+  });
 }
 
 export interface EventOwnedCardView {

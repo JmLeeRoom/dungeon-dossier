@@ -12,10 +12,34 @@ import {
 } from '../../src/engine/run';
 
 const EVENT_ID = 'event_sample';
+const EPISODE_ID = 'episode-sample';
 
+/**
+ * The EVENT and BOSS stages of one episode. Every pattern is played on the
+ * EVENT stage; the BOSS stage that follows keeps the route open so a completion
+ * never doubles as an episode or run clear.
+ */
 const STRIP: readonly NodeDefinition[] = [
-  { nodeId: 'run-node-1', kind: 'EVENT', ref: EVENT_ID, caseDirectory: 'case-a' },
-  { nodeId: 'run-node-2', kind: 'ENCOUNTER', ref: 'encounter-1', caseDirectory: 'case-a' },
+  {
+    nodeId: 'run-node-1',
+    kind: 'EVENT',
+    ref: EVENT_ID,
+    caseDirectory: 'case-a',
+    episodeId: EPISODE_ID,
+    episodeIndex: 0,
+    slotRole: 'EVENT',
+    slotIndex: 1,
+  },
+  {
+    nodeId: 'run-node-2',
+    kind: 'BOSS',
+    ref: 'encounter-1',
+    caseDirectory: 'case-a',
+    episodeId: EPISODE_ID,
+    episodeIndex: 0,
+    slotRole: 'BOSS',
+    slotIndex: 2,
+  },
 ];
 
 const BASE = {
@@ -196,6 +220,12 @@ describe('pattern D — card enhancement', () => {
     expect(completion.state.dp).toBe(12);
     expect(completion.state.nodeIndex).toBe(1);
     expect(completion.state.completedNodeIds).toEqual(['run-node-1']);
+    // A mid-episode stage clears the node and nothing else; only the BOSS stage
+    // may close an episode or the run.
+    expect(completion.progression).toEqual([
+      { type: 'NODE_CLEARED', nodeId: 'run-node-1', episodeId: EPISODE_ID },
+    ]);
+    expect(completion.state.completedEpisodeIds).toEqual([]);
   });
 
   it('treats a missing intent lookup as ineligible rather than tuning an unverified card', () => {

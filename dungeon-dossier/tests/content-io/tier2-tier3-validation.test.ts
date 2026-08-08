@@ -9,12 +9,15 @@ import {
   type CaseDefinition,
   type RunStripDefinition,
 } from '../../src/engine/domain';
+import { createNodeStrip } from '../../src/engine/run';
 
 const CASE_SOURCE = 'cases/tutorial/case.json';
 const CASE_DIRECTORIES = ['tutorial', 'ep001', 'ep004'] as const;
 let tutorial: CaseDefinition;
 let shippedCases: readonly (readonly [string, CaseDefinition])[];
 let runStrip: RunStripDefinition;
+/** The frontier pass walks a resolved route, not the slot/candidate topology. */
+let canonicalRunOrder: { readonly nodes: readonly { readonly ref: string }[] };
 
 async function readContent(relativePath: string): Promise<unknown> {
   const source = await readFile(new URL(`../../content/${relativePath}`, import.meta.url), 'utf8');
@@ -40,6 +43,7 @@ beforeAll(async () => {
   );
   tutorial = CaseSchema.parse(await readContent(CASE_SOURCE));
   runStrip = RunStripSchema.parse(await readContent('common/run-strip.json'));
+  canonicalRunOrder = { nodes: createNodeStrip(runStrip) };
 });
 
 describe('content validation T2/T3', () => {
@@ -48,9 +52,23 @@ describe('content validation T2/T3', () => {
   });
 
   it('accepts every shipped case against the canonical run-order frontier', () => {
+    // The canonical route is one node per slot: 3 episodes x COMBAT/EVENT/BOSS.
+    expect(canonicalRunOrder.nodes.map((node) => node.ref)).toEqual([
+      'enc_tutorial_slime',
+      'event_tutorial_choice',
+      'enc_tutorial_minotaur',
+      'enc_ep001_goblin',
+      'event_ep001_forensic_sweep',
+      'enc_ep001_succubus',
+      'enc_ep004_dwarf',
+      'event_ep004_machine_room',
+      'enc_ep004_fallen_hero',
+    ]);
     for (const [relativePath, caseDefinition] of shippedCases) {
       expect(
-        validateCaseTier2AndTier3(caseDefinition, relativePath, { runOrder: runStrip }),
+        validateCaseTier2AndTier3(caseDefinition, relativePath, {
+          runOrder: canonicalRunOrder,
+        }),
         relativePath,
       ).toEqual([]);
     }

@@ -5,6 +5,7 @@ import {
   CollectEvidenceEventSchema,
   CURRENT_SAVE_VERSION,
   EnhanceCardEventSchema,
+  LEGACY_EPISODE_PLACEHOLDER,
   NonCombatEventSchema,
   RunEffectSchema,
   RunEventCostSchema,
@@ -260,6 +261,10 @@ function saveWithRun(): SaveData {
       evidence_grade_by_id: { ev_sample_receipt: 'B' },
       open_route_ids: ['route_sample'],
       retry_count: 2,
+      active_episode_id: 'episode_sample',
+      unlocked_episode_ids: ['episode_sample'],
+      completed_episode_ids: [],
+      route_node_ids: ['run-node-1', 'run-node-2', 'run-node-3'],
       terminal: false,
     },
   };
@@ -273,6 +278,25 @@ const V2_RUN_FIELDS = [
   'retry_count',
 ] as const;
 
+const V3_RUN_FIELDS = [
+  'active_episode_id',
+  'unlocked_episode_ids',
+  'completed_episode_ids',
+  'route_node_ids',
+] as const;
+
+/**
+ * What v2->v3 writes for a save that predates episodes: a marked placeholder
+ * plus empty arrays, so the app re-derives them from the resolved route instead
+ * of trusting a value the old document could never have known.
+ */
+const V3_RUN_DEFAULTS = {
+  active_episode_id: LEGACY_EPISODE_PLACEHOLDER,
+  unlocked_episode_ids: [],
+  completed_episode_ids: [],
+  route_node_ids: [],
+} as const;
+
 function withoutKeys(
   source: Readonly<Record<string, unknown>>,
   omitted: readonly string[],
@@ -282,8 +306,8 @@ function withoutKeys(
   );
 }
 
-describe('save schema v2', () => {
-  it('round-trips the pattern D/E/F run fields', () => {
+describe('save schema v3', () => {
+  it('round-trips the pattern D/E/F and episode run fields', () => {
     const save = saveWithRun();
     expect(SaveSchema.parse(save)).toEqual(save);
     expect(migrateSave(save)).toEqual(save);
@@ -323,10 +347,27 @@ describe('save schema v2', () => {
     ).toBe(false);
   });
 
-  it('migrates a v1 run boundary to explicit empty v2 defaults', () => {
+  it('rejects an empty episode marker instead of restoring an unlocatable run', () => {
     const save = saveWithRun();
     if (save.run === undefined) throw new Error('Fixture must carry a run boundary.');
-    const legacyRun = withoutKeys(save.run, V2_RUN_FIELDS);
+    expect(
+      SaveSchema.safeParse({
+        ...save,
+        run: { ...save.run, active_episode_id: '' },
+      }).success,
+    ).toBe(false);
+    expect(
+      SaveSchema.safeParse({
+        ...save,
+        run: { ...save.run, route_node_ids: ['run-node-1', 'run-node-1'] },
+      }).success,
+    ).toBe(false);
+  });
+
+  it('migrates a v1 run boundary through v2 to explicit empty v3 defaults', () => {
+    const save = saveWithRun();
+    if (save.run === undefined) throw new Error('Fixture must carry a run boundary.');
+    const legacyRun = withoutKeys(save.run, [...V2_RUN_FIELDS, ...V3_RUN_FIELDS]);
     const legacy = { ...save, save_version: 1, run: legacyRun };
 
     const migrated = migrateSave(legacy);
@@ -338,7 +379,19 @@ describe('save schema v2', () => {
       evidence_grade_by_id: {},
       open_route_ids: [],
       retry_count: 0,
+      ...V3_RUN_DEFAULTS,
     });
+  });
+
+  it('migrates a v2 run boundary to the episode placeholder without touching v2 state', () => {
+    const save = saveWithRun();
+    if (save.run === undefined) throw new Error('Fixture must carry a run boundary.');
+    const v2Run = withoutKeys(save.run, V3_RUN_FIELDS);
+    const migrated = migrateSave({ ...save, save_version: 2, run: v2Run });
+
+    expect(migrated.save_version).toBe(CURRENT_SAVE_VERSION);
+    // The pattern D/E/F fields a v2 save already owns must survive verbatim.
+    expect(migrated.run).toEqual({ ...v2Run, ...V3_RUN_DEFAULTS });
   });
 
   it('migrates a v1 save that predates the run layer without inventing a boundary', () => {
@@ -348,9 +401,16 @@ describe('save schema v2', () => {
     expect(migrated.save_version).toBe(CURRENT_SAVE_VERSION);
   });
 
+  it('migrates a v2 save that predates the run layer without inventing a boundary', () => {
+    const envelope = withoutKeys(saveWithRun(), ['run']);
+    const migrated = migrateSave({ ...envelope, save_version: 2 });
+    expect(migrated.run).toBeUndefined();
+    expect(migrated.save_version).toBe(CURRENT_SAVE_VERSION);
+  });
+
   it('refuses versions it has no migration for', () => {
-    expect(() => migrateSave({ ...saveWithRun(), save_version: 3 })).toThrow(
-      UnsupportedSaveVersionError,
-    );
+    expect(() =>
+      migrateSave({ ...saveWithRun(), save_version: CURRENT_SAVE_VERSION + 1 }),
+    ).toThrow(UnsupportedSaveVersionError);
   });
 });

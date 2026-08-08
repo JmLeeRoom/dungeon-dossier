@@ -8,13 +8,13 @@
     "schema_version": {
       "$ref": "#/$defs/__schema2"
     },
-    "nodes": {
+    "episodes": {
       "$ref": "#/$defs/__schema3"
     }
   },
   "required": [
     "schema_version",
-    "nodes"
+    "episodes"
   ],
   "additionalProperties": false,
   "$defs": {
@@ -31,8 +31,7 @@
       "pattern": "^\\d+\\.\\d+(?:\\.\\d+)?$"
     },
     "__schema3": {
-      "minItems": 15,
-      "maxItems": 15,
+      "minItems": 1,
       "type": "array",
       "items": {
         "$ref": "#/$defs/__schema4"
@@ -41,8 +40,72 @@
     "__schema4": {
       "type": "object",
       "properties": {
+        "episode_id": {
+          "$ref": "#/$defs/__schema1"
+        },
+        "sequence_index": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "case_directory": {
+          "$ref": "#/$defs/__schema1"
+        },
+        "slots": {
+          "minItems": 3,
+          "maxItems": 3,
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/__schema5"
+          }
+        }
+      },
+      "required": [
+        "episode_id",
+        "sequence_index",
+        "case_directory",
+        "slots"
+      ],
+      "additionalProperties": false
+    },
+    "__schema5": {
+      "type": "object",
+      "properties": {
+        "role": {
+          "type": "string",
+          "enum": [
+            "COMBAT",
+            "EVENT",
+            "BOSS"
+          ]
+        },
+        "selection": {
+          "type": "string",
+          "enum": [
+            "FIXED",
+            "SEEDED_ONE"
+          ]
+        },
+        "candidates": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/__schema6"
+          }
+        }
+      },
+      "required": [
+        "role",
+        "selection",
+        "candidates"
+      ],
+      "additionalProperties": false
+    },
+    "__schema6": {
+      "type": "object",
+      "properties": {
         "node_id": {
-          "$ref": "#/$defs/__schema5"
+          "$ref": "#/$defs/__schema7"
         },
         "kind": {
           "type": "string",
@@ -53,21 +116,17 @@
           ]
         },
         "ref": {
-          "$ref": "#/$defs/__schema5"
-        },
-        "case_directory": {
-          "$ref": "#/$defs/__schema1"
+          "$ref": "#/$defs/__schema7"
         }
       },
       "required": [
         "node_id",
         "kind",
-        "ref",
-        "case_directory"
+        "ref"
       ],
       "additionalProperties": false
     },
-    "__schema5": {
+    "__schema7": {
       "type": "string",
       "minLength": 1,
       "maxLength": 160

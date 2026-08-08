@@ -15,6 +15,7 @@ vi.mock('../../src/dev/autoplay/report', async (importOriginal) => {
 
 import type { AutoplayPort } from '../../src/app/autoplayPort';
 import { startAutoplay } from '../../src/dev/autoplay/driver';
+import { AUTOPLAY_NODE_COUNT } from '../../src/dev/autoplay/report';
 import {
   resolveTypewriterIntervalMs,
   setTypewriterIntervalOverride,
@@ -34,7 +35,8 @@ function terminalPort(flowError?: string): {
         restart: vi.fn(),
       }),
       runSnapshot: () => ({
-        nodeIndex: 15,
+        // Terminal index of the resolved episode route.
+        nodeIndex: AUTOPLAY_NODE_COUNT,
         flags: { 'F-01': false, 'F-12': true, 'F-13': true },
         dp: 0,
         stress: 0,

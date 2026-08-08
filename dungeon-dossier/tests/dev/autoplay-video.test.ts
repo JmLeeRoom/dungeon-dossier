@@ -8,13 +8,17 @@ import {
   videoNodeGateMs,
 } from '../../src/dev/autoplay/driver';
 import { AUTOPLAY_CURSOR_DOCK_START_MS } from '../../src/dev/autoplay/hud';
-import { VIDEO_DURATION_ACCEPTANCE } from '../../src/dev/autoplay/report';
+import {
+  AUTOPLAY_NODE_COUNT,
+  VIDEO_DURATION_ACCEPTANCE,
+} from '../../src/dev/autoplay/report';
 import {
   resolveTypewriterIntervalMs,
   setTypewriterIntervalOverride,
 } from '../../src/ui/widgets/typewriter';
 
-const NODE_COUNT = 15;
+/** The gate schedule paces the resolved episode route, never a second count. */
+const NODE_COUNT = AUTOPLAY_NODE_COUNT;
 const VIDEO_TARGET_SEC = 150;
 
 describe('cinematic video autoplay mode', () => {
@@ -68,15 +72,58 @@ describe('cinematic video autoplay mode', () => {
     expect(MODE_CONFIGS.record.targetDurationSec).toBeUndefined();
   });
 
-  it('schedules the 15 nodes across exactly 150 seconds', () => {
-    expect(videoNodeGateMs(0, VIDEO_TARGET_SEC)).toBe(0);
-    expect(videoNodeGateMs(5, VIDEO_TARGET_SEC)).toBe(50_000);
-    expect(videoNodeGateMs(NODE_COUNT, VIDEO_TARGET_SEC)).toBe(150_000);
-    for (let index = 0; index < NODE_COUNT; index += 1) {
-      const budget =
-        videoNodeGateMs(index + 1, VIDEO_TARGET_SEC) -
-        videoNodeGateMs(index, VIDEO_TARGET_SEC);
-      expect(budget).toBe(10_000);
+  it('schedules the whole resolved route across exactly 150 seconds', () => {
+    // 150s over 9 nodes no longer divides evenly, so the gate is the exact
+    // Math.floor(150_000 * index / 9) schedule and the per-node budget
+    // alternates 16666/16667ms. The endpoints stay exact: 0 and 150_000.
+    const schedule = Array.from({ length: NODE_COUNT + 1 }, (_, index) =>
+      videoNodeGateMs(index, VIDEO_TARGET_SEC),
+    );
+    expect(schedule).toEqual([
+      0,
+      16_666,
+      33_333,
+      50_000,
+      66_666,
+      83_333,
+      100_000,
+      116_666,
+      133_333,
+      150_000,
+    ]);
+    expect(schedule).toHaveLength(NODE_COUNT + 1);
+    expect(schedule[0]).toBe(0);
+    expect(schedule.at(-1)).toBe(VIDEO_TARGET_SEC * 1000);
+    expect(schedule.at(-1)).toBe(VIDEO_DURATION_ACCEPTANCE.targetDurationMs);
+
+    const budgets = schedule
+      .slice(1)
+      .map((gate, index) => gate - (schedule[index] ?? 0));
+    expect(budgets).toEqual([
+      16_666,
+      16_667,
+      16_667,
+      16_666,
+      16_667,
+      16_667,
+      16_666,
+      16_667,
+      16_667,
+    ]);
+    // Every node still gets the same budget up to the 1ms floor remainder, and
+    // the budgets add back up to the target with nothing lost or invented.
+    expect(budgets).toHaveLength(NODE_COUNT);
+    expect(budgets.reduce((total, budget) => total + budget, 0)).toBe(150_000);
+    for (const budget of budgets) {
+      expect(Math.abs(budget - 150_000 / NODE_COUNT)).toBeLessThan(1);
+    }
+  });
+
+  it('paces from the resolved route count by default', () => {
+    for (let index = 0; index <= NODE_COUNT; index += 1) {
+      expect(videoNodeGateMs(index, VIDEO_TARGET_SEC)).toBe(
+        videoNodeGateMs(index, VIDEO_TARGET_SEC, AUTOPLAY_NODE_COUNT),
+      );
     }
   });
 

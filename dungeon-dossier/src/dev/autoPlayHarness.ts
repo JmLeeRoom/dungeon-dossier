@@ -42,7 +42,6 @@ import {
   type SimulationEncounterCatalogEntry,
 } from '../../tools/simulate/routeSimulator';
 
-export const AUTO_PLAY_NODE_COUNT = 15;
 export const DEFAULT_AUTO_PLAY_SEED = 20_260_805;
 
 export type AutoPlayStatus =
@@ -127,6 +126,13 @@ const FLAGS = FlagsSchema.parse(flagsJson);
 const GRADES = GradesSchema.parse(gradesJson);
 const REWARDS = RewardsSchema.parse(rewardsJson);
 const STRIP = createNodeStrip(RunStripSchema.parse(runStripJson));
+
+/**
+ * Length of the canonical resolved route (one node per episode slot). Derived
+ * from the strip so an episode/slot content change can never leave the harness
+ * asserting a stale hard-coded node count.
+ */
+export const AUTO_PLAY_NODE_COUNT = STRIP.length;
 const CASES_BY_DIRECTORY: Readonly<Record<string, CaseDefinition>> = Object.freeze({
   tutorial: CaseSchema.parse(tutorialCaseJson),
   ep001: CaseSchema.parse(ep001CaseJson),
@@ -466,7 +472,7 @@ async function yieldToHost(): Promise<void> {
 }
 
 /**
- * Creates a deterministic, stoppable 15-node unattended run. All game-state
+ * Creates a deterministic, stoppable full-route unattended run. All game-state
  * transitions go through the existing simulator and RunSession boundaries.
  */
 export function createAutoPlayHarness(
@@ -480,7 +486,9 @@ export function createAutoPlayHarness(
       reloadAfterCompletedNodes <= 0 ||
       reloadAfterCompletedNodes >= STRIP.length)
   ) {
-    throw new Error('Autoplay reload boundary must be inside the 15-node strip.');
+    throw new Error(
+      `Autoplay reload boundary must be inside the ${STRIP.length.toString()}-node route.`,
+    );
   }
   let stopRequested = false;
   let activeRun: Promise<AutoPlayProgress> | undefined;
@@ -576,7 +584,9 @@ export function createAutoPlayHarness(
         !finalState.terminal ||
         finalState.pendingRewardIds.length > 0
       ) {
-        throw new Error('Run ended without completing and settling all 15 nodes.');
+        throw new Error(
+          `Run ended without completing and settling all ${STRIP.length.toString()} nodes.`,
+        );
       }
       progress.status = 'RUN_COMPLETED';
       progress.currentNodeId = null;

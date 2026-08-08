@@ -29,6 +29,13 @@
 | 📄 [prompt_event_custom_scale_deadscene_design.md](./prompt_event_custom_scale_deadscene_design.md) | **Cutscene & Events** | **이미지 임의 크기·컷씬·비전투 이벤트 3종·데드씬·1280×321 데스크 설계 프롬프트** |
 | 📄 [prompt_workbench_disk_save_feature.md](./prompt_workbench_disk_save_feature.md) | **Disk Save API** | **PM 전용 에셋 워크벤치 1클릭 로컬 폴더(`assets/`) 실시간 파일 직저장 설계 프롬프트** |
 | 📄 [prompt_vite_504_outdated_optimize_dep_fix.md](./prompt_vite_504_outdated_optimize_dep_fix.md) | **Vite 504 Fix** | **Vite 504 (Outdated Optimize Dep) 의존성 캐시 오류 원인 분석 및 영구 해결 프롬프트** |
+| 📄 [prompt_opus_pdf_game_manual.md](./prompt_opus_pdf_game_manual.md) | **PDF Manual** | **Claude Opus 전용 제출용 PDF 게임 소개·플레이 및 실행 매뉴얼 문서 작성 프롬프트** |
+| 📄 [prompt_opus_pdf_ai_tech_and_asset_list.md](./prompt_opus_pdf_ai_tech_and_asset_list.md) | **AI Tech & Assets** | **Claude Opus 전용 제출용 PDF AI 활용 기술 내역(MCP, Hook, Skill, Subagent) & 전수 에셋 프롬프트 리스트업 작성 프롬프트** |
+| 📄 [prompt_team_introduction_pdf.md](./prompt_team_introduction_pdf.md) | **Team PDF** | **제출용 PDF 팀 소개 및 팀원(박건호 등) 역할·담당 영역 종합 정리 작성 프롬프트** |
+| 📄 [prompt_episode_flow_and_node_visibility_audit.md](./prompt_episode_flow_and_node_visibility_audit.md) | **Episode Audit** | **기획 발화(튜토리얼 3단계 흐름, 3노드 단위 국소 노출, 안개 연출) vs 현 아키텍처 비교 감사 프롬프트** |
+| 📄 [prompt_claude_episode_progression_implementation.md](./prompt_claude_episode_progression_implementation.md) | **Claude Episode Impl** | **설계 문서 기반 Claude 전용 에피소드 3단계 흐름 & 3노드 Fog-of-War 국소 공개 구현 마스터 프롬프트** |
+| 📄 [prompt_png_asset_integration_design.md](./prompt_png_asset_integration_design.md) | **PNG Asset Binding** | **`NHN AI_image/` PNG 에셋 및 엑셀 규칙 분석 기반 UI/캐릭터 이미지 채우기 통합 개발 설계 마스터 프롬프트** |
+| 📄 [prompt_pure_code_submit_impact_effects.md](./prompt_pure_code_submit_impact_effects.md) | **Pure Code FX** | **이미지 에셋 추가 없이 100% 코드(PixiJS/CSS)만으로 "받아라!" 대사·화면흔들림·플래시 이펙트 연출 프롬프트** |
 
 ---
 

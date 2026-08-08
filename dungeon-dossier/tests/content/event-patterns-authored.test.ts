@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 import { CaseSchema, RunStripSchema } from '../../src/engine/domain';
+import { createNodeStrip } from '../../src/engine/run';
 
 function common(file: string): unknown {
   return JSON.parse(
@@ -36,24 +37,46 @@ function eventForNode(ref: string, directory: string) {
   return event;
 }
 
-const stripEvents = strip.nodes
+/** Every EVENT node the strip declares, routed or not, in declaration order. */
+const authoredEvents = strip.episodes.flatMap((episode) =>
+  episode.slots.flatMap((slot) =>
+    slot.candidates
+      .filter((candidate) => candidate.kind === 'EVENT')
+      .map((candidate) => eventForNode(candidate.ref, episode.case_directory)),
+  ),
+);
+
+/** The three EVENT nodes a canonical (seedless) run actually plays. */
+const routedEvents = createNodeStrip(strip)
   .filter((node) => node.kind === 'EVENT')
-  .map((node) => eventForNode(node.ref, node.case_directory));
+  .map((node) => eventForNode(node.ref, node.caseDirectory));
 
 describe('authored non-combat event coverage', () => {
-  it('plays every one of the six patterns across the run', () => {
-    expect(stripEvents.map((event) => event.pattern)).toEqual([
-      'A', 'B', 'F', 'C', 'D', 'E',
+  it('authors every one of the six patterns across the shipped candidates', () => {
+    expect(authoredEvents.map((event) => event.pattern)).toEqual([
+      'A', 'B', 'C', 'F', 'C', 'D', 'E',
+    ]);
+    expect([...new Set(authoredEvents.map((event) => event.pattern))].sort()).toEqual([
+      'A', 'B', 'C', 'D', 'E', 'F',
     ]);
   });
 
-  it('resolves every localization key the strip events reference', () => {
+  it('plays one EVENT per episode on the canonical route', () => {
+    expect(routedEvents.map((event) => event.event_id)).toEqual([
+      'event_tutorial_choice',
+      'event_ep001_forensic_sweep',
+      'event_ep004_machine_room',
+    ]);
+    expect(routedEvents.map((event) => event.pattern)).toEqual(['A', 'F', 'D']);
+  });
+
+  it('resolves every localization key the strip event candidates reference', () => {
     const table = strings.strings;
     const missing: string[] = [];
     const check = (key: string): void => {
       if (table[key] === undefined) missing.push(key);
     };
-    for (const event of stripEvents) {
+    for (const event of authoredEvents) {
       check(event.title_key);
       check(event.description_key);
       if (event.pattern === 'A') event.choices.forEach((c) => { check(c.label_key); });

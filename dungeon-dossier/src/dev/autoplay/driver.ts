@@ -33,6 +33,7 @@ import {
   findAutoplayInvariantFailures,
   findRawI18nKeys,
   publishReport,
+  AUTOPLAY_NODE_COUNT,
   VIDEO_DURATION_ACCEPTANCE,
   VIDEO_TARGET_DURATION_SEC,
   type AutoplayNodeReport,
@@ -93,7 +94,8 @@ export const MODE_CONFIGS: Readonly<Record<AutoplayOptions['mode'], ModeConfig>>
 };
 
 const POLL_INTERVAL_MS = 150;
-const NODE_COUNT = 15;
+/** Derived from the resolved canonical route, never a second hard-coded count. */
+const NODE_COUNT = AUTOPLAY_NODE_COUNT;
 /**
  * Visible hover/docking lead before a staged cinematic action fires.
  *

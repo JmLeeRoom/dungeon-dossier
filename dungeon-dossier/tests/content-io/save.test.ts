@@ -9,13 +9,20 @@ import {
   saveRunAtNodeBoundary,
   toRunSaveData,
 } from '../../src/app/save';
-import { createRunState, type RunState } from '../../src/engine/run';
+import {
+  createRunState,
+  DEFAULT_RETRY_LIMIT,
+  type NodeDefinition,
+  type RunState,
+} from '../../src/engine/run';
 import {
   CURRENT_SAVE_VERSION,
+  LEGACY_EPISODE_PLACEHOLDER,
   UnsupportedSaveVersionError,
   type SaveData,
 } from '../../src/content-io/schemas';
 
+/** One episode: the COMBAT/EVENT/BOSS stage triple every episode resolves to. */
 const SEMANTIC_CATALOG = {
   strip: [
     {
@@ -23,18 +30,30 @@ const SEMANTIC_CATALOG = {
       kind: 'ENCOUNTER',
       ref: 'encounter-1',
       caseDirectory: 'case-a',
+      episodeId: 'episode-a',
+      episodeIndex: 0,
+      slotRole: 'COMBAT',
+      slotIndex: 0,
     },
     {
       nodeId: 'run-node-2',
       kind: 'EVENT',
       ref: 'event-1',
       caseDirectory: 'case-a',
+      episodeId: 'episode-a',
+      episodeIndex: 0,
+      slotRole: 'EVENT',
+      slotIndex: 1,
     },
     {
       nodeId: 'run-node-3',
       kind: 'BOSS',
       ref: 'encounter-2',
       caseDirectory: 'case-a',
+      episodeId: 'episode-a',
+      episodeIndex: 0,
+      slotRole: 'BOSS',
+      slotIndex: 2,
     },
   ] as const,
   cardIds: ['card-known'],
@@ -46,6 +65,21 @@ const SEMANTIC_CATALOG = {
   caseIdsByDirectory: { 'case-a': 'case_a' },
   contentVersionsByDirectory: { 'case-a': '1.0' },
 } as const;
+
+const SEMANTIC_ROUTE_NODE_IDS = SEMANTIC_CATALOG.strip.map((node) => node.nodeId);
+
+/** The shipped canonical route: 3 episodes x 3 slots, every slot's candidate[0]. */
+const CANONICAL_ROUTE_NODE_IDS = [
+  'run_tutorial_01',
+  'run_tutorial_02',
+  'run_tutorial_05',
+  'run_ep001_01',
+  'run_ep001_02',
+  'run_ep001_05',
+  'run_ep004_01',
+  'run_ep004_02',
+  'run_ep004_05',
+] as const;
 
 function semanticRunState(): RunState {
   const initial = createRunState({
@@ -63,6 +97,7 @@ function semanticRunState(): RunState {
     acquiredRelicIds: ['relic-known'],
     acquiredEnhancementIds: ['enhancement-known'],
     acquiredEvidenceIds: ['evidence-known'],
+    episodeIds: ['episode-a'],
   });
   return {
     ...initial,
@@ -195,6 +230,7 @@ describe('save schema usage path', () => {
         exhaustPile: [],
       },
       flags: { 'F-02': true },
+      episodeIds: ['tutorial', 'ep001', 'ep004'],
     });
     const state: RunState = {
       ...initial,
@@ -215,13 +251,20 @@ describe('save schema usage path', () => {
     const saved = saveRunAtNodeBoundary(repository, state, {
       caseId: 'case_tutorial',
       contentVersion: '1.1',
+      routeNodeIds: CANONICAL_ROUTE_NODE_IDS,
     });
     expect(saved.encounter).toBeNull();
     expect(saved.run?.node_index).toBe(2);
+    // The resolved route is persisted, not re-derived, so a later candidate-pool
+    // edit cannot relocate this in-flight save.
+    expect(saved.run?.route_node_ids).toEqual([...CANONICAL_ROUTE_NODE_IDS]);
+    expect(saved.run?.active_episode_id).toBe('tutorial');
+    expect(saved.run?.unlocked_episode_ids).toEqual(['tutorial']);
+    expect(saved.run?.completed_episode_ids).toEqual([]);
     expect(restoreRunState(repository.load()!)).toEqual(state);
   });
 
-  it('accepts canonical progress and a failed current encounter', () => {
+  it('accepts canonical progress and a retry-exhausted failed current encounter', () => {
     expect(() =>
       assertRestoredRunStateSemantics(semanticRunState(), SEMANTIC_CATALOG),
     ).not.toThrow();
@@ -232,6 +275,7 @@ describe('save schema usage path', () => {
       nodeIndex: 2,
       completedNodeIds: ['run-node-1', 'run-node-2'],
       pendingRewardIds: [],
+      retryCount: DEFAULT_RETRY_LIMIT,
       terminal: true,
       gradeHistory: [
         ...beforeBoss.gradeHistory,
@@ -247,11 +291,97 @@ describe('save schema usage path', () => {
     ).not.toThrow();
   });
 
+  it('accepts a retryable failure parked non-terminally at the current encounter', () => {
+    const beforeBoss = semanticRunState();
+    const retryableAtBoss: RunState = {
+      ...beforeBoss,
+      nodeIndex: 2,
+      completedNodeIds: ['run-node-1', 'run-node-2'],
+      pendingRewardIds: [],
+      retryCount: 1,
+      terminal: false,
+      gradeHistory: [
+        ...beforeBoss.gradeHistory,
+        { nodeId: 'run-node-3', outcome: 'FAILED', grade: 'F' },
+      ],
+      outcomeHistory: [
+        ...beforeBoss.outcomeHistory,
+        { nodeId: 'run-node-3', outcome: 'FAILED' },
+      ],
+    };
+    expect(() =>
+      assertRestoredRunStateSemantics(retryableAtBoss, SEMANTIC_CATALOG),
+    ).not.toThrow();
+    // The same save is a forgery once it claims the run ended while retries remain.
+    expect(() =>
+      assertRestoredRunStateSemantics(
+        { ...retryableAtBoss, terminal: true },
+        SEMANTIC_CATALOG,
+      ),
+    ).toThrow('terminal state');
+  });
+
+  /**
+   * The exact history `completeEncounterNode` writes when a RETRY-policy defeat
+   * is absorbed and the node is then cleared: two records for one strip node.
+   * `assertRestoredRunStateSemantics` already blesses this shape in its
+   * abandoned-failure rule, but its encounter-history rule still compares the
+   * raw record list against the strip prefix, so the retry record makes the
+   * lists differ in length and the save is refused. bootstrap.ts swallows that
+   * refusal and silently starts a fresh run, i.e. every retried run loses its
+   * save on the next launch. Left asserting the correct behaviour; see the
+   * handover notes for the one-place fix in src/app/save/runSave.ts.
+   */
+  it('accepts a history whose failed node was retried and then cleared', () => {
+    const state = semanticRunState();
+    const retriedThenCleared: RunState = {
+      ...state,
+      retryCount: 1,
+      gradeHistory: [
+        { nodeId: 'run-node-1', outcome: 'FAILED', grade: 'F' },
+        ...state.gradeHistory,
+      ],
+      outcomeHistory: [
+        { nodeId: 'run-node-1', outcome: 'FAILED' },
+        ...state.outcomeHistory,
+      ],
+    };
+    expect(() =>
+      assertRestoredRunStateSemantics(retriedThenCleared, SEMANTIC_CATALOG),
+    ).not.toThrow();
+    // The retry it spent has to be accounted for; a resolved failure with no
+    // retry behind it is a forged extra life.
+    expect(() =>
+      assertRestoredRunStateSemantics(
+        { ...retriedThenCleared, retryCount: 0 },
+        SEMANTIC_CATALOG,
+      ),
+    ).toThrow('retry count is lower');
+    // A FAILED that the next record does not re-attempt still ends the run.
+    expect(() =>
+      assertRestoredRunStateSemantics(
+        {
+          ...retriedThenCleared,
+          gradeHistory: [
+            { nodeId: 'run-node-3', outcome: 'FAILED', grade: 'F' },
+            ...state.gradeHistory,
+          ],
+          outcomeHistory: [
+            { nodeId: 'run-node-3', outcome: 'FAILED' },
+            ...state.outcomeHistory,
+          ],
+        },
+        SEMANTIC_CATALOG,
+      ),
+    ).toThrow('never retried');
+  });
+
   it('accepts an encounter-free run save whose metadata matches its boundary', () => {
     const state = semanticRunState();
     const save = toRunSaveData(state, {
       caseId: 'case_a',
       contentVersion: '1.0',
+      routeNodeIds: SEMANTIC_ROUTE_NODE_IDS,
     });
 
     expect(() =>
@@ -259,9 +389,86 @@ describe('save schema usage path', () => {
     ).not.toThrow();
   });
 
-  it('keeps legacy v1 import compatibility but rejects it at the run bootstrap boundary', () => {
-    const legacy = importSaveJson(JSON.stringify(validSave()));
+  it('re-derives episode bookkeeping for a migrated pre-episode run boundary', () => {
+    const twoEpisodeStrip: readonly NodeDefinition[] = [
+      ...SEMANTIC_CATALOG.strip,
+      {
+        nodeId: 'run-node-4',
+        kind: 'ENCOUNTER',
+        ref: 'encounter-3',
+        caseDirectory: 'case-b',
+        episodeId: 'episode-b',
+        episodeIndex: 1,
+        slotRole: 'COMBAT',
+        slotIndex: 0,
+      },
+      {
+        nodeId: 'run-node-5',
+        kind: 'EVENT',
+        ref: 'event-2',
+        caseDirectory: 'case-b',
+        episodeId: 'episode-b',
+        episodeIndex: 1,
+        slotRole: 'EVENT',
+        slotIndex: 1,
+      },
+      {
+        nodeId: 'run-node-6',
+        kind: 'BOSS',
+        ref: 'encounter-4',
+        caseDirectory: 'case-b',
+        episodeId: 'episode-b',
+        episodeIndex: 1,
+        slotRole: 'BOSS',
+        slotIndex: 2,
+      },
+    ];
+    const migrated: SaveData = {
+      ...validSave(),
+      run: {
+        node_index: 4,
+        reward_seed_stream: 12,
+        false_confessions: 0,
+        completed_node_ids: ['run-node-1', 'run-node-2', 'run-node-3', 'run-node-4'],
+        pending_reward_ids: [],
+        claimed_reward_ids: [],
+        acquired_evidence_ids: [],
+        grade_history: [],
+        outcome_history: [],
+        card_tuning: {},
+        canvassed_topic_ids: [],
+        evidence_grade_by_id: {},
+        open_route_ids: [],
+        retry_count: 0,
+        // Exactly what migrateSave writes for a v2 document: a placeholder plus
+        // empty arrays the run layer is expected to replace from the route.
+        active_episode_id: LEGACY_EPISODE_PLACEHOLDER,
+        unlocked_episode_ids: [],
+        completed_episode_ids: [],
+        route_node_ids: [],
+        terminal: false,
+      },
+    };
 
+    const restored = restoreRunState(migrated, {}, twoEpisodeStrip);
+    expect(restored.activeEpisodeId).toBe('episode-b');
+    expect(restored.unlockedEpisodeIds).toEqual(['episode-a', 'episode-b']);
+    expect(restored.completedEpisodeIds).toEqual(['episode-a']);
+
+    // Without the route there is nothing to re-derive from, so the placeholder
+    // must survive rather than be guessed at.
+    const withoutStrip = restoreRunState(migrated);
+    expect(withoutStrip.activeEpisodeId).toBe(LEGACY_EPISODE_PLACEHOLDER);
+    expect(withoutStrip.unlockedEpisodeIds).toEqual([]);
+    expect(withoutStrip.completedEpisodeIds).toEqual([]);
+  });
+
+  it('keeps legacy v1 import compatibility but rejects it at the run bootstrap boundary', () => {
+    const legacy = importSaveJson(
+      JSON.stringify({ ...validSave(), save_version: 1 }),
+    );
+
+    expect(legacy.save_version).toBe(CURRENT_SAVE_VERSION);
     expect(legacy.run).toBeUndefined();
     expect(() =>
       assertRestoredRunSaveSemantics(
@@ -300,6 +507,7 @@ describe('save schema usage path', () => {
     const save = toRunSaveData(state, {
       caseId: 'case_a',
       contentVersion: '1.0',
+      routeNodeIds: SEMANTIC_ROUTE_NODE_IDS,
     });
 
     expect(() =>
@@ -387,7 +595,7 @@ describe('save schema usage path', () => {
 
   it('rejects unsupported future save versions', () => {
     expect(() =>
-      exportSaveJson({ ...validSave(), save_version: 3 }),
+      exportSaveJson({ ...validSave(), save_version: CURRENT_SAVE_VERSION + 1 }),
     ).toThrow(UnsupportedSaveVersionError);
   });
 });

@@ -1,96 +1,161 @@
 {
   "$schema": "../../schemas/run-strip.schema.json",
-  "schema_version": "1.0",
-  "nodes": [
+  "schema_version": "2.0",
+  "episodes": [
     {
-      "node_id": "run_tutorial_01",
-      "kind": "ENCOUNTER",
-      "ref": "enc_tutorial_slime",
-      "case_directory": "tutorial"
+      "episode_id": "tutorial",
+      "sequence_index": 0,
+      "case_directory": "tutorial",
+      "slots": [
+        {
+          "role": "COMBAT",
+          "selection": "FIXED",
+          "candidates": [
+            {
+              "node_id": "run_tutorial_01",
+              "kind": "ENCOUNTER",
+              "ref": "enc_tutorial_slime"
+            },
+            {
+              "node_id": "run_tutorial_03",
+              "kind": "ENCOUNTER",
+              "ref": "enc_tutorial_harpy"
+            }
+          ]
+        },
+        {
+          "role": "EVENT",
+          "selection": "FIXED",
+          "candidates": [
+            {
+              "node_id": "run_tutorial_02",
+              "kind": "EVENT",
+              "ref": "event_tutorial_choice"
+            },
+            {
+              "node_id": "run_tutorial_04",
+              "kind": "EVENT",
+              "ref": "event_tutorial_placement"
+            },
+            {
+              "node_id": "run_tutorial_06",
+              "kind": "EVENT",
+              "ref": "event_tutorial_investigation"
+            }
+          ]
+        },
+        {
+          "role": "BOSS",
+          "selection": "FIXED",
+          "candidates": [
+            {
+              "node_id": "run_tutorial_05",
+              "kind": "BOSS",
+              "ref": "enc_tutorial_minotaur"
+            }
+          ]
+        }
+      ]
     },
     {
-      "node_id": "run_tutorial_02",
-      "kind": "EVENT",
-      "ref": "event_tutorial_choice",
-      "case_directory": "tutorial"
+      "episode_id": "ep001",
+      "sequence_index": 1,
+      "case_directory": "ep001",
+      "slots": [
+        {
+          "role": "COMBAT",
+          "selection": "SEEDED_ONE",
+          "candidates": [
+            {
+              "node_id": "run_ep001_01",
+              "kind": "ENCOUNTER",
+              "ref": "enc_ep001_goblin"
+            },
+            {
+              "node_id": "run_ep001_03",
+              "kind": "ENCOUNTER",
+              "ref": "enc_ep001_orc"
+            }
+          ]
+        },
+        {
+          "role": "EVENT",
+          "selection": "SEEDED_ONE",
+          "candidates": [
+            {
+              "node_id": "run_ep001_02",
+              "kind": "EVENT",
+              "ref": "event_ep001_forensic_sweep"
+            },
+            {
+              "node_id": "run_ep001_04",
+              "kind": "EVENT",
+              "ref": "event_ep001_warehouse"
+            }
+          ]
+        },
+        {
+          "role": "BOSS",
+          "selection": "FIXED",
+          "candidates": [
+            {
+              "node_id": "run_ep001_05",
+              "kind": "BOSS",
+              "ref": "enc_ep001_succubus"
+            }
+          ]
+        }
+      ]
     },
     {
-      "node_id": "run_tutorial_03",
-      "kind": "ENCOUNTER",
-      "ref": "enc_tutorial_harpy",
-      "case_directory": "tutorial"
-    },
-    {
-      "node_id": "run_tutorial_04",
-      "kind": "EVENT",
-      "ref": "event_tutorial_placement",
-      "case_directory": "tutorial"
-    },
-    {
-      "node_id": "run_tutorial_05",
-      "kind": "BOSS",
-      "ref": "enc_tutorial_minotaur",
-      "case_directory": "tutorial"
-    },
-    {
-      "node_id": "run_ep001_01",
-      "kind": "ENCOUNTER",
-      "ref": "enc_ep001_goblin",
-      "case_directory": "ep001"
-    },
-    {
-      "node_id": "run_ep001_02",
-      "kind": "EVENT",
-      "ref": "event_ep001_forensic_sweep",
-      "case_directory": "ep001"
-    },
-    {
-      "node_id": "run_ep001_03",
-      "kind": "ENCOUNTER",
-      "ref": "enc_ep001_orc",
-      "case_directory": "ep001"
-    },
-    {
-      "node_id": "run_ep001_04",
-      "kind": "EVENT",
-      "ref": "event_ep001_warehouse",
-      "case_directory": "ep001"
-    },
-    {
-      "node_id": "run_ep001_05",
-      "kind": "BOSS",
-      "ref": "enc_ep001_succubus",
-      "case_directory": "ep001"
-    },
-    {
-      "node_id": "run_ep004_01",
-      "kind": "ENCOUNTER",
-      "ref": "enc_ep004_dwarf",
-      "case_directory": "ep004"
-    },
-    {
-      "node_id": "run_ep004_02",
-      "kind": "EVENT",
-      "ref": "event_ep004_machine_room",
-      "case_directory": "ep004"
-    },
-    {
-      "node_id": "run_ep004_03",
-      "kind": "ENCOUNTER",
-      "ref": "enc_ep004_cyclops",
-      "case_directory": "ep004"
-    },
-    {
-      "node_id": "run_ep004_04",
-      "kind": "EVENT",
-      "ref": "event_ep004_broker_canvass",
-      "case_directory": "ep004"
-    },
-    {
-      "node_id": "run_ep004_05",
-      "kind": "BOSS",
-      "ref": "enc_ep004_fallen_hero",
-      "case_directory": "ep004"
+      "episode_id": "ep004",
+      "sequence_index": 2,
+      "case_directory": "ep004",
+      "slots": [
+        {
+          "role": "COMBAT",
+          "selection": "SEEDED_ONE",
+          "candidates": [
+            {
+              "node_id": "run_ep004_01",
+              "kind": "ENCOUNTER",
+              "ref": "enc_ep004_dwarf"
+            },
+            {
+              "node_id": "run_ep004_03",
+              "kind": "ENCOUNTER",
+              "ref": "enc_ep004_cyclops"
+            }
+          ]
+        },
+        {
+          "role": "EVENT",
+          "selection": "SEEDED_ONE",
+          "candidates": [
+            {
+              "node_id": "run_ep004_02",
+              "kind": "EVENT",
+              "ref": "event_ep004_machine_room"
+            },
+            {
+              "node_id": "run_ep004_04",
+              "kind": "EVENT",
+              "ref": "event_ep004_broker_canvass"
+            }
+          ]
+        },
+        {
+          "role": "BOSS",
+          "selection": "FIXED",
+          "candidates": [
+            {
+              "node_id": "run_ep004_05",
+              "kind": "BOSS",
+              "ref": "enc_ep004_fallen_hero"
+            }
+          ]
+        }
+      ]
     }
   ]
 }

@@ -7,20 +7,49 @@ import {
   installAutoPlayGlobal,
 } from '../../src/dev/autoPlayHarness';
 import { MAX_AUTOPLAY_SEED } from '../../src/app/autoplayPort';
-import { RunStripSchema } from '../../src/engine/domain';
+import { EPISODE_NODE_COUNT, RunStripSchema } from '../../src/engine/domain';
+import { createNodeStrip } from '../../src/engine/run';
 
-const EXPECTED_NODES = RunStripSchema.parse(runStripJson).nodes.map(
-  (node, index) => ({
-    index,
-    nodeId: node.node_id,
-    kind: node.kind,
-    ref: node.ref,
-  }),
-);
+// Independent re-derivation of the canonical route from shipped content: every
+// episode slot resolved to its first candidate, in declared episode order.
+const CANONICAL_STRIP = RunStripSchema.parse(runStripJson);
+const EXPECTED_NODES = createNodeStrip(CANONICAL_STRIP).map((node, index) => ({
+  index,
+  nodeId: node.nodeId,
+  kind: node.kind,
+  ref: node.ref,
+}));
 const EXPECTED_NODE_IDS = EXPECTED_NODES.map((node) => node.nodeId);
+const EXPECTED_ENCOUNTER_COUNT = EXPECTED_NODES.filter(
+  ({ kind }) => kind !== 'EVENT',
+).length;
+const EXPECTED_EVENT_COUNT = EXPECTED_NODES.length - EXPECTED_ENCOUNTER_COUNT;
+/** Mid-run reload boundary: inside ep001, after the tutorial episode cleared. */
+const RELOAD_AFTER_COMPLETED_NODES = 5;
 
-describe('15-node unattended autoplay', () => {
-  it('visits the canonical strip and reaches RUN_COMPLETED without a throw', async () => {
+describe('episode-route unattended autoplay', () => {
+  it('resolves one node per episode slot before any of it is played', () => {
+    expect(AUTO_PLAY_NODE_COUNT).toBe(
+      CANONICAL_STRIP.episodes.length * EPISODE_NODE_COUNT,
+    );
+    expect(EXPECTED_NODE_IDS).toEqual([
+      'run_tutorial_01',
+      'run_tutorial_02',
+      'run_tutorial_05',
+      'run_ep001_01',
+      'run_ep001_02',
+      'run_ep001_05',
+      'run_ep004_01',
+      'run_ep004_02',
+      'run_ep004_05',
+    ]);
+    expect(EXPECTED_ENCOUNTER_COUNT).toBe(6);
+    expect(EXPECTED_EVENT_COUNT).toBe(3);
+    expect(RELOAD_AFTER_COMPLETED_NODES).toBeGreaterThan(0);
+    expect(RELOAD_AFTER_COMPLETED_NODES).toBeLessThan(AUTO_PLAY_NODE_COUNT);
+  });
+
+  it('visits the canonical route and reaches RUN_COMPLETED without a throw', async () => {
     const harness = createAutoPlayHarness({ seed: 20_260_805 });
     const result = await harness.start();
 
@@ -38,30 +67,32 @@ describe('15-node unattended autoplay', () => {
       ref,
     }))).toEqual(EXPECTED_NODES);
     const encounterNodes = result.nodes.filter(({ kind }) => kind !== 'EVENT');
-    expect(encounterNodes).toHaveLength(9);
+    expect(encounterNodes).toHaveLength(EXPECTED_ENCOUNTER_COUNT);
     expect(encounterNodes.every(({ outcome }) => outcome === 'BEST_RESOLUTION')).toBe(true);
     expect(encounterNodes.every(({ grade }) => grade !== null)).toBe(true);
     expect(encounterNodes.every(({ resolutionCodes }) => resolutionCodes.length > 0)).toBe(true);
-    expect(result.nodes.filter(({ kind }) => kind === 'EVENT')).toHaveLength(6);
+    expect(result.nodes.filter(({ kind }) => kind === 'EVENT')).toHaveLength(
+      EXPECTED_EVENT_COUNT,
+    );
     expect(result.finalState).toMatchObject({
       nodeIndex: AUTO_PLAY_NODE_COUNT,
       terminal: true,
       completedNodeIds: EXPECTED_NODE_IDS,
       pendingRewardIds: [],
-      gradeCount: 9,
-      outcomeCount: 9,
+      gradeCount: EXPECTED_ENCOUNTER_COUNT,
+      outcomeCount: EXPECTED_ENCOUNTER_COUNT,
     });
     expect(harness.getProgress()).toEqual(result);
   });
 
-  it('restores the node-7 save and still completes nodes 8 through 15', async () => {
+  it('restores the mid-episode save and still completes the remaining nodes', async () => {
     const result = await createAutoPlayHarness({
       seed: 20_260_805,
-      reloadAfterCompletedNodes: 7,
+      reloadAfterCompletedNodes: RELOAD_AFTER_COMPLETED_NODES,
     }).start();
 
     expect(result.status).toBe('RUN_COMPLETED');
-    expect(result.reloadNodeIndices).toEqual([7]);
+    expect(result.reloadNodeIndices).toEqual([RELOAD_AFTER_COMPLETED_NODES]);
     expect(result.visitedNodeIds).toEqual(EXPECTED_NODE_IDS);
     expect(result.errors).toEqual([]);
     expect(result.finalState).toMatchObject({

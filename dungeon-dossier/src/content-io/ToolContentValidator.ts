@@ -55,6 +55,9 @@ interface ValidatedFile extends ToolContentFile {
   readonly data: unknown;
 }
 
+/** The episode every run must open on. Content-layer rule, not an engine one. */
+export const FIRST_EPISODE_ID = 'tutorial';
+
 type JsonObject = Record<string, unknown>;
 
 function asObject(value: unknown): JsonObject | undefined {
@@ -411,30 +414,54 @@ function validateCommonReferences(
       }
     }
     if (file.kind === 'run-strip') {
-      catalogueEntries(root, 'nodes').forEach((entry, index) => {
-        const node = asObject(entry);
-        if (!node) return;
-        const ref = node.ref;
-        const caseDirectory = node.case_directory;
-        const referenceOwners = node.kind === 'EVENT'
-          ? definitions.eventCaseById
-          : definitions.encounterCaseById;
-        if (typeof ref !== 'string' || !referenceOwners.has(ref)) {
-          if (typeof ref === 'string') {
-            problems.push(referenceProblem(file.relativePath, `nodes.${index}.ref`, ref));
-          }
-          return;
-        }
-        if (
-          typeof caseDirectory === 'string' &&
-          referenceOwners.get(ref) !== caseDirectory
-        ) {
+      // Every candidate of every slot must exist and be owned by the episode's
+      // own case; a candidate the resolver could pick is as load-bearing as the
+      // default one, so all of them are checked, not just `candidates[0]`.
+      catalogueEntries(root, 'episodes').forEach((episodeEntry, episodeIndex) => {
+        const episode = asObject(episodeEntry);
+        if (!episode) return;
+        const caseDirectory = episode.case_directory;
+        // A run must always open on the tutorial. The engine cannot own this
+        // rule — it may not name a case directory — so it lives here.
+        if (episodeIndex === 0 && episode.episode_id !== FIRST_EPISODE_ID) {
           problems.push({
             kind: 'tier1',
             relativePath: file.relativePath,
-            message: `[CASE_DIRECTORY_MISMATCH] $.nodes.${index}.case_directory: ${ref} belongs to ${referenceOwners.get(ref) ?? 'unknown'}`,
+            message:
+              `[FIRST_EPISODE_MISMATCH] $.episodes.0.episode_id: ` +
+              `a run must begin at ${FIRST_EPISODE_ID}, found ${String(episode.episode_id)}`,
           });
         }
+        catalogueEntries(episode, 'slots').forEach((slotEntry, slotIndex) => {
+          const slot = asObject(slotEntry);
+          if (!slot) return;
+          catalogueEntries(slot, 'candidates').forEach((candidateEntry, candidateIndex) => {
+            const candidate = asObject(candidateEntry);
+            if (!candidate) return;
+            const ref = candidate.ref;
+            const path =
+              `episodes.${episodeIndex}.slots.${slotIndex}.candidates.${candidateIndex}`;
+            const referenceOwners = candidate.kind === 'EVENT'
+              ? definitions.eventCaseById
+              : definitions.encounterCaseById;
+            if (typeof ref !== 'string' || !referenceOwners.has(ref)) {
+              if (typeof ref === 'string') {
+                problems.push(referenceProblem(file.relativePath, `${path}.ref`, ref));
+              }
+              return;
+            }
+            if (
+              typeof caseDirectory === 'string' &&
+              referenceOwners.get(ref) !== caseDirectory
+            ) {
+              problems.push({
+                kind: 'tier1',
+                relativePath: file.relativePath,
+                message: `[CASE_DIRECTORY_MISMATCH] $.${path}.ref: ${ref} belongs to ${referenceOwners.get(ref) ?? 'unknown'}`,
+              });
+            }
+          });
+        });
       });
     }
   }

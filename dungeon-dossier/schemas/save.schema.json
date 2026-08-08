@@ -3,12 +3,11 @@
   "type": "object",
   "properties": {
     "$schema": {
-      "type": "string",
-      "minLength": 1,
-      "maxLength": 500
+      "maxLength": 500,
+      "$ref": "#/$defs/__schema0"
     },
     "case_id": {
-      "$ref": "#/$defs/__schema0"
+      "$ref": "#/$defs/__schema1"
     },
     "content_version": {
       "type": "string",
@@ -25,7 +24,7 @@
         "type": "object",
         "properties": {
           "claim_id": {
-            "$ref": "#/$defs/__schema0"
+            "$ref": "#/$defs/__schema1"
           },
           "commitment": {
             "type": "string",
@@ -61,7 +60,7 @@
             ]
           },
           "resistance": {
-            "$ref": "#/$defs/__schema1"
+            "$ref": "#/$defs/__schema2"
           },
           "exposed": {
             "type": "boolean"
@@ -84,13 +83,13 @@
         "type": "object",
         "properties": {
           "evidence_id": {
-            "$ref": "#/$defs/__schema0"
+            "$ref": "#/$defs/__schema1"
           },
           "acquired": {
             "type": "boolean"
           },
           "grade": {
-            "$ref": "#/$defs/__schema2"
+            "$ref": "#/$defs/__schema3"
           },
           "integrity": {
             "type": "string",
@@ -104,7 +103,7 @@
           "sealed_until_turn": {
             "anyOf": [
               {
-                "$ref": "#/$defs/__schema1"
+                "$ref": "#/$defs/__schema2"
               },
               {
                 "type": "null"
@@ -135,34 +134,34 @@
         "draw_pile": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/__schema0"
+            "$ref": "#/$defs/__schema1"
           }
         },
         "hand": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/__schema0"
+            "$ref": "#/$defs/__schema1"
           }
         },
         "discard_pile": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/__schema0"
+            "$ref": "#/$defs/__schema1"
           }
         },
         "exhaust_pile": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/__schema0"
+            "$ref": "#/$defs/__schema1"
           }
         },
         "locked_cards": {
           "type": "object",
           "propertyNames": {
-            "$ref": "#/$defs/__schema0"
+            "$ref": "#/$defs/__schema1"
           },
           "additionalProperties": {
-            "$ref": "#/$defs/__schema1"
+            "$ref": "#/$defs/__schema2"
           }
         }
       },
@@ -198,25 +197,25 @@
       "type": "object",
       "properties": {
         "cp": {
-          "$ref": "#/$defs/__schema3"
+          "$ref": "#/$defs/__schema4"
         },
         "stress": {
-          "$ref": "#/$defs/__schema3"
+          "$ref": "#/$defs/__schema4"
         },
         "dp": {
-          "$ref": "#/$defs/__schema3"
+          "$ref": "#/$defs/__schema4"
         },
         "composure": {
-          "$ref": "#/$defs/__schema3"
+          "$ref": "#/$defs/__schema4"
         },
         "coercion": {
-          "$ref": "#/$defs/__schema3"
+          "$ref": "#/$defs/__schema4"
         },
         "trust": {
-          "$ref": "#/$defs/__schema3"
+          "$ref": "#/$defs/__schema4"
         },
         "turn": {
-          "$ref": "#/$defs/__schema1"
+          "$ref": "#/$defs/__schema2"
         }
       },
       "required": [
@@ -236,42 +235,42 @@
           "type": "object",
           "properties": {
             "encounter_id": {
-              "$ref": "#/$defs/__schema0"
+              "$ref": "#/$defs/__schema1"
             },
             "flow_node_id": {
-              "$ref": "#/$defs/__schema0"
+              "$ref": "#/$defs/__schema1"
             },
             "round_index": {
-              "$ref": "#/$defs/__schema1"
+              "$ref": "#/$defs/__schema2"
             },
             "entered_flow_nodes": {
               "minItems": 0,
               "type": "array",
               "items": {
-                "$ref": "#/$defs/__schema0"
+                "$ref": "#/$defs/__schema1"
               }
             },
             "active_modifiers": {
               "minItems": 0,
               "type": "array",
               "items": {
-                "$ref": "#/$defs/__schema0"
+                "$ref": "#/$defs/__schema1"
               }
             },
             "completed_objectives": {
               "minItems": 0,
               "type": "array",
               "items": {
-                "$ref": "#/$defs/__schema0"
+                "$ref": "#/$defs/__schema1"
               }
             },
             "shield_durability": {
               "type": "object",
               "propertyNames": {
-                "$ref": "#/$defs/__schema0"
+                "$ref": "#/$defs/__schema1"
               },
               "additionalProperties": {
-                "$ref": "#/$defs/__schema3"
+                "$ref": "#/$defs/__schema4"
               }
             }
           },
@@ -295,32 +294,32 @@
       "minItems": 0,
       "type": "array",
       "items": {
-        "$ref": "#/$defs/__schema0"
+        "$ref": "#/$defs/__schema1"
       }
     },
     "acquired_relics": {
       "minItems": 0,
       "type": "array",
       "items": {
-        "$ref": "#/$defs/__schema0"
+        "$ref": "#/$defs/__schema1"
       }
     },
     "acquired_enhancements": {
       "minItems": 0,
       "type": "array",
       "items": {
-        "$ref": "#/$defs/__schema0"
+        "$ref": "#/$defs/__schema1"
       }
     },
     "save_version": {
       "type": "number",
-      "const": 2
+      "const": 3
     },
     "run": {
       "type": "object",
       "properties": {
         "node_index": {
-          "$ref": "#/$defs/__schema1"
+          "$ref": "#/$defs/__schema2"
         },
         "reward_seed_stream": {
           "type": "integer",
@@ -328,34 +327,34 @@
           "maximum": 4294967295
         },
         "false_confessions": {
-          "$ref": "#/$defs/__schema1"
+          "$ref": "#/$defs/__schema2"
         },
         "completed_node_ids": {
           "minItems": 0,
           "type": "array",
           "items": {
-            "$ref": "#/$defs/__schema0"
+            "$ref": "#/$defs/__schema1"
           }
         },
         "pending_reward_ids": {
           "minItems": 0,
           "type": "array",
           "items": {
-            "$ref": "#/$defs/__schema0"
+            "$ref": "#/$defs/__schema1"
           }
         },
         "claimed_reward_ids": {
           "minItems": 0,
           "type": "array",
           "items": {
-            "$ref": "#/$defs/__schema0"
+            "$ref": "#/$defs/__schema1"
           }
         },
         "acquired_evidence_ids": {
           "minItems": 0,
           "type": "array",
           "items": {
-            "$ref": "#/$defs/__schema0"
+            "$ref": "#/$defs/__schema1"
           }
         },
         "grade_history": {
@@ -364,10 +363,10 @@
             "type": "object",
             "properties": {
               "node_id": {
-                "$ref": "#/$defs/__schema0"
+                "$ref": "#/$defs/__schema1"
               },
               "outcome": {
-                "$ref": "#/$defs/__schema4"
+                "$ref": "#/$defs/__schema5"
               },
               "grade": {
                 "type": "string",
@@ -395,10 +394,10 @@
             "type": "object",
             "properties": {
               "node_id": {
-                "$ref": "#/$defs/__schema0"
+                "$ref": "#/$defs/__schema1"
               },
               "outcome": {
-                "$ref": "#/$defs/__schema4"
+                "$ref": "#/$defs/__schema5"
               }
             },
             "required": [
@@ -414,7 +413,7 @@
         "card_tuning": {
           "type": "object",
           "propertyNames": {
-            "$ref": "#/$defs/__schema0"
+            "$ref": "#/$defs/__schema1"
           },
           "additionalProperties": {
             "type": "object",
@@ -447,27 +446,49 @@
           "minItems": 0,
           "type": "array",
           "items": {
-            "$ref": "#/$defs/__schema0"
+            "$ref": "#/$defs/__schema1"
           }
         },
         "evidence_grade_by_id": {
           "type": "object",
           "propertyNames": {
-            "$ref": "#/$defs/__schema0"
+            "$ref": "#/$defs/__schema1"
           },
           "additionalProperties": {
-            "$ref": "#/$defs/__schema2"
+            "$ref": "#/$defs/__schema3"
           }
         },
         "open_route_ids": {
           "minItems": 0,
           "type": "array",
           "items": {
-            "$ref": "#/$defs/__schema0"
+            "$ref": "#/$defs/__schema1"
           }
         },
         "retry_count": {
-          "$ref": "#/$defs/__schema1"
+          "$ref": "#/$defs/__schema2"
+        },
+        "active_episode_id": {
+          "$ref": "#/$defs/__schema0"
+        },
+        "unlocked_episode_ids": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/__schema0"
+          }
+        },
+        "completed_episode_ids": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/__schema0"
+          }
+        },
+        "route_node_ids": {
+          "minItems": 0,
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/__schema1"
+          }
         }
       },
       "required": [
@@ -485,7 +506,11 @@
         "canvassed_topic_ids",
         "evidence_grade_by_id",
         "open_route_ids",
-        "retry_count"
+        "retry_count",
+        "active_episode_id",
+        "unlocked_episode_ids",
+        "completed_episode_ids",
+        "route_node_ids"
       ],
       "additionalProperties": false
     }
@@ -509,15 +534,19 @@
   "$defs": {
     "__schema0": {
       "type": "string",
+      "minLength": 1
+    },
+    "__schema1": {
+      "type": "string",
       "minLength": 1,
       "maxLength": 160
     },
-    "__schema1": {
+    "__schema2": {
       "type": "integer",
       "minimum": 0,
       "maximum": 9007199254740991
     },
-    "__schema2": {
+    "__schema3": {
       "type": "string",
       "enum": [
         "A",
@@ -525,11 +554,11 @@
         "C"
       ]
     },
-    "__schema3": {
+    "__schema4": {
       "type": "number",
       "minimum": 0
     },
-    "__schema4": {
+    "__schema5": {
       "type": "string",
       "enum": [
         "BEST_RESOLUTION",

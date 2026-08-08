@@ -10,6 +10,7 @@ import {
 import { MAX_ABS_CARD_TUNING } from './case';
 import {
   JsonSchemaReferenceSchema,
+  NonEmptyStringSchema,
   NonNegativeIntegerSchema,
   NonNegativeNumberSchema,
   PositiveIntegerSchema,
@@ -19,7 +20,7 @@ import {
 import { CaseGradeSchema } from './grades';
 import { OutcomeGradeSchema } from './encounter';
 
-export const CURRENT_SAVE_VERSION = 2 as const;
+export const CURRENT_SAVE_VERSION = 3 as const;
 
 export const SavedClaimStateSchema = z.strictObject({
   claim_id: ContentIdSchema,
@@ -110,11 +111,28 @@ const SavedRunStateV2Shape = {
   retry_count: NonNegativeIntegerSchema,
 } as const;
 
+/**
+ * v3 persists the episode progression the 3-stage run introduced, plus the
+ * resolved route. The route is stored rather than re-derived from the seed so a
+ * later candidate-pool edit can never silently relocate an in-flight save.
+ */
+const SavedRunStateV3Shape = {
+  active_episode_id: NonEmptyStringSchema,
+  unlocked_episode_ids: z.array(NonEmptyStringSchema),
+  completed_episode_ids: z.array(NonEmptyStringSchema),
+  route_node_ids: uniqueContentIds(),
+} as const;
+
 const SavedRunStateV1Schema = z.strictObject(SavedRunStateV1Shape);
+const SavedRunStateV2Schema = z.strictObject({
+  ...SavedRunStateV1Shape,
+  ...SavedRunStateV2Shape,
+});
 
 export const SavedRunStateSchema = z.strictObject({
   ...SavedRunStateV1Shape,
   ...SavedRunStateV2Shape,
+  ...SavedRunStateV3Shape,
 });
 
 const SaveEnvelopeShape = {
@@ -139,6 +157,12 @@ const SaveV1Schema = z.strictObject({
   run: SavedRunStateV1Schema.optional(),
 });
 
+const SaveV2Schema = z.strictObject({
+  ...SaveEnvelopeShape,
+  save_version: z.literal(2),
+  run: SavedRunStateV2Schema.optional(),
+});
+
 export const SaveSchema = z.strictObject({
   ...SaveEnvelopeShape,
   save_version: z.literal(CURRENT_SAVE_VERSION),
@@ -161,13 +185,13 @@ export class UnsupportedSaveVersionError extends Error {
 /**
  * v1 predates pattern D/E/F, so its run boundary genuinely has no tuning,
  * canvassed topic, grade override, opened route, or retry. Defaults are filled
- * once here and re-parsed by the v2 schema instead of at each reading layer.
+ * once here and handed to the next migration rather than to each reading layer.
  */
-function migrateSaveV1ToV2(input: unknown): SaveData {
+function migrateSaveV1ToV2(input: unknown): unknown {
   const legacy = SaveV1Schema.parse(input);
-  return SaveSchema.parse({
+  return {
     ...legacy,
-    save_version: CURRENT_SAVE_VERSION,
+    save_version: 2,
     ...(legacy.run === undefined
       ? {}
       : {
@@ -180,8 +204,38 @@ function migrateSaveV1ToV2(input: unknown): SaveData {
             retry_count: 0,
           },
         }),
+  };
+}
+
+/**
+ * v2 predates episodes. Its flat cursor cannot say which episode it stood in,
+ * so the fields are left blank here on purpose: the app re-derives them from
+ * the resolved route on restore, which is the only source that can be right.
+ */
+function migrateSaveV2ToV3(input: unknown): SaveData {
+  const legacy = SaveV2Schema.parse(input);
+  return SaveSchema.parse({
+    ...legacy,
+    save_version: CURRENT_SAVE_VERSION,
+    ...(legacy.run === undefined
+      ? {}
+      : {
+          run: {
+            ...legacy.run,
+            active_episode_id: LEGACY_EPISODE_PLACEHOLDER,
+            unlocked_episode_ids: [],
+            completed_episode_ids: [],
+            route_node_ids: [],
+          },
+        }),
   });
 }
+
+/**
+ * Marks a run block whose episode fields came from a pre-episode save. The app
+ * layer replaces it with the route-derived value instead of trusting it.
+ */
+export const LEGACY_EPISODE_PLACEHOLDER = 'legacy';
 
 /**
  * Stable migration entrypoint. Migrations run in ascending order before the
@@ -190,6 +244,7 @@ function migrateSaveV1ToV2(input: unknown): SaveData {
 export function migrateSave(input: unknown): SaveData {
   const probe = SaveVersionProbeSchema.parse(input);
   if (probe.save_version === CURRENT_SAVE_VERSION) return SaveSchema.parse(input);
-  if (probe.save_version === 1) return migrateSaveV1ToV2(input);
+  if (probe.save_version === 1) return migrateSaveV2ToV3(migrateSaveV1ToV2(input));
+  if (probe.save_version === 2) return migrateSaveV2ToV3(input);
   throw new UnsupportedSaveVersionError(probe.save_version);
 }

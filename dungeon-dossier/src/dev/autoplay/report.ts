@@ -3,7 +3,9 @@ import {
   isAutoplaySeed,
   type AutoplayOptions,
 } from '../../app/autoplayPort';
-import { RunStripSchema } from '../../engine/domain';
+import { EPISODE_NODE_COUNT, RunStripSchema } from '../../engine/domain';
+import { createNodeStrip } from '../../engine/run';
+import { BROKER_CANVASS_EVENT_ID } from './policy';
 
 export const AUTOPLAY_REPORT_SCHEMA_VERSION = '1.0';
 export const AUTOPLAY_REPORT_ELEMENT_ID = 'dd-autoplay-report';
@@ -78,17 +80,28 @@ export const AUTOPLAY_TECHNICAL_CONTENT_IDS: readonly string[] = Object.freeze(
 const AUTOPLAY_TECHNICAL_CONTENT_ID_SET = new Set(AUTOPLAY_TECHNICAL_CONTENT_IDS);
 
 const canonicalStrip = RunStripSchema.parse(runStripJson);
-if (canonicalStrip.nodes.length !== 15) {
+/**
+ * Autoplay asserts against the canonical route: every slot resolved to its
+ * first candidate. Seeded runs pick other candidates, so a report is validated
+ * against the route it actually walked, not against this baseline.
+ */
+const canonicalRoute = createNodeStrip(canonicalStrip);
+const expectedNodeCount = canonicalStrip.episodes.length * EPISODE_NODE_COUNT;
+if (canonicalRoute.length !== expectedNodeCount) {
   throw new Error(
-    `Autoplay report requires the canonical 15-node strip; found ${canonicalStrip.nodes.length.toString()}.`,
+    `Autoplay report requires ${expectedNodeCount.toString()} resolved nodes; ` +
+      `found ${canonicalRoute.length.toString()}.`,
   );
 }
 
+/** Nodes a canonical run visits, in play order. */
+export const AUTOPLAY_NODE_COUNT = canonicalRoute.length;
+
 /** Data-owned expectation shared by report validation and its regression tests. */
 export const AUTOPLAY_EXPECTED_NODES = Object.freeze(
-  canonicalStrip.nodes.map((node, index) => Object.freeze({
+  canonicalRoute.map((node, index) => Object.freeze({
     index,
-    nodeId: node.node_id,
+    nodeId: node.nodeId,
     kind: node.kind,
     ref: node.ref,
   })),
@@ -256,7 +269,9 @@ export function findAutoplayInvariantFailures(
     failures.push('missing RUN_COMPLETED terminal marker');
   }
   if (!sameValues(report.finalState.completedNodeIds, expectedIds)) {
-    failures.push('completedNodeIds do not match the canonical 15-node order');
+    failures.push(
+      `completedNodeIds do not match the canonical ${AUTOPLAY_EXPECTED_NODES.length.toString()}-node order`,
+    );
   }
   if (report.finalState.pendingRewardIds.length > 0) {
     failures.push(`pending rewards remain: ${report.finalState.pendingRewardIds.join(', ')}`);
@@ -275,12 +290,16 @@ export function findAutoplayInvariantFailures(
   const expectedEncounterIds = AUTOPLAY_EXPECTED_NODES
     .filter((node) => node.kind !== 'EVENT')
     .map((node) => node.nodeId);
-  if (encounterNodes.length !== 9) {
-    failures.push(`expected 9 graded encounter nodes, got ${encounterNodes.length.toString()}`);
-  }
-  if (report.finalState.gradeHistory.length !== 9) {
+  if (encounterNodes.length !== expectedEncounterIds.length) {
     failures.push(
-      `expected 9 grade-history records, got ${report.finalState.gradeHistory.length.toString()}`,
+      `expected ${expectedEncounterIds.length.toString()} graded encounter nodes, ` +
+      `got ${encounterNodes.length.toString()}`,
+    );
+  }
+  if (report.finalState.gradeHistory.length !== expectedEncounterIds.length) {
+    failures.push(
+      `expected ${expectedEncounterIds.length.toString()} grade-history records, ` +
+      `got ${report.finalState.gradeHistory.length.toString()}`,
     );
   }
   if (!sameValues(
@@ -297,7 +316,14 @@ export function findAutoplayInvariantFailures(
     if (report.finalState.flags['F-13'] !== true) {
       failures.push('BEST final state did not set F-13');
     }
-    if (report.finalState.flags['F-12'] !== true) {
+    // F-12's only writer is the broker canvass, which is one candidate of a
+    // seeded ep004 slot. Requiring it unconditionally would fail every route
+    // that legitimately drew the other candidate, so the guard follows the
+    // route the run actually walked.
+    const playedBrokerCanvass = report.nodes.some(
+      (node) => node.ref === BROKER_CANVASS_EVENT_ID,
+    );
+    if (playedBrokerCanvass && report.finalState.flags['F-12'] !== true) {
       failures.push('BEST final state did not preserve the F-12 branch');
     }
     if (report.finalState.flags['F-01'] !== false) {

@@ -4,6 +4,7 @@ import { MODE_CONFIGS } from '../../src/dev/autoplay/driver';
 
 import {
   AUTOPLAY_EXPECTED_NODES,
+  AUTOPLAY_NODE_COUNT,
   AUTOPLAY_REPORT_SCHEMA_VERSION,
   AUTOPLAY_TECHNICAL_CONTENT_IDS,
   findAutoplayInvariantFailures,
@@ -21,6 +22,11 @@ const ALL_CONTENT_JSON = import.meta.glob('../../content/**/*.json', {
 
 const TECHNICAL_ID_FIELD = /(?:^|_)id$/u;
 const TECHNICAL_IDS_FIELD = /(?:^|_)ids$/u;
+
+/** Graded (non-EVENT) nodes of the canonical resolved route. */
+const GRADED_NODES = AUTOPLAY_EXPECTED_NODES.filter((node) => node.kind !== 'EVENT');
+const EVENT_NODES = AUTOPLAY_EXPECTED_NODES.filter((node) => node.kind === 'EVENT');
+const FINAL_BOSS_NODE_ID = 'run_ep004_05';
 
 function independentlyCollectTechnicalIds(value: unknown, ids: Set<string>): void {
   if (value === null || typeof value !== 'object') return;
@@ -68,7 +74,7 @@ function validBestEvidence(): AutoplayReportEvidence {
               rewardOffered: [rewards[encounterIndex]!],
               rewardClaimed: rewards[encounterIndex],
             }),
-        flagsSet: node.nodeId === 'run_ep004_05' ? ['F-13'] : [],
+        flagsSet: node.nodeId === FINAL_BOSS_NODE_ID ? ['F-13'] : [],
         durationMs: 100,
         warnings: [],
       };
@@ -76,7 +82,7 @@ function validBestEvidence(): AutoplayReportEvidence {
     ending: { endingId: 'ending-true' },
     terminalMarker: 'RUN_COMPLETED',
     finalState: {
-      nodeIndex: 15,
+      nodeIndex: AUTOPLAY_NODE_COUNT,
       terminal: true,
       dp: 100,
       stress: 0,
@@ -98,6 +104,29 @@ function validBestEvidence(): AutoplayReportEvidence {
 }
 
 describe('autoplay report invariants', () => {
+  it('expects exactly the canonical episode route, resolved from shipped content', () => {
+    expect(AUTOPLAY_NODE_COUNT).toBe(AUTOPLAY_EXPECTED_NODES.length);
+    expect(AUTOPLAY_EXPECTED_NODES.map((node) => node.nodeId)).toEqual([
+      'run_tutorial_01',
+      'run_tutorial_02',
+      'run_tutorial_05',
+      'run_ep001_01',
+      'run_ep001_02',
+      'run_ep001_05',
+      'run_ep004_01',
+      'run_ep004_02',
+      'run_ep004_05',
+    ]);
+    expect(AUTOPLAY_EXPECTED_NODES.map((node) => node.kind)).toEqual([
+      'ENCOUNTER', 'EVENT', 'BOSS',
+      'ENCOUNTER', 'EVENT', 'BOSS',
+      'ENCOUNTER', 'EVENT', 'BOSS',
+    ]);
+    expect(GRADED_NODES).toHaveLength(6);
+    expect(EVENT_NODES).toHaveLength(3);
+    expect(AUTOPLAY_EXPECTED_NODES.at(-1)?.nodeId).toBe(FINAL_BOSS_NODE_ID);
+  });
+
   it('derives its raw-ID denylist from every content JSON file', () => {
     const expected = new Set<string>();
     for (const content of Object.values(ALL_CONTENT_JSON)) {
@@ -166,7 +195,10 @@ describe('autoplay report invariants', () => {
     });
     const failures = findAutoplayInvariantFailures({ ...valid, nodes });
 
-    expect(failures).toContain('BEST report must record 9 node-level reward claims, got 8');
+    expect(failures).toContain(
+      `BEST report must record ${GRADED_NODES.length.toString()} node-level reward claims, ` +
+      `got ${(GRADED_NODES.length - 1).toString()}`,
+    );
     expect(failures).toContain('run_tutorial_01 has no claimed reward');
   });
 
@@ -184,24 +216,29 @@ describe('autoplay report invariants', () => {
     expect(failures).toContain('BEST final state did not set F-13');
   });
 
-  it('rejects a partial encounter even after all 15 nodes render', () => {
+  it('rejects a partial encounter even after every route node renders', () => {
     const valid = validBestEvidence();
+    expect(valid.nodes).toHaveLength(AUTOPLAY_NODE_COUNT);
     const finalBossIndex = valid.nodes.findIndex(
-      (node) => node.nodeId === 'run_ep004_05',
+      (node) => node.nodeId === FINAL_BOSS_NODE_ID,
     );
     const nodes = valid.nodes.map((node, index) =>
       index === finalBossIndex ? { ...node, outcome: 'PARTIAL' } : node,
     );
     const gradeHistory = valid.finalState.gradeHistory.map((record) =>
-      record.nodeId === 'run_ep004_05' ? { ...record, outcome: 'PARTIAL' } : record,
+      record.nodeId === FINAL_BOSS_NODE_ID ? { ...record, outcome: 'PARTIAL' } : record,
     );
     const failures = findAutoplayInvariantFailures({
       ...valid,
       nodes,
       finalState: { ...valid.finalState, gradeHistory },
     });
-    expect(failures).toContain('run_ep004_05 outcome is PARTIAL, not BEST_RESOLUTION');
-    expect(failures).toContain('run_ep004_05 grade-history outcome is PARTIAL');
+    expect(failures).toContain(
+      `${FINAL_BOSS_NODE_ID} outcome is PARTIAL, not BEST_RESOLUTION`,
+    );
+    expect(failures).toContain(
+      `${FINAL_BOSS_NODE_ID} grade-history outcome is PARTIAL`,
+    );
   });
 
   it('rejects skipped or reordered strip nodes', () => {

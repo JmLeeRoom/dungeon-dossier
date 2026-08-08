@@ -2,22 +2,128 @@ import { describe, expect, it, vi } from 'vitest';
 import { createEndingScreen, endingTone } from '../../src/ui/screens/ending';
 import { canInvestigate, createEventScreen, placementResultLabel, scorePlacement, type EventSceneModel } from '../../src/ui/screens/event';
 import { createRewardScreen } from '../../src/ui/screens/reward';
-import { createRunStripModel, createRunStripScreen } from '../../src/ui/screens/strip';
+import {
+  createRunStripModel,
+  createRunStripScreen,
+  EPISODE_BOARD_SLOT_COUNT,
+  type EpisodeBoardInput,
+  type EpisodeBoardNodeInput,
+  type EpisodeNodeView,
+} from '../../src/ui/screens/strip';
 
-const stripNodes = Array.from({ length: 15 }, (_, index) => ({
-  nodeId: `node-${index.toString()}`,
-  kind: index % 5 === 4 ? 'BOSS' as const : index % 2 === 0 ? 'ENCOUNTER' as const : 'EVENT' as const,
-  label: `NODE ${index.toString()}`,
-}));
+/** One episode is exactly COMBAT ▸ EVENT ▸ BOSS; the board never shows more. */
+const STAGE_COMBAT: EpisodeBoardNodeInput = {
+  nodeId: 'run_ep001_01', kind: 'ENCOUNTER', role: 'COMBAT', label: '고블린 서기 심문',
+};
+const STAGE_EVENT: EpisodeBoardNodeInput = {
+  nodeId: 'run_ep001_02', kind: 'EVENT', role: 'EVENT', label: '감식반 동행',
+};
+const STAGE_BOSS: EpisodeBoardNodeInput = {
+  nodeId: 'run_ep001_05', kind: 'BOSS', role: 'BOSS', label: '서큐버스 대면',
+};
+const EPISODE_STAGES: readonly EpisodeBoardNodeInput[] = [STAGE_COMBAT, STAGE_EVENT, STAGE_BOSS];
+
+function board(
+  activeSlotIndex: number,
+  overrides: Partial<EpisodeBoardInput> = {},
+): EpisodeBoardInput {
+  return {
+    episodeId: 'ep001',
+    episodeLabel: 'EPISODE 001 · 붉은 장부와 사라진 보급품',
+    episodeDisplayIndex: 2,
+    episodeCount: 3,
+    nodes: EPISODE_STAGES,
+    activeSlotIndex,
+    clearedEpisodes: [
+      { episodeId: 'tutorial', displayIndex: 1, label: '튜토리얼 · 황금 엘릭서 믹스커피 절도' },
+    ],
+    hasNextEpisode: true,
+    ...overrides,
+  };
+}
+
+function shape(nodes: readonly EpisodeNodeView[]): readonly string[] {
+  return nodes.map((node) =>
+    node.visibility === 'VEILED' ? 'VEILED' : `KNOWN:${node.status}`,
+  );
+}
 
 describe('game completion presentation models', () => {
-  it('builds the exact 15-node strip with cleared/current/locked states', () => {
-    const model = createRunStripModel(stripNodes, 6);
-    expect(model.nodes).toHaveLength(15);
-    expect(model.nodes.slice(0, 6).every((node) => node.status === 'CLEARED')).toBe(true);
-    expect(model.nodes[6]?.status).toBe('CURRENT');
-    expect(model.nodes.slice(7).every((node) => node.status === 'LOCKED')).toBe(true);
+  it('builds the exact 3-stage episode board with cleared/current/veiled states', () => {
+    expect(EPISODE_BOARD_SLOT_COUNT).toBe(3);
+
+    const first = createRunStripModel(board(0));
+    const second = createRunStripModel(board(1));
+    const third = createRunStripModel(board(2));
+
+    for (const model of [first, second, third]) {
+      expect(model.nodes).toHaveLength(EPISODE_BOARD_SLOT_COUNT);
+      expect(model.episodeId).toBe('ep001');
+      expect(model.episodeLabel).toBe('EPISODE 001 · 붉은 장부와 사라진 보급품');
+      expect(model.episodeDisplayIndex).toBe(2);
+      expect(model.episodeCount).toBe(3);
+      expect(model.nextEpisodeVeiled).toBe(true);
+      expect(model.clearedEpisodes).toEqual([
+        { episodeId: 'tutorial', displayIndex: 1, label: '튜토리얼 · 황금 엘릭서 믹스커피 절도' },
+      ]);
+      // Every stage keeps its role badge, veiled or not, so the silhouette holds.
+      expect(model.nodes.map((node) => node.role)).toEqual(['COMBAT', 'EVENT', 'BOSS']);
+    }
+
+    expect(first.activeSlotIndex).toBe(0);
+    expect(shape(first.nodes)).toEqual(['KNOWN:CURRENT', 'VEILED', 'VEILED']);
+    expect(second.activeSlotIndex).toBe(1);
+    expect(shape(second.nodes)).toEqual(['KNOWN:CLEARED', 'KNOWN:CURRENT', 'VEILED']);
+    expect(third.activeSlotIndex).toBe(2);
+    expect(shape(third.nodes)).toEqual(['KNOWN:CLEARED', 'KNOWN:CLEARED', 'KNOWN:CURRENT']);
+
+    // The revealed stages carry the authored identity through unchanged.
+    expect(third.nodes).toEqual([
+      { visibility: 'KNOWN', ...STAGE_COMBAT, status: 'CLEARED' },
+      { visibility: 'KNOWN', ...STAGE_EVENT, status: 'CLEARED' },
+      { visibility: 'KNOWN', ...STAGE_BOSS, status: 'CURRENT' },
+    ]);
     expect(createRunStripScreen).toBeTypeOf('function');
+  });
+
+  it('redacts veiled stages down to visibility and role only', () => {
+    const model = createRunStripModel(board(0));
+    const veiled = model.nodes.slice(1);
+    expect(veiled).toEqual([
+      { visibility: 'VEILED', role: 'EVENT' },
+      { visibility: 'VEILED', role: 'BOSS' },
+    ]);
+    // The redaction happens in the model, not at draw time: the fields must be
+    // absent, not merely blank, so nothing can leak via telemetry or a11y trees.
+    for (const node of veiled) {
+      expect(Object.keys(node).sort()).toEqual(['role', 'visibility']);
+      expect(node).not.toHaveProperty('nodeId');
+      expect(node).not.toHaveProperty('kind');
+      expect(node).not.toHaveProperty('label');
+    }
+    const serialized = JSON.stringify(model);
+    // `role` survives on purpose (it is the silhouette); identity must not.
+    for (const hidden of [
+      STAGE_EVENT.nodeId, STAGE_EVENT.label,
+      STAGE_BOSS.nodeId, STAGE_BOSS.label,
+    ]) {
+      expect(serialized).not.toContain(hidden);
+    }
+    // The next episode is announced but never named.
+    expect(serialized).not.toContain('ep004');
+  });
+
+  it('reveals the whole episode as AVAILABLE only when asked, and rejects bad boards', () => {
+    const revealed = createRunStripModel(board(0, { revealWholeEpisode: true }));
+    expect(shape(revealed.nodes))
+      .toEqual(['KNOWN:CURRENT', 'KNOWN:AVAILABLE', 'KNOWN:AVAILABLE']);
+    expect(revealed.nodes.map((node) => (node.visibility === 'KNOWN' ? node.label : null)))
+      .toEqual(['고블린 서기 심문', '감식반 동행', '서큐버스 대면']);
+
+    expect(() => createRunStripModel(board(0, { nodes: EPISODE_STAGES.slice(0, 2) })))
+      .toThrow(/exactly 3 stages/u);
+    expect(() => createRunStripModel(board(3))).toThrow(RangeError);
+    expect(() => createRunStripModel(board(-1))).toThrow(RangeError);
   });
 
   it('supports event patterns A, B, and C without encounter imports', () => {

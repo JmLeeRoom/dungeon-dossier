@@ -33,6 +33,7 @@ let table: StringsDefinition;
 let referencedKeys: ReadonlySet<string>;
 let rewardIds: readonly string[];
 let runStripRefs: readonly string[];
+let runStripEpisodeIds: readonly string[];
 let objectiveIds: readonly string[];
 let eventDescriptionKeys: readonly (string | undefined)[];
 let contentPaths: readonly string[];
@@ -148,9 +149,19 @@ beforeAll(async () => {
   rewardIds = rewards.rewards.map((reward) => reward.reward_id);
 
   const runStrip = contentByPath.get('common/run-strip.json') as {
-    readonly nodes: readonly { readonly ref: string }[];
+    readonly episodes: readonly {
+      readonly episode_id: string;
+      readonly slots: readonly {
+        readonly candidates: readonly { readonly ref: string }[];
+      }[];
+    }[];
   };
-  runStripRefs = runStrip.nodes.map((node) => node.ref);
+  // Every declared candidate is a node the player can be routed onto, so each
+  // one owes a label — not just the ones the canonical route happens to take.
+  runStripRefs = runStrip.episodes.flatMap((episode) =>
+    episode.slots.flatMap((slot) => slot.candidates.map((candidate) => candidate.ref)),
+  );
+  runStripEpisodeIds = runStrip.episodes.map((episode) => episode.episode_id);
 });
 
 describe('Korean string table coverage', () => {
@@ -195,10 +206,18 @@ describe('Korean string table coverage', () => {
     expect(missing).toEqual([]);
   });
 
-  it('covers node.<ref> for every run-strip node', () => {
+  it('covers node.<ref> for every run-strip slot candidate', () => {
     expect(runStripRefs.length).toBeGreaterThan(0);
     const missing = runStripRefs.filter(
       (ref) => table.strings[`node.${ref}`] === undefined,
+    );
+    expect(missing).toEqual([]);
+  });
+
+  it('covers episode.<episode_id> for every run-strip episode', () => {
+    expect(runStripEpisodeIds.length).toBeGreaterThan(0);
+    const missing = runStripEpisodeIds.filter(
+      (episodeId) => table.strings[`episode.${episodeId}`] === undefined,
     );
     expect(missing).toEqual([]);
   });

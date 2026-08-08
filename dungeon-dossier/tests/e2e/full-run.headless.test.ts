@@ -16,7 +16,11 @@ import {
 } from '../../src/engine/domain';
 import { EncounterCoordinator } from '../../src/engine/encounter/EncounterCoordinator';
 import { createRngState } from '../../src/engine/rng';
-import { createNodeStrip, type EncounterGradeMetrics } from '../../src/engine/run';
+import {
+  createNodeStrip,
+  runEpisodeIds,
+  type EncounterGradeMetrics,
+} from '../../src/engine/run';
 import { createRunSession, type RunSession } from '../../src/app/createRunSession';
 import {
   createInitialGameRunState,
@@ -46,7 +50,9 @@ function caseContent(directory: string): CaseDefinition {
   )) as unknown);
 }
 
+/** Canonical route: every episode slot takes its first candidate. */
 const STRIP = createNodeStrip(RunStripSchema.parse(common('run-strip.json')));
+const EPISODE_IDS = runEpisodeIds(STRIP);
 const FLAGS = FlagsSchema.parse(common('flags.json'));
 const REWARDS = RewardsSchema.parse(common('rewards.json'));
 const GRADES = GradesSchema.parse(common('grades.json'));
@@ -94,13 +100,50 @@ const CONTENT_VERSIONS_BY_DIRECTORY = Object.fromEntries(
   ]),
 );
 
-/** Audit §BLK-1 seeds: all but 2026 previously soft-locked at nodes 3-8. */
+/** Audit §BLK-1 seeds: all but 2026 previously soft-locked mid-run. */
 const BLK1_AUDIT_SEEDS = [20_260_805, 1, 7, 42, 999, 2_026] as const;
 
-const TRUE_ENDING_FLAG_IDS = [
-  'F-02', 'F-03', 'F-04', 'F-05', 'F-06', 'F-07',
-  'F-08', 'F-09', 'F-10', 'F-11', 'F-12', 'F-13',
+/**
+ * The resolved canonical route: 3 episodes x (COMBAT, EVENT, BOSS).
+ * Spelled out rather than derived from STRIP so the shipped run-strip content
+ * cannot silently change what this end-to-end run actually plays.
+ */
+const CANONICAL_ROUTE_NODE_IDS = [
+  'run_tutorial_01', 'run_tutorial_02', 'run_tutorial_05',
+  'run_ep001_01', 'run_ep001_02', 'run_ep001_05',
+  'run_ep004_01', 'run_ep004_02', 'run_ep004_05',
 ] as const;
+
+const RUN_NODE_COUNT = CANONICAL_ROUTE_NODE_IDS.length;
+/** Non-EVENT nodes: the only ones that produce grade/outcome records. */
+const GRADED_NODE_COUNT = 6;
+
+/**
+ * Flags the canonical route actually writes, in flags.json order.
+ *
+ * Re-derived for the episode strip: a run now visits one candidate per slot, so
+ * the writers sitting on the unplayed candidates are never reached —
+ * F-04 (event_tutorial_placement), F-05 (enc_tutorial_harpy),
+ * F-09 (event_ep001_warehouse), F-10 (enc_ep001_orc) and
+ * F-12 (event_ep004_broker_canvass) are off-route. F-01 stays false because it
+ * is the coerced-confession writer on enc_tutorial_slime.
+ * The true ending only requires F-13 (enc_ep004_fallen_hero BEST_RESOLUTION),
+ * which is a FIXED BOSS slot, so it remains reachable on every route.
+ */
+const CANONICAL_ROUTE_SET_FLAG_IDS = [
+  'F-02', 'F-03', 'F-06', 'F-07', 'F-08', 'F-11', 'F-13',
+] as const;
+
+const CANONICAL_ROUTE_UNSET_FLAG_IDS = [
+  'F-01', 'F-04', 'F-05', 'F-09', 'F-10', 'F-12',
+] as const;
+
+function enabledFlagIds(flags: Readonly<Record<string, unknown>>): readonly string[] {
+  return Object.entries(flags)
+    .filter(([, value]) => value === true)
+    .map(([flagId]) => flagId)
+    .sort();
+}
 
 function archetypeForEncounter(encounterId: string): SimulationArchetype {
   const archetype = SIMULATION_ARCHETYPES.find(
@@ -218,7 +261,7 @@ function playFullRun(seed: number): FullRunResult {
     removeItem: (key) => values.delete(key),
   });
   const session = createRunSession({
-    initialState: createInitialGameRunState(CARDS, BALANCE, FLAGS, seed),
+    initialState: createInitialGameRunState(CARDS, BALANCE, FLAGS, seed, EPISODE_IDS),
     strip: STRIP,
     flags: FLAGS.flags,
     rewards: REWARDS,
@@ -345,50 +388,71 @@ function playFullRun(seed: number): FullRunResult {
 }
 
 describe('L1 headless full run (route simulator x run session)', () => {
-  it('completes all 15 nodes with honest coordinator metrics, save validation, and the true ending', () => {
+  it('resolves the canonical 3-episode route', () => {
+    expect(STRIP.map((node) => node.nodeId)).toEqual([...CANONICAL_ROUTE_NODE_IDS]);
+    expect(EPISODE_IDS).toEqual(['tutorial', 'ep001', 'ep004']);
+    expect(STRIP.filter((node) => node.kind !== 'EVENT')).toHaveLength(GRADED_NODE_COUNT);
+  });
+
+  it('completes all 9 nodes with honest coordinator metrics, save validation, and the true ending', () => {
     const { session, repository } = playFullRun(20_260_805);
     const state = session.snapshot;
 
-    expect(state.nodeIndex).toBe(15);
-    expect(state.completedNodeIds).toHaveLength(15);
-    expect(state.completedNodeIds).toEqual(STRIP.map((node) => node.nodeId));
+    expect(state.nodeIndex).toBe(RUN_NODE_COUNT);
+    expect(state.completedNodeIds).toHaveLength(RUN_NODE_COUNT);
+    expect(state.completedNodeIds).toEqual([...CANONICAL_ROUTE_NODE_IDS]);
     expect(state.terminal).toBe(true);
     expect(state.pendingRewardIds).toEqual([]);
-    expect(state.gradeHistory).toHaveLength(9);
-    expect(state.outcomeHistory).toHaveLength(9);
+    expect(state.gradeHistory).toHaveLength(GRADED_NODE_COUNT);
+    expect(state.outcomeHistory).toHaveLength(GRADED_NODE_COUNT);
     expect(endingIdForRun(state)).toBe('ending-true');
 
-    for (const flagId of TRUE_ENDING_FLAG_IDS) {
+    // Every episode boss fell, so every episode is cleared and unlocked.
+    expect(state.completedEpisodeIds).toEqual(['tutorial', 'ep001', 'ep004']);
+    expect(state.unlockedEpisodeIds).toEqual(['tutorial', 'ep001', 'ep004']);
+    expect(state.activeEpisodeId).toBe('ep004');
+
+    expect(enabledFlagIds(state.flags)).toEqual([...CANONICAL_ROUTE_SET_FLAG_IDS]);
+    for (const flagId of CANONICAL_ROUTE_SET_FLAG_IDS) {
       expect(state.flags[flagId], `${flagId} must be set`).toBe(true);
     }
-    expect(state.flags['F-01'], 'F-01 is coerced-confession only').toBe(false);
+    for (const flagId of CANONICAL_ROUTE_UNSET_FLAG_IDS) {
+      expect(state.flags[flagId], `${flagId} is off the canonical route`).toBe(false);
+    }
 
     const saved = repository.load();
     if (saved === undefined) throw new Error('Saved run data must reload.');
-    expect(saved.run?.node_index).toBe(15);
+    expect(saved.run?.node_index).toBe(RUN_NODE_COUNT);
     expect(saved.run?.terminal).toBe(true);
-    expect(saved.run?.grade_history).toHaveLength(9);
-    const restored = restoreRunState(saved);
-    expect(restored.nodeIndex).toBe(15);
+    expect(saved.run?.grade_history).toHaveLength(GRADED_NODE_COUNT);
+    expect(saved.run?.route_node_ids).toEqual([...CANONICAL_ROUTE_NODE_IDS]);
+    expect(saved.run?.active_episode_id).toBe('ep004');
+    expect(saved.run?.completed_episode_ids).toEqual(['tutorial', 'ep001', 'ep004']);
+    const restored = restoreRunState(saved, {}, STRIP);
+    expect(restored.nodeIndex).toBe(RUN_NODE_COUNT);
     expect(restored.terminal).toBe(true);
     expect(restored.completedNodeIds).toEqual(state.completedNodeIds);
     expect(restored.claimedRewardIds).toEqual(state.claimedRewardIds);
     expect(restored.gradeHistory).toEqual(state.gradeHistory);
+    expect(restored.activeEpisodeId).toBe(state.activeEpisodeId);
+    expect(restored.unlockedEpisodeIds).toEqual(state.unlockedEpisodeIds);
+    expect(restored.completedEpisodeIds).toEqual(state.completedEpisodeIds);
   });
 
   it.each([...BLK1_AUDIT_SEEDS])(
-    'seed %d completes 15 nodes with the save repository attached',
+    'seed %d completes 9 nodes with the save repository attached',
     (seed) => {
       const { session, repository } = playFullRun(seed);
       const state = session.snapshot;
 
-      expect(state.nodeIndex).toBe(15);
-      expect(state.completedNodeIds).toHaveLength(15);
+      expect(state.nodeIndex).toBe(RUN_NODE_COUNT);
+      expect(state.completedNodeIds).toHaveLength(RUN_NODE_COUNT);
       expect(state.terminal).toBe(true);
       expect(state.pendingRewardIds).toEqual([]);
-      expect(state.gradeHistory).toHaveLength(9);
+      expect(state.gradeHistory).toHaveLength(GRADED_NODE_COUNT);
+      expect(state.completedEpisodeIds).toEqual(['tutorial', 'ep001', 'ep004']);
       expect(endingIdForRun(state)).toBe('ending-true');
-      expect(repository.load()?.run?.node_index).toBe(15);
+      expect(repository.load()?.run?.node_index).toBe(RUN_NODE_COUNT);
     },
   );
 });

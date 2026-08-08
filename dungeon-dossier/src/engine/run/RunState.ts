@@ -31,6 +31,7 @@ import {
   advanceRunNodeIndex,
   currentRunNode,
   isRunStripComplete,
+  runEpisodeIds,
   type NodeDefinition,
 } from './NodeStrip';
 import {
@@ -127,6 +128,12 @@ export interface RunState {
   readonly openRouteIds: readonly string[];
   /** Dead-scene retries taken this run. The retry policy itself lives in the app layer. */
   readonly retryCount: number;
+  /** Episode the cursor currently sits in. Empty only before a strip is known. */
+  readonly activeEpisodeId: string;
+  /** Episodes the player may enter; the next one is added on a boss clear. */
+  readonly unlockedEpisodeIds: readonly string[];
+  /** Episodes whose BOSS stage has been cleared, in clear order. */
+  readonly completedEpisodeIds: readonly string[];
   readonly terminal: boolean;
   /** Ceilings every resource mutation honours; empty means unbounded. */
   readonly resourceBounds: RunResourceBounds;
@@ -143,6 +150,77 @@ export interface CreateRunStateInput {
   readonly acquiredEnhancementIds?: readonly string[];
   readonly acquiredEvidenceIds?: readonly string[];
   readonly resourceBounds?: RunResourceBounds;
+  /**
+   * Episode order of the resolved route. Only the first entry is needed to arm
+   * the run; the rest are re-derived from the strip at every node boundary.
+   */
+  readonly episodeIds?: readonly string[];
+}
+
+/**
+ * Structural transitions a completed node produced. The UI drives fog reveals
+ * and camera moves from these instead of diffing state between renders.
+ */
+export type RunProgressionEvent =
+  | { readonly type: 'NODE_CLEARED'; readonly nodeId: string; readonly episodeId: string }
+  | { readonly type: 'EPISODE_CLEARED'; readonly episodeId: string }
+  | { readonly type: 'EPISODE_UNLOCKED'; readonly episodeId: string }
+  | { readonly type: 'RUN_CLEARED' };
+
+interface EpisodeProgress {
+  readonly activeEpisodeId: string;
+  readonly unlockedEpisodeIds: readonly string[];
+  readonly completedEpisodeIds: readonly string[];
+  readonly progression: readonly RunProgressionEvent[];
+}
+
+/**
+ * Recomputes episode bookkeeping after a node advanced the cursor. Clearing the
+ * BOSS stage is the only thing that completes an episode and unlocks the next,
+ * so the fog can never open early even if the cursor is restored from a save.
+ */
+function advanceEpisodeProgress(
+  state: RunState,
+  strip: readonly NodeDefinition[],
+  completedNode: NodeDefinition,
+  nextNodeIndex: number,
+): EpisodeProgress {
+  const progression: RunProgressionEvent[] = [
+    { type: 'NODE_CLEARED', nodeId: completedNode.nodeId, episodeId: completedNode.episodeId },
+  ];
+  const nextNode = strip[nextNodeIndex];
+  const crossedEpisode = nextNode === undefined || nextNode.episodeId !== completedNode.episodeId;
+  if (!crossedEpisode) {
+    return {
+      activeEpisodeId: completedNode.episodeId,
+      unlockedEpisodeIds: state.unlockedEpisodeIds,
+      completedEpisodeIds: state.completedEpisodeIds,
+      progression,
+    };
+  }
+
+  progression.push({ type: 'EPISODE_CLEARED', episodeId: completedNode.episodeId });
+  const completedEpisodeIds = appendUnique(
+    state.completedEpisodeIds,
+    completedNode.episodeId,
+  );
+  if (nextNode === undefined) {
+    progression.push({ type: 'RUN_CLEARED' });
+    return {
+      activeEpisodeId: completedNode.episodeId,
+      unlockedEpisodeIds: state.unlockedEpisodeIds,
+      completedEpisodeIds,
+      progression,
+    };
+  }
+
+  progression.push({ type: 'EPISODE_UNLOCKED', episodeId: nextNode.episodeId });
+  return {
+    activeEpisodeId: nextNode.episodeId,
+    unlockedEpisodeIds: appendUnique(state.unlockedEpisodeIds, nextNode.episodeId),
+    completedEpisodeIds,
+    progression,
+  };
 }
 
 export type EncounterGradeMetrics = Omit<GradeEvaluationInput, 'falseConfessions'>;
@@ -193,6 +271,8 @@ export interface RunNodeCompletion {
   readonly appliedFlags: readonly AppliedFlagSet[];
   /** True when a failure was absorbed and the node may be attempted again. */
   readonly retryAllowed: boolean;
+  /** Structural transitions this completion produced; empty on an absorbed failure. */
+  readonly progression: readonly RunProgressionEvent[];
 }
 
 /** Branch consequences a framing cutscene staged before the node committed. */
@@ -239,6 +319,8 @@ export interface RunEventCompletion {
   readonly state: RunState;
   readonly appliedFlags: readonly AppliedFlagSet[];
   readonly placementResult?: PlacementEventResult;
+  /** Structural transitions this completion produced. */
+  readonly progression: readonly RunProgressionEvent[];
 }
 
 function assertUint32(name: string, value: number): void {
@@ -330,8 +412,42 @@ export function createRunState(input: CreateRunStateInput): RunState {
     evidenceGradeById: {},
     openRouteIds: [],
     retryCount: 0,
+    // A fresh run may only ever stand in the first episode, and only that one
+    // is unlocked; every later episode stays fogged until its boss falls.
+    activeEpisodeId: input.episodeIds?.[0] ?? '',
+    unlockedEpisodeIds: input.episodeIds?.[0] === undefined ? [] : [input.episodeIds[0]],
+    completedEpisodeIds: [],
     terminal: false,
   };
+}
+
+/** Episode bookkeeping a restored save should carry when it predates the field. */
+export function deriveEpisodeProgress(
+  strip: readonly NodeDefinition[],
+  nodeIndex: number,
+  completedNodeIds: readonly string[],
+): Readonly<{
+  activeEpisodeId: string;
+  unlockedEpisodeIds: readonly string[];
+  completedEpisodeIds: readonly string[];
+}> {
+  const episodeIds = runEpisodeIds(strip);
+  if (episodeIds.length === 0) {
+    return { activeEpisodeId: '', unlockedEpisodeIds: [], completedEpisodeIds: [] };
+  }
+  const completed = new Set(completedNodeIds);
+  const completedEpisodeIds = episodeIds.filter((episodeId) =>
+    strip
+      .filter((node) => node.episodeId === episodeId)
+      .every((node) => completed.has(node.nodeId)),
+  );
+  const activeNode = strip[Math.min(nodeIndex, strip.length - 1)];
+  const activeEpisodeId = activeNode?.episodeId ?? episodeIds[0] ?? '';
+  const unlockedEpisodeIds = episodeIds.slice(
+    0,
+    Math.max(1, episodeIds.indexOf(activeEpisodeId) + 1),
+  );
+  return { activeEpisodeId, unlockedEpisodeIds, completedEpisodeIds };
 }
 
 function rewardEligible(outcome: EncounterOutcome): boolean {
@@ -420,8 +536,21 @@ export function completeEncounterNode(
   const completedNodeIds = failed
     ? rewarded.completedNodeIds
     : [...rewarded.completedNodeIds, node.nodeId];
+  // A failed node never clears its episode, so the fog stays exactly where the
+  // player left it and a retry re-enters the same stage.
+  const episodeProgress = failed
+    ? {
+        activeEpisodeId: node.episodeId,
+        unlockedEpisodeIds: rewarded.unlockedEpisodeIds,
+        completedEpisodeIds: rewarded.completedEpisodeIds,
+        progression: [] as readonly RunProgressionEvent[],
+      }
+    : advanceEpisodeProgress(rewarded, input.strip, node, nodeIndex);
   const nextState: RunState = {
     ...rewarded,
+    activeEpisodeId: episodeProgress.activeEpisodeId,
+    unlockedEpisodeIds: episodeProgress.unlockedEpisodeIds,
+    completedEpisodeIds: episodeProgress.completedEpisodeIds,
     retryCount: retryAllowed ? rewarded.retryCount + 1 : rewarded.retryCount,
     stress: retryAllowed
       ? Math.max(rewarded.stress, input.retryStressRestore ?? DEFAULT_RETRY_STRESS_RESTORE)
@@ -448,6 +577,7 @@ export function completeEncounterNode(
     rewardChoices: rewardResult.choices,
     grade: grade.grade,
     appliedFlags: flagResult.applied,
+    progression: episodeProgress.progression,
   };
 }
 
@@ -875,15 +1005,25 @@ export function completeEventNode(
       : { evaluateCondition: input.evaluateFlagCondition }),
   });
   const nodeIndex = advanceRunNodeIndex(input.strip, state.nodeIndex);
+  const episodeProgress = advanceEpisodeProgress(
+    appliedEvent.state,
+    input.strip,
+    node,
+    nodeIndex,
+  );
   return {
     state: {
       ...appliedEvent.state,
       nodeIndex,
       flags: flagResult.store,
       completedNodeIds: [...appliedEvent.state.completedNodeIds, node.nodeId],
+      activeEpisodeId: episodeProgress.activeEpisodeId,
+      unlockedEpisodeIds: episodeProgress.unlockedEpisodeIds,
+      completedEpisodeIds: episodeProgress.completedEpisodeIds,
       terminal: isRunStripComplete(input.strip, nodeIndex),
     },
     appliedFlags: flagResult.applied,
+    progression: episodeProgress.progression,
     ...(appliedEvent.placementResult === undefined
       ? {}
       : { placementResult: appliedEvent.placementResult }),

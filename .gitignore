@@ -10,3 +10,27 @@ build/
 Thumbs.db
 .vscode/
 .idea/
+
+# Large Media, Images, PDFs & Archives (Ignore by default)
+*.pdf
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.psd
+*.webp
+*.pur
+*.zip
+*.rar
+*.7z
+~$*.docx
+~$*.xlsx
+
+# Raw Asset Dumps
+docs/NHN AI_image/
+NHN AI -*.zip
+
+# Exception: Keep game runtime assets in dungeon-dossier/assets/
+!dungeon-dossier/assets/**/*.png
+!dungeon-dossier/assets/*.png
+

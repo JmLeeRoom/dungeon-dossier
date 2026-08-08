@@ -12,6 +12,7 @@ import {
   type FetchLike,
   type InvalidValidationReport,
 } from '../../src/content-io';
+import { createNodeStrip } from '../../src/engine/run';
 
 const CONTENT_ROOT = new URL('../../content/', import.meta.url);
 
@@ -71,7 +72,27 @@ describe('content repositories', () => {
     expect(loadedBalance?.dmg.contradict).toBe(18);
     expect(balanceRepository.current()).toBe(loadedBalance);
     expect(loadedDialogue?.statements.clm_tutorial_who?.fallback).toHaveLength(1);
-    expect(loadedRunStrip?.nodes).toHaveLength(15);
+    expect(loadedRunStrip?.episodes).toHaveLength(3);
+    expect(loadedRunStrip?.episodes.flatMap((episode) => episode.slots)).toHaveLength(9);
+    expect(
+      loadedRunStrip?.episodes.flatMap((episode) =>
+        episode.slots.flatMap((slot) => slot.candidates),
+      ),
+    ).toHaveLength(16);
+    // An absent strip resolves to [], which still fails the exact-route check.
+    const canonicalRoute =
+      loadedRunStrip === undefined ? [] : createNodeStrip(loadedRunStrip);
+    expect(canonicalRoute.map((node) => node.nodeId)).toEqual([
+      'run_tutorial_01',
+      'run_tutorial_02',
+      'run_tutorial_05',
+      'run_ep001_01',
+      'run_ep001_02',
+      'run_ep001_05',
+      'run_ep004_01',
+      'run_ep004_02',
+      'run_ep004_05',
+    ]);
     expect(loadedStrings?.strings['event.tutorial.choice.title']).toBe('탕비실 야근');
   });
 

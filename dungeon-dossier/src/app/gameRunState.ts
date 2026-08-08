@@ -42,12 +42,15 @@ export function createInitialGameRunState(
   balance: BalanceDefinition,
   flags: FlagsDefinition,
   runSeed = DEFAULT_RUN_SEED,
+  /** Episode order of the resolved route; arms the first episode as unlocked. */
+  episodeIds: readonly string[] = [],
 ): RunState {
   const startingDeck = cards.cards.flatMap((card) =>
     Array.from({ length: card.starting_copies }, () => card.card_id),
   );
   return createRunState({
     runSeed,
+    episodeIds,
     stress: balance.stress.max,
     dp: balance.dp.initial,
     trust: 0,

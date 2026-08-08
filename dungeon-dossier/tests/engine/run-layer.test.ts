@@ -1,6 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
+  EPISODE_NODE_COUNT,
+  EPISODE_SLOT_ORDER,
+  NODE_KIND_BY_SLOT_ROLE,
   FlagsSchema,
   GradesSchema,
   CaseSchema,
@@ -20,24 +23,79 @@ import {
   createNodeStrip,
   createRunState,
   currentRunNode,
+  episodeIdAt,
   evaluateCaseGrade,
   evaluateEnding,
+  isEpisodeFinalNode,
   isRunStripComplete,
+  nextEpisodeId,
+  runEpisodeIds,
   selectRewardChoices,
   withFlag,
   type EndingFormula,
   type GradeEvaluationInput,
+  type RunProgressionEvent,
 } from '../../src/engine/run';
 
+/** Fixture episode ids; the first matches the reward catalogue's episode gate. */
+const FIXTURE_EPISODE_IDS = ['episode-alpha', 'episode-beta', 'episode-gamma'] as const;
+/** Three episodes of COMBAT/EVENT/BOSS resolve to this many route nodes. */
+const FIXTURE_NODE_COUNT = FIXTURE_EPISODE_IDS.length * EPISODE_NODE_COUNT;
+/** Route index of the first episode's EVENT stage. */
+const FIRST_EVENT_NODE_INDEX = 1;
+/** Route index of the first episode's BOSS stage. */
+const FIRST_BOSS_NODE_INDEX = 2;
+
+/**
+ * Three episodes of the mandated COMBAT/EVENT/BOSS slot order. Every slot is
+ * FIXED with a single candidate, so the resolved route stays deterministic the
+ * way the old flat 15-node fixture was.
+ */
 function runStripDefinition(): RunStripDefinition {
   return {
-    schema_version: '1.0',
-    nodes: Array.from({ length: 15 }, (_, index) => ({
-      node_id: `run-node-${(index + 1).toString()}`,
-      kind: index === 1 || index === 14 ? 'BOSS' as const : 'ENCOUNTER' as const,
-      ref: `run-reference-${(index + 1).toString()}`,
-      case_directory: `episode-${Math.floor(index / 5).toString()}`,
+    schema_version: '2.0',
+    episodes: FIXTURE_EPISODE_IDS.map((episodeId, episodeIndex) => ({
+      episode_id: episodeId,
+      sequence_index: episodeIndex,
+      case_directory: `case-${episodeId}`,
+      slots: EPISODE_SLOT_ORDER.map((role, slotIndex) => {
+        const nodeNumber = episodeIndex * EPISODE_NODE_COUNT + slotIndex + 1;
+        return {
+          role,
+          selection: 'FIXED' as const,
+          candidates: [{
+            node_id: `run-node-${nodeNumber.toString()}`,
+            kind: NODE_KIND_BY_SLOT_ROLE[role],
+            ref: `run-reference-${nodeNumber.toString()}`,
+          }],
+        };
+      }),
     })),
+  };
+}
+
+/** Repoints the first episode's EVENT stage at an authored event definition. */
+function withFirstEventRef(
+  definition: RunStripDefinition,
+  ref: string,
+): RunStripDefinition {
+  return {
+    ...definition,
+    episodes: definition.episodes.map((episode, episodeIndex) =>
+      episodeIndex !== 0
+        ? episode
+        : {
+            ...episode,
+            slots: episode.slots.map((slot) =>
+              slot.role !== 'EVENT'
+                ? slot
+                : {
+                    ...slot,
+                    candidates: slot.candidates.map((candidate) => ({ ...candidate, ref })),
+                  },
+            ),
+          },
+    ),
   };
 }
 
@@ -208,22 +266,44 @@ describe('run layer', () => {
     expect(event.state.acquiredEvidenceIds).toContain('ev_tutorial_receipt');
   });
 
-  it('validates an injected 15-node strip and advances by array index only', () => {
+  it('validates an injected 3-episode strip and advances by array index only', () => {
     const definition = runStripDefinition();
-    expect(RunStripSchema.parse(definition).nodes).toHaveLength(15);
+    expect(RunStripSchema.parse(definition).episodes).toHaveLength(3);
     const strip = createNodeStrip(definition);
+    expect(strip).toHaveLength(FIXTURE_NODE_COUNT);
+    expect(strip.map((node) => node.kind)).toEqual([
+      'ENCOUNTER', 'EVENT', 'BOSS',
+      'ENCOUNTER', 'EVENT', 'BOSS',
+      'ENCOUNTER', 'EVENT', 'BOSS',
+    ]);
+    expect(strip.map((node) => node.nodeId)).toEqual([
+      'run-node-1', 'run-node-2', 'run-node-3',
+      'run-node-4', 'run-node-5', 'run-node-6',
+      'run-node-7', 'run-node-8', 'run-node-9',
+    ]);
+    expect(runEpisodeIds(strip)).toEqual([...FIXTURE_EPISODE_IDS]);
+    expect(strip.map((node) => node.slotIndex)).toEqual([0, 1, 2, 0, 1, 2, 0, 1, 2]);
     let nodeIndex = 0;
     for (const expected of strip) {
       expect(currentRunNode(strip, nodeIndex)?.nodeId).toBe(expected.nodeId);
+      expect(episodeIdAt(strip, nodeIndex)).toBe(expected.episodeId);
+      expect(isEpisodeFinalNode(strip, nodeIndex)).toBe(expected.slotRole === 'BOSS');
       nodeIndex = advanceRunNodeIndex(strip, nodeIndex);
     }
-    expect(nodeIndex).toBe(15);
+    expect(nodeIndex).toBe(FIXTURE_NODE_COUNT);
     expect(isRunStripComplete(strip, nodeIndex)).toBe(true);
     expect(currentRunNode(strip, nodeIndex)).toBeNull();
+    expect(nextEpisodeId(strip, FIRST_BOSS_NODE_INDEX)).toBe('episode-beta');
+    expect(nextEpisodeId(strip, FIXTURE_NODE_COUNT - 1)).toBeNull();
     expect(() => advanceRunNodeIndex(strip, nodeIndex)).toThrow(/already complete/u);
+    const [firstEpisode] = definition.episodes;
+    if (firstEpisode === undefined) throw new Error('Expected the first fixture episode.');
     expect(() => RunStripSchema.parse({
       ...definition,
-      nodes: definition.nodes.slice(0, 14),
+      episodes: [
+        { ...firstEpisode, slots: firstEpisode.slots.slice(0, EPISODE_NODE_COUNT - 1) },
+        ...definition.episodes.slice(1),
+      ],
     })).toThrow();
   });
 
@@ -269,7 +349,7 @@ describe('run layer', () => {
       flag_id: 'F-13',
       set_by: [{ encounter: strip[0]?.ref, outcome: 'BEST_RESOLUTION', value: true }],
       consumed_by: [{
-        encounter: strip[1]?.ref ?? 'next-reference',
+        encounter: strip[FIRST_BOSS_NODE_INDEX]?.ref ?? 'next-reference',
         apply: { type: 'MODIFY_SHIELDS', delta: 1 },
       }],
     }];
@@ -335,7 +415,13 @@ describe('run layer', () => {
     expect(claimed.claimedRewardIds).toEqual([selected.reward_id]);
     expect(claimed.deck.discardPile).toContain(selected.reference_id);
 
-    const boss = completeEncounterNode(claimed, {
+    // The BOSS stage is now the third slot, so the episode's EVENT stage sits
+    // between the two graded nodes this test compares.
+    const throughEvent = completeEventNode(claimed, { strip, flagDefinitions: [] });
+    expect(throughEvent.state.nodeIndex).toBe(FIRST_BOSS_NODE_INDEX);
+    expect(throughEvent.state.gradeHistory.map((record) => record.grade)).toEqual(['S']);
+
+    const boss = completeEncounterNode(throughEvent.state, {
       ...completionInput,
       outcome: 'PARTIAL_RESOLUTION',
       gradeMetrics: {
@@ -344,9 +430,9 @@ describe('run layer', () => {
         coercion: 50,
       },
     });
-    expect(strip[1]?.kind).toBe('BOSS');
+    expect(strip[FIRST_BOSS_NODE_INDEX]?.kind).toBe('BOSS');
     expect(boss.rewardChoices).toHaveLength(2);
-    expect(boss.state.nodeIndex).toBe(2);
+    expect(boss.state.nodeIndex).toBe(3);
     expect(boss.state.gradeHistory.map((record) => record.grade)).toEqual(['S', 'C']);
   });
 
@@ -402,37 +488,154 @@ describe('run layer', () => {
     expect(failed.grade).toBe('F');
   });
 
-  it('advances event nodes through injected event/choice flag hooks', () => {
-    const definition = runStripDefinition();
-    const first = definition.nodes[0];
-    if (first === undefined) throw new Error('Expected the first run node.');
-    const strip = createNodeStrip({
-      ...definition,
-      nodes: [{ ...first, kind: 'EVENT' }, ...definition.nodes.slice(1)],
-    });
-    const initial = createRunState({
-      runSeed: 3,
+  it('emits episode progression only when a BOSS stage clears', () => {
+    const strip = createNodeStrip(runStripDefinition());
+    const episodeIds = runEpisodeIds(strip);
+    expect(episodeIds).toEqual([...FIXTURE_EPISODE_IDS]);
+    let state = createRunState({
+      runSeed: 4_242,
       stress: 100,
       dp: 0,
       trust: 0,
       deck: { drawPile: [], hand: [], discardPile: [], exhaustPile: [] },
+      episodeIds,
     });
+    // A fresh run stands in the first episode with every later one still fogged.
+    expect(state.activeEpisodeId).toBe('episode-alpha');
+    expect(state.unlockedEpisodeIds).toEqual(['episode-alpha']);
+    expect(state.completedEpisodeIds).toEqual([]);
+
+    const progression: RunProgressionEvent[][] = [];
+    for (const node of strip) {
+      if (node.kind === 'EVENT') {
+        const event = completeEventNode(state, { strip, flagDefinitions: [] });
+        progression.push([...event.progression]);
+        state = event.state;
+        continue;
+      }
+      const encounter = completeEncounterNode(state, {
+        strip,
+        outcome: 'BEST_RESOLUTION',
+        flagDefinitions: [],
+        rewardCatalogue: rewardsDefinition(),
+        rewardRarity: 'COMMON',
+        episodeId: 'episode-alpha',
+        act: 1,
+        gradeCatalogue: gradesDefinition(),
+        gradeMetrics: {
+          requiredClaimResolutionRatio: 1,
+          optionalObjectiveRatio: 1,
+          sweetSpotFinish: true,
+          originalsPreserved: true,
+          coercion: 5,
+        },
+      });
+      progression.push([...encounter.progression]);
+      const [choice] = encounter.rewardChoices;
+      if (choice === undefined) throw new Error('Expected a reward choice to claim.');
+      state = claimRunReward(encounter.state, choice);
+    }
+
+    expect(progression).toEqual([
+      [{ type: 'NODE_CLEARED', nodeId: 'run-node-1', episodeId: 'episode-alpha' }],
+      [{ type: 'NODE_CLEARED', nodeId: 'run-node-2', episodeId: 'episode-alpha' }],
+      [
+        { type: 'NODE_CLEARED', nodeId: 'run-node-3', episodeId: 'episode-alpha' },
+        { type: 'EPISODE_CLEARED', episodeId: 'episode-alpha' },
+        { type: 'EPISODE_UNLOCKED', episodeId: 'episode-beta' },
+      ],
+      [{ type: 'NODE_CLEARED', nodeId: 'run-node-4', episodeId: 'episode-beta' }],
+      [{ type: 'NODE_CLEARED', nodeId: 'run-node-5', episodeId: 'episode-beta' }],
+      [
+        { type: 'NODE_CLEARED', nodeId: 'run-node-6', episodeId: 'episode-beta' },
+        { type: 'EPISODE_CLEARED', episodeId: 'episode-beta' },
+        { type: 'EPISODE_UNLOCKED', episodeId: 'episode-gamma' },
+      ],
+      [{ type: 'NODE_CLEARED', nodeId: 'run-node-7', episodeId: 'episode-gamma' }],
+      [{ type: 'NODE_CLEARED', nodeId: 'run-node-8', episodeId: 'episode-gamma' }],
+      [
+        { type: 'NODE_CLEARED', nodeId: 'run-node-9', episodeId: 'episode-gamma' },
+        { type: 'EPISODE_CLEARED', episodeId: 'episode-gamma' },
+        { type: 'RUN_CLEARED' },
+      ],
+    ]);
+    expect(state.nodeIndex).toBe(FIXTURE_NODE_COUNT);
+    expect(state.terminal).toBe(true);
+    expect(state.activeEpisodeId).toBe('episode-gamma');
+    expect(state.unlockedEpisodeIds).toEqual([...FIXTURE_EPISODE_IDS]);
+    expect(state.completedEpisodeIds).toEqual([...FIXTURE_EPISODE_IDS]);
+  });
+
+  it('leaves the episode fog closed when the BOSS stage fails', () => {
+    const strip = createNodeStrip(runStripDefinition());
+    const initial = {
+      ...createRunState({
+        runSeed: 5,
+        stress: 100,
+        dp: 0,
+        trust: 0,
+        deck: { drawPile: [], hand: [], discardPile: [], exhaustPile: [] },
+        episodeIds: runEpisodeIds(strip),
+      }),
+      nodeIndex: FIRST_BOSS_NODE_INDEX,
+    };
+    const failed = completeEncounterNode(initial, {
+      strip,
+      outcome: 'FAILED',
+      flagDefinitions: [],
+      rewardCatalogue: rewardsDefinition(),
+      rewardRarity: 'COMMON',
+      episodeId: 'episode-alpha',
+      act: 1,
+      gradeCatalogue: gradesDefinition(),
+      gradeMetrics: {
+        requiredClaimResolutionRatio: 0.1,
+        optionalObjectiveRatio: 0,
+        sweetSpotFinish: false,
+        originalsPreserved: false,
+        coercion: 120,
+      },
+    });
+    expect(failed.progression).toEqual([]);
+    expect(failed.state.nodeIndex).toBe(FIRST_BOSS_NODE_INDEX);
+    expect(failed.state.activeEpisodeId).toBe('episode-alpha');
+    expect(failed.state.unlockedEpisodeIds).toEqual(['episode-alpha']);
+    expect(failed.state.completedEpisodeIds).toEqual([]);
+  });
+
+  it('advances event nodes through injected event/choice flag hooks', () => {
+    const strip = createNodeStrip(runStripDefinition());
+    const eventNode = strip[FIRST_EVENT_NODE_INDEX];
+    if (eventNode === undefined) throw new Error('Expected the first EVENT stage.');
+    expect(eventNode.kind).toBe('EVENT');
+    // The EVENT stage is the second slot of every episode, so the run cursor is
+    // placed on it directly rather than grading the COMBAT stage first.
+    const initial = {
+      ...createRunState({
+        runSeed: 3,
+        stress: 100,
+        dp: 0,
+        trust: 0,
+        deck: { drawPile: [], hand: [], discardPile: [], exhaustPile: [] },
+      }),
+      nodeIndex: FIRST_EVENT_NODE_INDEX,
+    };
     const result = completeEventNode(initial, {
       strip,
       choiceId: 'event-choice',
       flagDefinitions: [{
         flag_id: 'F-12',
-        set_by: [{ event: first.ref, choice: 'event-choice', value: true }],
+        set_by: [{ event: eventNode.ref, choice: 'event-choice', value: true }],
         consumed_by: [{
           encounter: 'future-consumer',
           apply: { type: 'ADJUST_RESOURCE', resource: 'trust', delta: 1 },
         }],
       }],
     });
-    expect(result.state.nodeIndex).toBe(1);
+    expect(result.state.nodeIndex).toBe(FIRST_EVENT_NODE_INDEX + 1);
     expect(result.state.flags['F-12']).toBe(true);
     expect(result.appliedFlags).toHaveLength(1);
-    expect(result.state.completedNodeIds).toEqual([first.node_id]);
+    expect(result.state.completedNodeIds).toEqual([eventNode.nodeId]);
   });
 
   it('validates and scores authored pattern B placement submissions in the run layer', () => {
@@ -446,23 +649,20 @@ describe('run layer', () => {
     if (placementEvent?.pattern !== 'B') {
       throw new Error('Expected the authored tutorial placement event.');
     }
-    const definition = runStripDefinition();
-    const first = definition.nodes[0];
-    if (first === undefined) throw new Error('Expected the first run node.');
-    const strip = createNodeStrip({
-      ...definition,
-      nodes: [
-        { ...first, kind: 'EVENT', ref: placementEvent.event_id },
-        ...definition.nodes.slice(1),
-      ],
-    });
-    const initial = createRunState({
-      runSeed: 31,
-      stress: 100,
-      dp: 0,
-      trust: 0,
-      deck: { drawPile: [], hand: [], discardPile: [], exhaustPile: [] },
-    });
+    const strip = createNodeStrip(
+      withFirstEventRef(runStripDefinition(), placementEvent.event_id),
+    );
+    expect(strip[FIRST_EVENT_NODE_INDEX]?.ref).toBe(placementEvent.event_id);
+    const initial = {
+      ...createRunState({
+        runSeed: 31,
+        stress: 100,
+        dp: 0,
+        trust: 0,
+        deck: { drawPile: [], hand: [], discardPile: [], exhaustPile: [] },
+      }),
+      nodeIndex: FIRST_EVENT_NODE_INDEX,
+    };
     const placement = { ...placementEvent.answer_mapping };
     const result = completeEventNode(initial, {
       strip,
@@ -476,7 +676,7 @@ describe('run layer', () => {
       ratio: 1,
       result: 'SUCCESS',
     });
-    expect(result.state.nodeIndex).toBe(1);
+    expect(result.state.nodeIndex).toBe(FIRST_EVENT_NODE_INDEX + 1);
     expect(() => completeEventNode(initial, {
       strip,
       flagDefinitions: [],

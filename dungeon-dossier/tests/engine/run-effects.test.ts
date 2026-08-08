@@ -12,10 +12,34 @@ import {
 } from '../../src/engine/run';
 
 const EVENT_ID = 'event_sample';
+const EPISODE_ID = 'episode-sample';
 
+/**
+ * The EVENT and BOSS stages of one episode. Effects are exercised on the EVENT
+ * stage; the BOSS stage that follows keeps the route open so a completion never
+ * doubles as an episode or run clear.
+ */
 const STRIP: readonly NodeDefinition[] = [
-  { nodeId: 'run-node-1', kind: 'EVENT', ref: EVENT_ID, caseDirectory: 'case-a' },
-  { nodeId: 'run-node-2', kind: 'ENCOUNTER', ref: 'encounter-1', caseDirectory: 'case-a' },
+  {
+    nodeId: 'run-node-1',
+    kind: 'EVENT',
+    ref: EVENT_ID,
+    caseDirectory: 'case-a',
+    episodeId: EPISODE_ID,
+    episodeIndex: 0,
+    slotRole: 'EVENT',
+    slotIndex: 1,
+  },
+  {
+    nodeId: 'run-node-2',
+    kind: 'BOSS',
+    ref: 'encounter-1',
+    caseDirectory: 'case-a',
+    episodeId: EPISODE_ID,
+    episodeIndex: 0,
+    slotRole: 'BOSS',
+    slotIndex: 2,
+  },
 ];
 
 const BASE = {

@@ -203,6 +203,7 @@
     "node.event_tutorial_choice": "탕비실 야근",
     "node.enc_tutorial_harpy": "하피 심문",
     "node.event_tutorial_placement": "시간표 정리",
+    "node.event_tutorial_investigation": "탕비실 현장 조사",
     "node.enc_tutorial_minotaur": "미노타우로스 대면",
     "node.enc_ep001_goblin": "고블린 서기 심문",
     "node.event_ep001_links": "장부 시간선 잇기",
@@ -369,6 +370,9 @@
     "cutscene.ep004.canvass.leave": "브로커는 말을 마치자마자 승강장 안쪽으로 사라졌다. 표 냄새가 아직 손에 남아 있다.",
     "cutscene.ep004.canvass.decide": "들은 것을 어떻게 남길지 정해야 한다.",
     "cutscene.ep004.canvass.log_the_lead": "조서에 그대로 적는다 · 신뢰도 +1",
-    "cutscene.ep004.canvass.keep_it_quiet": "아직 덮어둔다 · DP +6"
+    "cutscene.ep004.canvass.keep_it_quiet": "아직 덮어둔다 · DP +6",
+    "episode.tutorial": "튜토리얼 · 황금 엘릭서 믹스커피 절도",
+    "episode.ep001": "EPISODE 001 · 붉은 장부와 사라진 보급품",
+    "episode.ep004": "EPISODE 004 · 심야 용맥 급행의 우회권"
   }
 }
