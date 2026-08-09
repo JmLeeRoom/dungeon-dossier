@@ -224,13 +224,13 @@ describe('stage slot bindings', () => {
     expect(resolveStageSlotImage(state, 'bg-room')).toEqual(image('bg.png'));
   });
 
-  it('names bound slots after their character in the asset manifest', () => {
+  it('keeps production manifest identity stable while editing a bound character preview', () => {
     let state = withActiveCharacter(createInitialWorkbenchState(), '미노타우로스');
     state = withStageSlotImage(state, 'suspect-base', image('mino.png'));
     const manifest = buildAssetManifest(state);
 
-    expect(manifest.slots['suspect-base']?.image).toBe('portrait_미노타우로스_base.png');
-    expect(manifest.slots['suspect-state-parts']?.image).toBeNull();
+    expect(manifest.slots['suspect-base']?.image).toBe('idle_mulkung_base.png');
+    expect(manifest.slots['suspect-state-parts']?.image).toBe('idle_mulkung_upset.png');
   });
 });
 

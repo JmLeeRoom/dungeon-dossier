@@ -4,6 +4,7 @@ import {
   type ValidatedRepositoryOptions,
 } from './RuntimeJsonRepository';
 import { SchemaValidator } from './SchemaValidator';
+import { runtimeContentUrl } from './runtimeContentUrl';
 
 export interface CaseRepositoryOptions extends ValidatedRepositoryOptions {
   /** IDs defined by common catalogues (cards, partner skills, flags, relics). */
@@ -28,7 +29,7 @@ export class CaseRepository {
   load(caseDirectory: string): Promise<CaseDefinition | undefined> {
     const safeDirectory = encodeURIComponent(caseDirectory);
     return this.#repository.load(
-      `/content/cases/${safeDirectory}/case.json`,
+      runtimeContentUrl(`cases/${safeDirectory}/case.json`),
       (data, source) =>
         this.#validator.validateTier1Case(data, source, {
           ...(this.#externalIds ? { externalIds: this.#externalIds } : {}),

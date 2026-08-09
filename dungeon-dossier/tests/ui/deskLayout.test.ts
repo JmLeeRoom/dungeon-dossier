@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { ASSET_DIMENSIONS } from '../../src/ui/core/assetDimensions';
+import { ASSET_DIMENSIONS, matchesAssetAspectRatio } from '../../src/ui/core/assetDimensions';
 import { DEFAULT_TARGET_SCALE, INTERNAL_HEIGHT } from '../../src/ui/core/integerScale';
 import {
   DESK_ACTION_INSET,
@@ -11,11 +11,13 @@ import {
   DESK_TRAY_INSET,
   DESK_TOP,
   DESK_TYPEWRITER_INSET,
+  TAG_CHIP_PITCH,
+  TAG_CHIP_WIDTH,
+  TAG_ROW_HEIGHT,
   TAG_ROW_Y,
 } from '../../src/ui/screens/interrogation/createInterrogationScreen';
 import { SUSPECT_PORTRAIT_SIZE } from '../../src/ui/widgets';
 
-const TAG_ROW_HEIGHT = 26;
 /** Where the suspect portrait is mounted by the interrogation screen. */
 const PORTRAIT_Y = 34;
 
@@ -31,9 +33,20 @@ describe('1280x321 desk layout', () => {
     );
   });
 
-  it('lifts the tag row clear of the desk edge', () => {
-    expect(TAG_ROW_Y).toBe(205);
+  it('lifts the tag row clear of the desk edge at the authored plate ratio', () => {
+    // The 830x330 plate is 2.515:1, so a 98px-wide chip is 39px tall and the
+    // row starts higher than the 26px vector chip needed.
+    expect({ width: TAG_CHIP_WIDTH, height: TAG_ROW_HEIGHT }).toEqual({ width: 98, height: 39 });
+    expect(matchesAssetAspectRatio('tag_830x330', { width: 98, height: 39 })).toBe(false);
+    expect(Math.abs(TAG_CHIP_WIDTH / TAG_ROW_HEIGHT - 830 / 330)).toBeLessThan(0.02);
+    expect(TAG_ROW_Y).toBe(192);
     expect(TAG_ROW_Y + TAG_ROW_HEIGHT).toBeLessThan(DESK_TOP);
+  });
+
+  it('fits six chips across the stage at the authored pitch', () => {
+    const lastRight = 12 + 5 * TAG_CHIP_PITCH + TAG_CHIP_WIDTH;
+    expect(TAG_CHIP_PITCH).toBeGreaterThanOrEqual(TAG_CHIP_WIDTH);
+    expect(lastRight).toBeLessThanOrEqual(640);
   });
 
   it('lets the desk and tag row overlap the portrait on purpose', () => {

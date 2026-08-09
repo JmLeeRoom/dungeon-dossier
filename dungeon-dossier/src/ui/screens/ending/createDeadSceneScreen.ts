@@ -1,4 +1,6 @@
-import { Container, Graphics, Sprite, Texture } from 'pixi.js';
+import { Container, Graphics, Sprite } from 'pixi.js';
+import { ASSET_DIMENSIONS } from '../../core/assetDimensions';
+import { containImage, coverImage } from '../../core/imageFit';
 import { createPixelText } from '../../core/pixelText';
 import { createTypewriter, type TypewriterController } from '../../widgets';
 import { UI_PALETTE } from '../../widgets/theme';
@@ -10,6 +12,13 @@ import {
 
 const STAGE_WIDTH = 640;
 const STAGE_HEIGHT = 400;
+export const DEAD_SCENE_ILLUSTRATION_SOURCE = { width: 1280, height: 440 } as const;
+export const DEAD_SCENE_ILLUSTRATION_BOUNDS = {
+  x: 0,
+  y: 0,
+  width: STAGE_WIDTH,
+  height: 220,
+} as const;
 
 export interface DeadSceneScreenController {
   readonly view: Container;
@@ -68,14 +77,51 @@ export function createDeadSceneScreen(
 
   content.addChild(new Graphics().rect(0, 0, STAGE_WIDTH, STAGE_HEIGHT).fill(UI_PALETTE.deepInk));
 
-  const illustrationUrl =
-    services.assets?.resolveOptionalUrl?.(model.illustrationAssetKey) ??
+  const backgroundUrl = services.assets?.resolveRequiredUrl?.(
+    model.backgroundAssetKey,
+    {
+      screen: 'dead-scene',
+      contentId: model.title,
+      slotId: 'background',
+      bundle: 'result',
+    },
+  ) ?? services.assets?.resolveUrl(model.backgroundAssetKey);
+  if (backgroundUrl !== undefined) {
+    const rect = coverImage(ASSET_DIMENSIONS.event_bg_1280x800, {
+      x: 0,
+      y: 0,
+      width: STAGE_WIDTH,
+      height: STAGE_HEIGHT,
+    });
+    const background = Sprite.from(backgroundUrl);
+    background.position.set(rect.x, rect.y);
+    background.width = rect.width;
+    background.height = rect.height;
+    background.eventMode = 'none';
+    content.addChild(background);
+  }
+
+  const illustrationUrl = services.assets?.resolveRequiredUrl?.(
+    model.illustrationAssetKey,
+    {
+      screen: 'dead-scene',
+      contentId: model.title,
+      slotId: 'reason-illustration',
+      bundle: 'result',
+    },
+  ) ?? services.assets?.resolveOptionalUrl?.(model.illustrationAssetKey) ??
     services.assets?.resolveUrl(model.illustrationAssetKey);
   if (illustrationUrl !== undefined) {
-    const image = new Sprite(Texture.from(illustrationUrl));
-    image.width = STAGE_WIDTH;
-    image.height = 220;
+    const rect = containImage(
+      DEAD_SCENE_ILLUSTRATION_SOURCE,
+      DEAD_SCENE_ILLUSTRATION_BOUNDS,
+    );
+    const image = Sprite.from(illustrationUrl);
+    image.position.set(rect.x, rect.y);
+    image.width = rect.width;
+    image.height = rect.height;
     image.alpha = 0.55;
+    image.eventMode = 'none';
     content.addChild(image);
   }
   content.addChild(

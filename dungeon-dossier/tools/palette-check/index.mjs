@@ -3,11 +3,18 @@ import path from "node:path";
 import { fileURLToPath, URL } from "node:url";
 import pngjs from "pngjs";
 
+import {
+  MAX_OPAQUE_RGBA_COLOURS,
+  countVisibleRgbaColours,
+  evaluatePalette,
+  toRuntimePath,
+} from "../assets/palettePolicy.mjs";
+
 const { PNG } = pngjs;
 
 export const REPOSITORY_ROOT = fileURLToPath(new URL("../../", import.meta.url));
 export const DEFAULT_ASSET_ROOT = path.join(REPOSITORY_ROOT, "assets");
-export const MAX_OPAQUE_RGBA_COLOURS = 16;
+export { MAX_OPAQUE_RGBA_COLOURS, countVisibleRgbaColours };
 
 function relativeDisplayPath(root, absolutePath) {
   return path.relative(root, absolutePath).split(path.sep).join("/");
@@ -15,40 +22,23 @@ function relativeDisplayPath(root, absolutePath) {
 
 async function collectPngFiles(directory) {
   const files = [];
+  const invalidExtensions = [];
   const entries = await readdir(directory, { withFileTypes: true });
   entries.sort((left, right) => left.name.localeCompare(right.name));
 
   for (const entry of entries) {
     const absolutePath = path.join(directory, entry.name);
     if (entry.isDirectory()) {
-      files.push(...(await collectPngFiles(absolutePath)));
+      const nested = await collectPngFiles(absolutePath);
+      files.push(...nested.files);
+      invalidExtensions.push(...nested.invalidExtensions);
     } else if (entry.isFile() && path.extname(entry.name).toLowerCase() === ".png") {
-      files.push(absolutePath);
+      if (path.extname(entry.name) === ".png") files.push(absolutePath);
+      else invalidExtensions.push(absolutePath);
     }
   }
 
-  return files;
-}
-
-export function countVisibleRgbaColours(png) {
-  const colours = new Set();
-
-  for (let offset = 0; offset < png.data.length; offset += 4) {
-    const alpha = png.data[offset + 3];
-    if (alpha === 0) {
-      continue;
-    }
-
-    const rgba =
-      ((png.data[offset] << 24) |
-        (png.data[offset + 1] << 16) |
-        (png.data[offset + 2] << 8) |
-        alpha) >>>
-      0;
-    colours.add(rgba);
-  }
-
-  return colours.size;
+  return { files, invalidExtensions };
 }
 
 export async function checkPalettes(assetRoot = DEFAULT_ASSET_ROOT) {
@@ -72,19 +62,25 @@ export async function checkPalettes(assetRoot = DEFAULT_ASSET_ROOT) {
     throw error;
   }
 
-  const files = await collectPngFiles(assetRoot);
-  const problems = [];
+  const { files, invalidExtensions } = await collectPngFiles(assetRoot);
+  const problems = invalidExtensions.map((absolutePath) => ({
+    relativePath: relativeDisplayPath(assetRoot, absolutePath),
+    message: "asset extension must be lower-case .png",
+  }));
+  const byPolicy = { strict16: 0, "approved-production": 0 };
 
   for (const absolutePath of files) {
     const relativePath = relativeDisplayPath(assetRoot, absolutePath);
     try {
-      const png = PNG.sync.read(await readFile(absolutePath));
-      const colourCount = countVisibleRgbaColours(png);
-      if (colourCount > MAX_OPAQUE_RGBA_COLOURS) {
-        problems.push({
-          relativePath,
-          message: `${colourCount} visible RGBA colours (maximum ${MAX_OPAQUE_RGBA_COLOURS})`,
-        });
+      const buffer = await readFile(absolutePath);
+      const result = await evaluatePalette({
+        runtimePath: toRuntimePath(relativePath),
+        buffer,
+        png: PNG.sync.read(buffer),
+      });
+      byPolicy[result.policy] += 1;
+      if (result.problem !== undefined) {
+        problems.push({ relativePath, message: result.problem });
       }
     } catch (error) {
       problems.push({
@@ -94,16 +90,23 @@ export async function checkPalettes(assetRoot = DEFAULT_ASSET_ROOT) {
     }
   }
 
-  return { checkedFiles: files.length, problems };
+  return { checkedFiles: files.length, byPolicy, problems };
 }
 
 async function main() {
   const result = await checkPalettes();
 
+  const counts = result.byPolicy ?? { strict16: result.checkedFiles, "approved-production": 0 };
+  const summary =
+    `${result.checkedFiles} PNG file(s): ` +
+    `${counts.strict16} at strict16, ` +
+    `${counts["approved-production"]} approved production art verified by digest`;
+
   if (result.problems.length === 0) {
-    console.log(`Palette check passed (${result.checkedFiles} PNG file(s) checked).`);
+    console.log(`Palette check passed (${summary}).`);
     return;
   }
+  console.error(`Checked ${summary}.`);
 
   console.error(`Palette check failed with ${result.problems.length} problem(s):`);
   for (const problem of result.problems) {

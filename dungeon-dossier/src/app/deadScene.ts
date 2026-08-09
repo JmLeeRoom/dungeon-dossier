@@ -6,6 +6,7 @@ import type {
   DeadSceneTreatment,
 } from '../ui/screens/ending';
 import { t } from './i18n';
+import { EVENT_BACKGROUND_ASSET_KEYS } from './uiAssetBindings';
 
 /**
  * The four ways an encounter ends in `FAILED`. `OutcomeReason` also carries
@@ -95,6 +96,7 @@ export function toDeadSceneModel(context: DeadSceneContext): DeadSceneScreenMode
   return {
     title: t(preset.titleKey),
     cause: t(preset.causeKey),
+    backgroundAssetKey: EVENT_BACKGROUND_ASSET_KEYS.dead,
     illustrationAssetKey: preset.illustrationAssetKey,
     treatment: preset.treatment,
     stats: [
@@ -128,4 +130,9 @@ export function toDeadSceneModel(context: DeadSceneContext): DeadSceneScreenMode
       },
     ],
   };
+}
+
+/** Exact branch assets; encounter clear/fail plates are handled separately. */
+export function deadSceneAssetKeys(reason: FailureReason): readonly string[] {
+  return [EVENT_BACKGROUND_ASSET_KEYS.dead, DEAD_SCENE_TABLE[reason].illustrationAssetKey];
 }

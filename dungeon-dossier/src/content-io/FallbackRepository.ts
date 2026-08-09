@@ -3,6 +3,7 @@ import {
   ValidatedRuntimeJsonRepository,
   type ValidatedRepositoryOptions,
 } from './RuntimeJsonRepository';
+import { runtimeContentUrl } from './runtimeContentUrl';
 
 const SAFE_FILE_STEM = /^[a-z0-9][a-z0-9_-]*$/;
 
@@ -22,7 +23,7 @@ export class FallbackRepository {
 
   load(caseDirectory: string): Promise<DialogueDefinition | undefined> {
     const safeCase = safeSegment(caseDirectory, 'caseDirectory');
-    return this.#repository.load(`/content/cases/${safeCase}/dialogue.json`);
+    return this.#repository.load(runtimeContentUrl(`cases/${safeCase}/dialogue.json`));
   }
 
   loadEncounter(
@@ -32,7 +33,7 @@ export class FallbackRepository {
     const safeCase = safeSegment(caseDirectory, 'caseDirectory');
     const safeFile = safeSegment(dialogueFile, 'dialogueFile');
     return this.#repository.load(
-      `/content/cases/${safeCase}/dialogue/${safeFile}.json`,
+      runtimeContentUrl(`cases/${safeCase}/dialogue/${safeFile}.json`),
     );
   }
 }

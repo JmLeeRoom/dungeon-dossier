@@ -1,0 +1,1316 @@
+{
+  "schema_version": "1.0",
+  "generated_by": "docs/design/png_asset_integration_and_ui_binding_design.md §3.2-§3.4",
+  "sourceRoot": "docs/NHN AI_image",
+  "workbook": {
+    "path": "docs/NHN AI PNG Asset Naming Convention.xlsx",
+    "sheet": "시트1",
+    "runtimeRows": [
+      2,
+      73
+    ],
+    "referenceRows": [
+      74,
+      82
+    ]
+  },
+  "scannedSourceTrees": [
+    {
+      "directory": "Characters",
+      "recursive": true,
+      "note": "41 PNGs: 20 adopted from iloveimg-resized/, 1 oversized root export and 20 PSD/ working exports excluded"
+    },
+    {
+      "directory": "background",
+      "recursive": false,
+      "note": "13 PNGs, all adopted"
+    },
+    {
+      "directory": "UI",
+      "recursive": false,
+      "note": "39 PNGs, all adopted"
+    }
+  ],
+  "blockedPathSegments": [
+    "ref",
+    "PSD"
+  ],
+  "blockedExtensions": [
+    ".psd",
+    ".pur"
+  ],
+  "requiredExtension": ".png",
+  "expectedSourcePngCount": {
+    "adopted": 72,
+    "excludedInScannedTree": 21,
+    "totalInScannedTree": 93
+  },
+  "expectedCategoryCounts": {
+    "characters": 20,
+    "background": 13,
+    "ui": 39
+  },
+  "expectedForbiddenSourceCounts": {
+    "psdFiles": 33,
+    "blockedDirectories": [
+      "Characters/PSD"
+    ],
+    "referenceDirectory": "ref"
+  },
+  "workbookKeyNormalizations": [
+    {
+      "workbookRow": 51,
+      "fileName": "ui_card_stamp_logic.png",
+      "workbook": "ui / card / stamp_logic",
+      "canonical": "ui / card_stamp / logic",
+      "reason": "Card-internal attribute seal is its own name segment; ui/card/* is reserved for card faces."
+    },
+    {
+      "workbookRow": 52,
+      "fileName": "ui_card_stamp_pushy.png",
+      "workbook": "ui / card / stamp_pushy",
+      "canonical": "ui / card_stamp / pushy",
+      "reason": "Card-internal attribute seal is its own name segment; ui/card/* is reserved for card faces."
+    },
+    {
+      "workbookRow": 65,
+      "fileName": "ui_pin_00.png",
+      "workbook": "ui / pin / 0.0",
+      "canonical": "ui / pin / 00",
+      "reason": "Numeric spreadsheet cell lost the zero padding; the filename stem is the canonical key source."
+    },
+    {
+      "workbookRow": 68,
+      "fileName": "ui_system_00.png",
+      "workbook": "ui / system / 0.0",
+      "canonical": "ui / system / 00",
+      "reason": "Numeric spreadsheet cell lost the zero padding; the filename stem is the canonical key source."
+    }
+  ],
+  "entries": [
+    {
+      "workbookRow": 2,
+      "sourcePath": "docs/NHN AI_image/Characters/iloveimg-resized/idle_bensi_base.png",
+      "targetPath": "assets/portraits/idle_bensi_base.png",
+      "key": "idle/bensi/base",
+      "width": 512,
+      "height": 512,
+      "sha256": "e02a02a293164335edab159e1492c5c24b1e02c9fa2849ec8341eae9e39786b4",
+      "byteLength": 90529,
+      "workbookDecomposition": {
+        "category": "idle",
+        "name": "bensi",
+        "state": "base"
+      },
+      "episode": "4.0",
+      "stage": "1.0"
+    },
+    {
+      "workbookRow": 4,
+      "sourcePath": "docs/NHN AI_image/Characters/iloveimg-resized/idle_bensi_lose.png",
+      "targetPath": "assets/portraits/idle_bensi_lose.png",
+      "key": "idle/bensi/lose",
+      "width": 512,
+      "height": 512,
+      "sha256": "f2781034229c1d41e348769be07c07f9e4a2a8dea0dd239a3153a495890c8a04",
+      "byteLength": 97038,
+      "workbookDecomposition": {
+        "category": "idle",
+        "name": "bensi",
+        "state": "lose"
+      },
+      "episode": "4.0",
+      "stage": "1.0"
+    },
+    {
+      "workbookRow": 3,
+      "sourcePath": "docs/NHN AI_image/Characters/iloveimg-resized/idle_bensi_upset.png",
+      "targetPath": "assets/portraits/idle_bensi_upset.png",
+      "key": "idle/bensi/upset",
+      "width": 512,
+      "height": 512,
+      "sha256": "b07b7a5521d381070f91e64d8b6da605b604f308cfea21ed6f2de0915c2c1014",
+      "byteLength": 94953,
+      "workbookDecomposition": {
+        "category": "idle",
+        "name": "bensi",
+        "state": "upset"
+      },
+      "episode": "4.0",
+      "stage": "1.0"
+    },
+    {
+      "workbookRow": 5,
+      "sourcePath": "docs/NHN AI_image/Characters/iloveimg-resized/idle_coffee_base.png",
+      "targetPath": "assets/portraits/idle_coffee_base.png",
+      "key": "idle/coffee/base",
+      "width": 512,
+      "height": 512,
+      "sha256": "5d24055f61d23e7efc001d76459871cd3c897919dd89e585df1c692b5180a77f",
+      "byteLength": 82620,
+      "workbookDecomposition": {
+        "category": "idle",
+        "name": "coffee",
+        "state": "base"
+      },
+      "episode": "all",
+      "stage": "all"
+    },
+    {
+      "workbookRow": 6,
+      "sourcePath": "docs/NHN AI_image/Characters/iloveimg-resized/idle_coffee_used.png",
+      "targetPath": "assets/portraits/idle_coffee_used.png",
+      "key": "idle/coffee/used",
+      "width": 512,
+      "height": 512,
+      "sha256": "2ca357b7923bbbd7792812baf84209e0d8cb408973f6256c9c7f16ec3f084377",
+      "byteLength": 64219,
+      "workbookDecomposition": {
+        "category": "idle",
+        "name": "coffee",
+        "state": "used"
+      },
+      "episode": "all",
+      "stage": "all"
+    },
+    {
+      "workbookRow": 7,
+      "sourcePath": "docs/NHN AI_image/Characters/iloveimg-resized/idle_goblin_base.png",
+      "targetPath": "assets/portraits/idle_goblin_base.png",
+      "key": "idle/goblin/base",
+      "width": 512,
+      "height": 512,
+      "sha256": "77240548c3cb7d07e6b564488df444ec9f0b85a8f9760c0e14551365144d9a22",
+      "byteLength": 74965,
+      "workbookDecomposition": {
+        "category": "idle",
+        "name": "goblin",
+        "state": "base"
+      },
+      "episode": "1.0",
+      "stage": "1.0"
+    },
+    {
+      "workbookRow": 8,
+      "sourcePath": "docs/NHN AI_image/Characters/iloveimg-resized/idle_goblin_lose.png",
+      "targetPath": "assets/portraits/idle_goblin_lose.png",
+      "key": "idle/goblin/lose",
+      "width": 512,
+      "height": 512,
+      "sha256": "b4d0a80d0d59d3a50d88a6cd04c846a37aebb7f2f7825d66c7f88151dfadcd4b",
+      "byteLength": 91665,
+      "workbookDecomposition": {
+        "category": "idle",
+        "name": "goblin",
+        "state": "lose"
+      },
+      "episode": "1.0",
+      "stage": "1.0"
+    },
+    {
+      "workbookRow": 9,
+      "sourcePath": "docs/NHN AI_image/Characters/iloveimg-resized/idle_goblin_upset.png",
+      "targetPath": "assets/portraits/idle_goblin_upset.png",
+      "key": "idle/goblin/upset",
+      "width": 512,
+      "height": 512,
+      "sha256": "60fc304dcebeeb2cc05a2b52189b491f4255195e5b3f3d2742696df4a4498172",
+      "byteLength": 78603,
+      "workbookDecomposition": {
+        "category": "idle",
+        "name": "goblin",
+        "state": "upset"
+      },
+      "episode": "1.0",
+      "stage": "1.0"
+    },
+    {
+      "workbookRow": 10,
+      "sourcePath": "docs/NHN AI_image/Characters/iloveimg-resized/idle_kimyongsa_base.png",
+      "targetPath": "assets/portraits/idle_kimyongsa_base.png",
+      "key": "idle/kimyongsa/base",
+      "width": 512,
+      "height": 512,
+      "sha256": "c07035d2d477e3d7c3786c5300dcbe40024b9e5582f62ef3b2bc5944adcc9ac8",
+      "byteLength": 164970,
+      "workbookDecomposition": {
+        "category": "idle",
+        "name": "kimyongsa",
+        "state": "base"
+      },
+      "episode": "4.0",
+      "stage": "3.0"
+    },
+    {
+      "workbookRow": 11,
+      "sourcePath": "docs/NHN AI_image/Characters/iloveimg-resized/idle_kimyongsa_lose.png",
+      "targetPath": "assets/portraits/idle_kimyongsa_lose.png",
+      "key": "idle/kimyongsa/lose",
+      "width": 512,
+      "height": 512,
+      "sha256": "aac8616f268963dca06342971f41e5369391f14abdbd0d101e42d4bebbb13922",
+      "byteLength": 162333,
+      "workbookDecomposition": {
+        "category": "idle",
+        "name": "kimyongsa",
+        "state": "lose"
+      },
+      "episode": "4.0",
+      "stage": "3.0"
+    },
+    {
+      "workbookRow": 12,
+      "sourcePath": "docs/NHN AI_image/Characters/iloveimg-resized/idle_kimyongsa_upset.png",
+      "targetPath": "assets/portraits/idle_kimyongsa_upset.png",
+      "key": "idle/kimyongsa/upset",
+      "width": 512,
+      "height": 512,
+      "sha256": "fc558d737c922b940063f400938bbb51687577650d4ffdb9a352b4a96f798c05",
+      "byteLength": 169977,
+      "workbookDecomposition": {
+        "category": "idle",
+        "name": "kimyongsa",
+        "state": "upset"
+      },
+      "episode": "4.0",
+      "stage": "3.0"
+    },
+    {
+      "workbookRow": 13,
+      "sourcePath": "docs/NHN AI_image/Characters/iloveimg-resized/idle_minota_base.png",
+      "targetPath": "assets/portraits/idle_minota_base.png",
+      "key": "idle/minota/base",
+      "width": 512,
+      "height": 512,
+      "sha256": "a991939b30e4156bd92d199bf2f24661c933ff45218ef1afef8cf8bcf1a912ae",
+      "byteLength": 153789,
+      "workbookDecomposition": {
+        "category": "idle",
+        "name": "minota",
+        "state": "base"
+      },
+      "episode": "tutorial",
+      "stage": "3.0"
+    },
+    {
+      "workbookRow": 14,
+      "sourcePath": "docs/NHN AI_image/Characters/iloveimg-resized/idle_minota_lose.png",
+      "targetPath": "assets/portraits/idle_minota_lose.png",
+      "key": "idle/minota/lose",
+      "width": 512,
+      "height": 512,
+      "sha256": "60e59845f7cefa0b04927fc53f686b496c6f2f645b720d7f68d2e81795806c9d",
+      "byteLength": 162467,
+      "workbookDecomposition": {
+        "category": "idle",
+        "name": "minota",
+        "state": "lose"
+      },
+      "episode": "tutorial",
+      "stage": "3.0"
+    },
+    {
+      "workbookRow": 15,
+      "sourcePath": "docs/NHN AI_image/Characters/iloveimg-resized/idle_minota_upset.png",
+      "targetPath": "assets/portraits/idle_minota_upset.png",
+      "key": "idle/minota/upset",
+      "width": 512,
+      "height": 512,
+      "sha256": "4aa93b10f4d06e9dd9e9cdb19ba20446033f8ad470e484d9a60cb12085ad1336",
+      "byteLength": 157675,
+      "workbookDecomposition": {
+        "category": "idle",
+        "name": "minota",
+        "state": "upset"
+      },
+      "episode": "tutorial",
+      "stage": "3.0"
+    },
+    {
+      "workbookRow": 16,
+      "sourcePath": "docs/NHN AI_image/Characters/iloveimg-resized/idle_mulkung_base.png",
+      "targetPath": "assets/portraits/idle_mulkung_base.png",
+      "key": "idle/mulkung/base",
+      "width": 512,
+      "height": 512,
+      "sha256": "e96181e1957bc2f5a0efb73a8d66436a5d416b5c9dbf6213492975999d333a5d",
+      "byteLength": 118806,
+      "workbookDecomposition": {
+        "category": "idle",
+        "name": "mulkung",
+        "state": "base"
+      },
+      "episode": "tutorial",
+      "stage": "1.0"
+    },
+    {
+      "workbookRow": 17,
+      "sourcePath": "docs/NHN AI_image/Characters/iloveimg-resized/idle_mulkung_lose.png",
+      "targetPath": "assets/portraits/idle_mulkung_lose.png",
+      "key": "idle/mulkung/lose",
+      "width": 512,
+      "height": 512,
+      "sha256": "40b1b9d834494f5d759f82b8f7fe145e962d5cf34002cd17cef6b29da1230841",
+      "byteLength": 84011,
+      "workbookDecomposition": {
+        "category": "idle",
+        "name": "mulkung",
+        "state": "lose"
+      },
+      "episode": "tutorial",
+      "stage": "1.0"
+    },
+    {
+      "workbookRow": 18,
+      "sourcePath": "docs/NHN AI_image/Characters/iloveimg-resized/idle_mulkung_upset.png",
+      "targetPath": "assets/portraits/idle_mulkung_upset.png",
+      "key": "idle/mulkung/upset",
+      "width": 512,
+      "height": 512,
+      "sha256": "16584b989ffb2c23920f89f67d4066b89577a8eb34d4f18398d920c7d46b9cda",
+      "byteLength": 147075,
+      "workbookDecomposition": {
+        "category": "idle",
+        "name": "mulkung",
+        "state": "upset"
+      },
+      "episode": "tutorial",
+      "stage": "1.0"
+    },
+    {
+      "workbookRow": 19,
+      "sourcePath": "docs/NHN AI_image/Characters/iloveimg-resized/idle_succuba_base.png",
+      "targetPath": "assets/portraits/idle_succuba_base.png",
+      "key": "idle/succuba/base",
+      "width": 512,
+      "height": 512,
+      "sha256": "07257d3774d19e93fa97c18e739277dc28834373f79ad5ed66c85498b25dd3d8",
+      "byteLength": 116609,
+      "workbookDecomposition": {
+        "category": "idle",
+        "name": "succuba",
+        "state": "base"
+      },
+      "episode": "1.0",
+      "stage": "3.0"
+    },
+    {
+      "workbookRow": 20,
+      "sourcePath": "docs/NHN AI_image/Characters/iloveimg-resized/idle_succuba_lose.png",
+      "targetPath": "assets/portraits/idle_succuba_lose.png",
+      "key": "idle/succuba/lose",
+      "width": 512,
+      "height": 512,
+      "sha256": "90432290a1775556d104c3061a471f5df2e180c1681145e37528da7582fd40d2",
+      "byteLength": 131299,
+      "workbookDecomposition": {
+        "category": "idle",
+        "name": "succuba",
+        "state": "lose"
+      },
+      "episode": "1.0",
+      "stage": "3.0"
+    },
+    {
+      "workbookRow": 21,
+      "sourcePath": "docs/NHN AI_image/Characters/iloveimg-resized/idle_succuba_upset.png",
+      "targetPath": "assets/portraits/idle_succuba_upset.png",
+      "key": "idle/succuba/upset",
+      "width": 512,
+      "height": 512,
+      "sha256": "a0a698d052afa68ed3a69a8d4fc7902d5092add5aab3b56409ced8f13e1b83e8",
+      "byteLength": 128210,
+      "workbookDecomposition": {
+        "category": "idle",
+        "name": "succuba",
+        "state": "upset"
+      },
+      "episode": "1.0",
+      "stage": "3.0"
+    },
+    {
+      "workbookRow": 22,
+      "sourcePath": "docs/NHN AI_image/background/bg_event_crazyboard.png",
+      "targetPath": "assets/bg/bg_event_crazyboard.png",
+      "key": "bg/event/crazyboard",
+      "width": 1280,
+      "height": 800,
+      "sha256": "7106a3db43f1e527ff7ccbd0a44ed0dcd6241ff38bd9ffd77c8a3e75bd0b9d7e",
+      "byteLength": 613324,
+      "workbookDecomposition": {
+        "category": "bg",
+        "name": "event",
+        "state": "crazyboard"
+      },
+      "episode": "map select",
+      "stage": ""
+    },
+    {
+      "workbookRow": 23,
+      "sourcePath": "docs/NHN AI_image/background/bg_event_dead.png",
+      "targetPath": "assets/bg/bg_event_dead.png",
+      "key": "bg/event/dead",
+      "width": 1280,
+      "height": 800,
+      "sha256": "e81db90008e0c5ab7fbb9d6eaecf4fa4acc0c7a2d6c2dab8dd03c2a5a94c034b",
+      "byteLength": 450058,
+      "workbookDecomposition": {
+        "category": "bg",
+        "name": "event",
+        "state": "dead"
+      },
+      "episode": "all",
+      "stage": ""
+    },
+    {
+      "workbookRow": 24,
+      "sourcePath": "docs/NHN AI_image/background/bg_event_phone.png",
+      "targetPath": "assets/bg/bg_event_phone.png",
+      "key": "bg/event/phone",
+      "width": 1280,
+      "height": 800,
+      "sha256": "a5e693e00563daa451234c3e8f380f1d2fda39004f4fc603680692b6927bc298",
+      "byteLength": 1038696,
+      "workbookDecomposition": {
+        "category": "bg",
+        "name": "event",
+        "state": "phone"
+      },
+      "episode": "4.0",
+      "stage": "2.0"
+    },
+    {
+      "workbookRow": 25,
+      "sourcePath": "docs/NHN AI_image/background/bg_event_post.png",
+      "targetPath": "assets/bg/bg_event_post.png",
+      "key": "bg/event/post",
+      "width": 181,
+      "height": 156,
+      "sha256": "5a7adeb73a2c818abe4383ad61a1a9ed48f0fc1c48dbbc8198dac710a7877904",
+      "byteLength": 15929,
+      "workbookDecomposition": {
+        "category": "bg",
+        "name": "event",
+        "state": "post"
+      },
+      "episode": "1.0",
+      "stage": "2.0"
+    },
+    {
+      "workbookRow": 26,
+      "sourcePath": "docs/NHN AI_image/background/bg_event_rest.png",
+      "targetPath": "assets/bg/bg_event_rest.png",
+      "key": "bg/event/rest",
+      "width": 1280,
+      "height": 800,
+      "sha256": "aee10fc3d1d17d7c3d71df1e12bafbe77887d7f2e7de228c41e4d9f6422aefdd",
+      "byteLength": 1371454,
+      "workbookDecomposition": {
+        "category": "bg",
+        "name": "event",
+        "state": "rest"
+      },
+      "episode": "tutorial",
+      "stage": "2.0"
+    },
+    {
+      "workbookRow": 27,
+      "sourcePath": "docs/NHN AI_image/background/bg_event_safe.png",
+      "targetPath": "assets/bg/bg_event_safe.png",
+      "key": "bg/event/safe",
+      "width": 1280,
+      "height": 800,
+      "sha256": "c2b181b68dccf7874110d331b530e94a00609ef9efe177f47441eedbc377ed22",
+      "byteLength": 1202616,
+      "workbookDecomposition": {
+        "category": "bg",
+        "name": "event",
+        "state": "safe"
+      },
+      "episode": "1.0",
+      "stage": "2.0"
+    },
+    {
+      "workbookRow": 28,
+      "sourcePath": "docs/NHN AI_image/background/bg_event_scene0.png",
+      "targetPath": "assets/bg/bg_event_scene0.png",
+      "key": "bg/event/scene0",
+      "width": 1280,
+      "height": 800,
+      "sha256": "bc1a05094ea749112e5d99d224eb62bfb4cc36b8a76a502c1ff9d6d6715e8846",
+      "byteLength": 1084903,
+      "workbookDecomposition": {
+        "category": "bg",
+        "name": "event",
+        "state": "scene0"
+      },
+      "episode": "",
+      "stage": ""
+    },
+    {
+      "workbookRow": 29,
+      "sourcePath": "docs/NHN AI_image/background/bg_event_scene1.png",
+      "targetPath": "assets/bg/bg_event_scene1.png",
+      "key": "bg/event/scene1",
+      "width": 1280,
+      "height": 800,
+      "sha256": "c381e214d1245fdec5bffc7be1535e8dbcfae7aaee1e973d1f7b50fd173a1a83",
+      "byteLength": 1096782,
+      "workbookDecomposition": {
+        "category": "bg",
+        "name": "event",
+        "state": "scene1"
+      },
+      "episode": "",
+      "stage": ""
+    },
+    {
+      "workbookRow": 30,
+      "sourcePath": "docs/NHN AI_image/background/bg_event_scene2.png",
+      "targetPath": "assets/bg/bg_event_scene2.png",
+      "key": "bg/event/scene2",
+      "width": 1280,
+      "height": 800,
+      "sha256": "82ddd591690f148331a9c494666bb4f93c14c0fd2244740007ba7729a72a460a",
+      "byteLength": 1113163,
+      "workbookDecomposition": {
+        "category": "bg",
+        "name": "event",
+        "state": "scene2"
+      },
+      "episode": "",
+      "stage": ""
+    },
+    {
+      "workbookRow": 31,
+      "sourcePath": "docs/NHN AI_image/background/bg_event_stamp.png",
+      "targetPath": "assets/bg/bg_event_stamp.png",
+      "key": "bg/event/stamp",
+      "width": 181,
+      "height": 156,
+      "sha256": "79e76c4e760d443c62a2e2bd9d4edc59d7f82d2d8153a8635cd1844a9d4df19f",
+      "byteLength": 34345,
+      "workbookDecomposition": {
+        "category": "bg",
+        "name": "event",
+        "state": "stamp"
+      },
+      "episode": "1.0",
+      "stage": "2.0"
+    },
+    {
+      "workbookRow": 32,
+      "sourcePath": "docs/NHN AI_image/background/bg_event_town.png",
+      "targetPath": "assets/bg/bg_event_town.png",
+      "key": "bg/event/town",
+      "width": 1280,
+      "height": 800,
+      "sha256": "710ded6a8d77a8577bcf9f8fdeb2e59173c9e4380f955ecd118d0510330a3cff",
+      "byteLength": 1308479,
+      "workbookDecomposition": {
+        "category": "bg",
+        "name": "event",
+        "state": "town"
+      },
+      "episode": "",
+      "stage": ""
+    },
+    {
+      "workbookRow": 33,
+      "sourcePath": "docs/NHN AI_image/background/bg_interrogationroom_base.png",
+      "targetPath": "assets/bg/bg_interrogationroom_base.png",
+      "key": "bg/interrogationroom/base",
+      "width": 1280,
+      "height": 800,
+      "sha256": "3db8f77955858f79df3db28bb6d9286bb1dfa63d40df9f81ea3dfba8a443e2e3",
+      "byteLength": 1113701,
+      "workbookDecomposition": {
+        "category": "bg",
+        "name": "interrogationroom",
+        "state": "base"
+      },
+      "episode": "battle",
+      "stage": ""
+    },
+    {
+      "workbookRow": 34,
+      "sourcePath": "docs/NHN AI_image/background/bg_interrogationroom_desk.png",
+      "targetPath": "assets/fg/bg_interrogationroom_desk.png",
+      "key": "bg/interrogationroom/desk",
+      "width": 1280,
+      "height": 321,
+      "sha256": "8faf1a783f290b1aa272ff84e61f77decc9d8c1de7cd3bf6ec9a8bf235cd1272",
+      "byteLength": 491671,
+      "workbookDecomposition": {
+        "category": "bg",
+        "name": "interrogationroom",
+        "state": "desk"
+      },
+      "episode": "battle",
+      "stage": ""
+    },
+    {
+      "workbookRow": 35,
+      "sourcePath": "docs/NHN AI_image/UI/ui_board_event.png",
+      "targetPath": "assets/ui/ui_board_event.png",
+      "key": "ui/board/event",
+      "width": 1024,
+      "height": 1024,
+      "sha256": "4a5eccb40517cdf5c54619aff0205fe9875c4af657f21b9d877e661c3f0371bb",
+      "byteLength": 263024,
+      "workbookDecomposition": {
+        "category": "ui",
+        "name": "board",
+        "state": "event"
+      },
+      "episode": "map select",
+      "stage": ""
+    },
+    {
+      "workbookRow": 36,
+      "sourcePath": "docs/NHN AI_image/UI/ui_card_base.png",
+      "targetPath": "assets/cards/ui_card_base.png",
+      "key": "ui/card/base",
+      "width": 768,
+      "height": 1024,
+      "sha256": "5b2b9dd6b360984a94d75d0346402eb567c22cd8add7e9c570bbfcf2be4b7adb",
+      "byteLength": 703604,
+      "workbookDecomposition": {
+        "category": "ui",
+        "name": "card",
+        "state": "base"
+      },
+      "episode": "",
+      "stage": ""
+    },
+    {
+      "workbookRow": 37,
+      "sourcePath": "docs/NHN AI_image/UI/ui_card_evidence00.png",
+      "targetPath": "assets/evidence/ui_card_evidence00.png",
+      "key": "ui/card/evidence00",
+      "width": 256,
+      "height": 256,
+      "sha256": "762e7eac173994da521447d335a3c4561da10b71201c3be6ebaf33bd27fc982d",
+      "byteLength": 65005,
+      "workbookDecomposition": {
+        "category": "ui",
+        "name": "card",
+        "state": "evidence00"
+      },
+      "episode": "",
+      "stage": ""
+    },
+    {
+      "workbookRow": 38,
+      "sourcePath": "docs/NHN AI_image/UI/ui_card_evidence01.png",
+      "targetPath": "assets/evidence/ui_card_evidence01.png",
+      "key": "ui/card/evidence01",
+      "width": 256,
+      "height": 256,
+      "sha256": "cd265a7bbe000feb05c11109e6e27e313e3398b754c4a3d019977e92fc2197a2",
+      "byteLength": 63719,
+      "workbookDecomposition": {
+        "category": "ui",
+        "name": "card",
+        "state": "evidence01"
+      },
+      "episode": "",
+      "stage": ""
+    },
+    {
+      "workbookRow": 39,
+      "sourcePath": "docs/NHN AI_image/UI/ui_card_evidence02.png",
+      "targetPath": "assets/evidence/ui_card_evidence02.png",
+      "key": "ui/card/evidence02",
+      "width": 256,
+      "height": 256,
+      "sha256": "ff5edc52add50b7b5888776ce92a809dd8daecb4759b2885efad505cab1f615a",
+      "byteLength": 72401,
+      "workbookDecomposition": {
+        "category": "ui",
+        "name": "card",
+        "state": "evidence02"
+      },
+      "episode": "",
+      "stage": ""
+    },
+    {
+      "workbookRow": 40,
+      "sourcePath": "docs/NHN AI_image/UI/ui_card_evidence03.png",
+      "targetPath": "assets/evidence/ui_card_evidence03.png",
+      "key": "ui/card/evidence03",
+      "width": 256,
+      "height": 256,
+      "sha256": "51d971a9fd7b82af49a2faf7159377952d0f7eab485e97efdd42ccee429d5842",
+      "byteLength": 57934,
+      "workbookDecomposition": {
+        "category": "ui",
+        "name": "card",
+        "state": "evidence03"
+      },
+      "episode": "tutorial",
+      "stage": ""
+    },
+    {
+      "workbookRow": 41,
+      "sourcePath": "docs/NHN AI_image/UI/ui_card_evidence04.png",
+      "targetPath": "assets/evidence/ui_card_evidence04.png",
+      "key": "ui/card/evidence04",
+      "width": 256,
+      "height": 256,
+      "sha256": "7a31f087eca33bba6a1f557a9a9ac4f4a62b5f58f07f85c30ef196e306b409b0",
+      "byteLength": 64393,
+      "workbookDecomposition": {
+        "category": "ui",
+        "name": "card",
+        "state": "evidence04"
+      },
+      "episode": "1.0",
+      "stage": ""
+    },
+    {
+      "workbookRow": 42,
+      "sourcePath": "docs/NHN AI_image/UI/ui_card_evidence05.png",
+      "targetPath": "assets/evidence/ui_card_evidence05.png",
+      "key": "ui/card/evidence05",
+      "width": 256,
+      "height": 256,
+      "sha256": "d3413fe92b75f160f48bd019d1b2345a3d3f01e700a9f36fbe726de8bc9e339d",
+      "byteLength": 54923,
+      "workbookDecomposition": {
+        "category": "ui",
+        "name": "card",
+        "state": "evidence05"
+      },
+      "episode": "3.0",
+      "stage": ""
+    },
+    {
+      "workbookRow": 43,
+      "sourcePath": "docs/NHN AI_image/UI/ui_card_illust00.png",
+      "targetPath": "assets/cards/ui_card_illust00.png",
+      "key": "ui/card/illust00",
+      "width": 256,
+      "height": 256,
+      "sha256": "e755b7da52e37cd3a0f75ae89ce43c7432048eb6ae4b2bd529ee44e70edd17da",
+      "byteLength": 83505,
+      "workbookDecomposition": {
+        "category": "ui",
+        "name": "card",
+        "state": "illust00"
+      },
+      "episode": "",
+      "stage": ""
+    },
+    {
+      "workbookRow": 44,
+      "sourcePath": "docs/NHN AI_image/UI/ui_card_illust01.png",
+      "targetPath": "assets/cards/ui_card_illust01.png",
+      "key": "ui/card/illust01",
+      "width": 256,
+      "height": 256,
+      "sha256": "61ef37214ddbaf067075476c2153b1c7d5dba50b8c51cd15954ad852b3b52650",
+      "byteLength": 93057,
+      "workbookDecomposition": {
+        "category": "ui",
+        "name": "card",
+        "state": "illust01"
+      },
+      "episode": "",
+      "stage": ""
+    },
+    {
+      "workbookRow": 45,
+      "sourcePath": "docs/NHN AI_image/UI/ui_card_illust02.png",
+      "targetPath": "assets/cards/ui_card_illust02.png",
+      "key": "ui/card/illust02",
+      "width": 256,
+      "height": 256,
+      "sha256": "9895cc4ceaed6ad4c101a51f04b0db88b1c51dac2f1de9ad3c1990de0fd0585e",
+      "byteLength": 95309,
+      "workbookDecomposition": {
+        "category": "ui",
+        "name": "card",
+        "state": "illust02"
+      },
+      "episode": "",
+      "stage": ""
+    },
+    {
+      "workbookRow": 46,
+      "sourcePath": "docs/NHN AI_image/UI/ui_card_illust03.png",
+      "targetPath": "assets/cards/ui_card_illust03.png",
+      "key": "ui/card/illust03",
+      "width": 256,
+      "height": 256,
+      "sha256": "177f1bd4792b5c6c3c664314ee586d66df2ebb1689b0629d966b73cfb43ba8c2",
+      "byteLength": 95344,
+      "workbookDecomposition": {
+        "category": "ui",
+        "name": "card",
+        "state": "illust03"
+      },
+      "episode": "",
+      "stage": ""
+    },
+    {
+      "workbookRow": 47,
+      "sourcePath": "docs/NHN AI_image/UI/ui_card_illust04.png",
+      "targetPath": "assets/cards/ui_card_illust04.png",
+      "key": "ui/card/illust04",
+      "width": 256,
+      "height": 256,
+      "sha256": "2c0118d19279217553618b64829a8eb04cd7af748ce66553b107cd8abfb1ec1c",
+      "byteLength": 82905,
+      "workbookDecomposition": {
+        "category": "ui",
+        "name": "card",
+        "state": "illust04"
+      },
+      "episode": "",
+      "stage": ""
+    },
+    {
+      "workbookRow": 48,
+      "sourcePath": "docs/NHN AI_image/UI/ui_card_illust05.png",
+      "targetPath": "assets/cards/ui_card_illust05.png",
+      "key": "ui/card/illust05",
+      "width": 256,
+      "height": 256,
+      "sha256": "049ec47a59ce5b8266e0b5d788281ecb03003706562b447054085d1811f78919",
+      "byteLength": 88292,
+      "workbookDecomposition": {
+        "category": "ui",
+        "name": "card",
+        "state": "illust05"
+      },
+      "episode": "4.0",
+      "stage": "1.0"
+    },
+    {
+      "workbookRow": 49,
+      "sourcePath": "docs/NHN AI_image/UI/ui_card_post.png",
+      "targetPath": "assets/cards/ui_card_post.png",
+      "key": "ui/card/post",
+      "width": 675,
+      "height": 312,
+      "sha256": "7946cc6a0eac7febe6ea2d4aefc5bf912858f2b6969854e9ab3e24048723ffa3",
+      "byteLength": 167636,
+      "workbookDecomposition": {
+        "category": "ui",
+        "name": "card",
+        "state": "post"
+      },
+      "episode": "",
+      "stage": ""
+    },
+    {
+      "workbookRow": 50,
+      "sourcePath": "docs/NHN AI_image/UI/ui_card_pushy.png",
+      "targetPath": "assets/cards/ui_card_pushy.png",
+      "key": "ui/card/pushy",
+      "width": 344,
+      "height": 176,
+      "sha256": "b2ed1f2dcd92a3708a9274c288efde4d45431dae2d44938183259f61e9a6efa6",
+      "byteLength": 89711,
+      "workbookDecomposition": {
+        "category": "ui",
+        "name": "card",
+        "state": "pushy"
+      },
+      "episode": "",
+      "stage": ""
+    },
+    {
+      "workbookRow": 51,
+      "sourcePath": "docs/NHN AI_image/UI/ui_card_stamp_logic.png",
+      "targetPath": "assets/cards/ui_card_stamp_logic.png",
+      "key": "ui/card_stamp/logic",
+      "width": 344,
+      "height": 176,
+      "sha256": "b068cf54258deb46e2c17e94cd13fef91e3bfea31b5fbe6e2306a33eb9fc0c64",
+      "byteLength": 86140,
+      "workbookDecomposition": {
+        "category": "ui",
+        "name": "card",
+        "state": "stamp_logic"
+      },
+      "episode": "",
+      "stage": ""
+    },
+    {
+      "workbookRow": 52,
+      "sourcePath": "docs/NHN AI_image/UI/ui_card_stamp_pushy.png",
+      "targetPath": "assets/cards/ui_card_stamp_pushy.png",
+      "key": "ui/card_stamp/pushy",
+      "width": 344,
+      "height": 176,
+      "sha256": "d0ca0bfd39fd31eebc03d2b1303ac6c1eec26cea88e7ee3f7afc7d13422de293",
+      "byteLength": 89916,
+      "workbookDecomposition": {
+        "category": "ui",
+        "name": "card",
+        "state": "stamp_pushy"
+      },
+      "episode": "",
+      "stage": ""
+    },
+    {
+      "workbookRow": 53,
+      "sourcePath": "docs/NHN AI_image/UI/ui_debuff_kiss.png",
+      "targetPath": "assets/ui/ui_debuff_kiss.png",
+      "key": "ui/debuff/kiss",
+      "width": 580,
+      "height": 580,
+      "sha256": "a602904fd9375ab2306d3b6ab1becb3370dbc9e5cced6dbec044f4b8767d5a6b",
+      "byteLength": 243923,
+      "workbookDecomposition": {
+        "category": "ui",
+        "name": "debuff",
+        "state": "kiss"
+      },
+      "episode": "1.0",
+      "stage": "3.0"
+    },
+    {
+      "workbookRow": 54,
+      "sourcePath": "docs/NHN AI_image/UI/ui_game_clear.png",
+      "targetPath": "assets/ui/ui_game_clear.png",
+      "key": "ui/game/clear",
+      "width": 1024,
+      "height": 506,
+      "sha256": "4495e98adce93f9ed957c1c617dcd2fd9984237f220684df0b168fd2ca165e14",
+      "byteLength": 466970,
+      "workbookDecomposition": {
+        "category": "ui",
+        "name": "game",
+        "state": "clear"
+      },
+      "episode": "",
+      "stage": ""
+    },
+    {
+      "workbookRow": 55,
+      "sourcePath": "docs/NHN AI_image/UI/ui_game_fail.png",
+      "targetPath": "assets/ui/ui_game_fail.png",
+      "key": "ui/game/fail",
+      "width": 1024,
+      "height": 506,
+      "sha256": "a73adf96515092d5446b5672a7c2dca7c97d0aa825bfa0fb92ac3728a2fe88ae",
+      "byteLength": 489224,
+      "workbookDecomposition": {
+        "category": "ui",
+        "name": "game",
+        "state": "fail"
+      },
+      "episode": "",
+      "stage": ""
+    },
+    {
+      "workbookRow": 56,
+      "sourcePath": "docs/NHN AI_image/UI/ui_icon_composure.png",
+      "targetPath": "assets/ui/ui_icon_composure.png",
+      "key": "ui/icon/composure",
+      "width": 32,
+      "height": 32,
+      "sha256": "0fa3519aa84ac6aeaa13b9c65d28405b63ed4c30ac6f18c2f169feb6e3528e49",
+      "byteLength": 4167,
+      "workbookDecomposition": {
+        "category": "ui",
+        "name": "icon",
+        "state": "composure"
+      },
+      "episode": "",
+      "stage": ""
+    },
+    {
+      "workbookRow": 57,
+      "sourcePath": "docs/NHN AI_image/UI/ui_icon_pushy.png",
+      "targetPath": "assets/ui/ui_icon_pushy.png",
+      "key": "ui/icon/pushy",
+      "width": 32,
+      "height": 32,
+      "sha256": "813060a588db277378660b86ec38168f80e7158c398d121f14321eb7f14cd1db",
+      "byteLength": 4700,
+      "workbookDecomposition": {
+        "category": "ui",
+        "name": "icon",
+        "state": "pushy"
+      },
+      "episode": "",
+      "stage": ""
+    },
+    {
+      "workbookRow": 58,
+      "sourcePath": "docs/NHN AI_image/UI/ui_photo_bensi.png",
+      "targetPath": "assets/ui/ui_photo_bensi.png",
+      "key": "ui/photo/bensi",
+      "width": 256,
+      "height": 256,
+      "sha256": "f2f5cf64c8299465d4be10eca3d5b9f1c3d2ae61a2d841706ae4fbc26881a6c5",
+      "byteLength": 85205,
+      "workbookDecomposition": {
+        "category": "ui",
+        "name": "photo",
+        "state": "bensi"
+      },
+      "episode": "",
+      "stage": ""
+    },
+    {
+      "workbookRow": 59,
+      "sourcePath": "docs/NHN AI_image/UI/ui_photo_goblin.png",
+      "targetPath": "assets/ui/ui_photo_goblin.png",
+      "key": "ui/photo/goblin",
+      "width": 256,
+      "height": 256,
+      "sha256": "2ac4dbb499b188b5ca35b08b6995ab471c9dd4cb2b637736cc7f12ceb188db83",
+      "byteLength": 87272,
+      "workbookDecomposition": {
+        "category": "ui",
+        "name": "photo",
+        "state": "goblin"
+      },
+      "episode": "",
+      "stage": ""
+    },
+    {
+      "workbookRow": 60,
+      "sourcePath": "docs/NHN AI_image/UI/ui_photo_kimyongsa.png",
+      "targetPath": "assets/ui/ui_photo_kimyongsa.png",
+      "key": "ui/photo/kimyongsa",
+      "width": 256,
+      "height": 256,
+      "sha256": "a8620fe721024e3d7bc359c1cf4f98c797e32a3d7908da5640ec15c9564d9377",
+      "byteLength": 91443,
+      "workbookDecomposition": {
+        "category": "ui",
+        "name": "photo",
+        "state": "kimyongsa"
+      },
+      "episode": "",
+      "stage": ""
+    },
+    {
+      "workbookRow": 61,
+      "sourcePath": "docs/NHN AI_image/UI/ui_photo_minota.png",
+      "targetPath": "assets/ui/ui_photo_minota.png",
+      "key": "ui/photo/minota",
+      "width": 256,
+      "height": 256,
+      "sha256": "3a3877e53083199e2fe8183d0265e4c80bc4d9c33d6f0fde838438cfa154a4f1",
+      "byteLength": 90572,
+      "workbookDecomposition": {
+        "category": "ui",
+        "name": "photo",
+        "state": "minota"
+      },
+      "episode": "",
+      "stage": ""
+    },
+    {
+      "workbookRow": 62,
+      "sourcePath": "docs/NHN AI_image/UI/ui_photo_mulkung.png",
+      "targetPath": "assets/ui/ui_photo_mulkung.png",
+      "key": "ui/photo/mulkung",
+      "width": 256,
+      "height": 256,
+      "sha256": "49e57d7e8b862f0dd00bab19032843561e503d0bea9e161cd5e9c32a4f217098",
+      "byteLength": 75997,
+      "workbookDecomposition": {
+        "category": "ui",
+        "name": "photo",
+        "state": "mulkung"
+      },
+      "episode": "",
+      "stage": ""
+    },
+    {
+      "workbookRow": 63,
+      "sourcePath": "docs/NHN AI_image/UI/ui_photo_succuba.png",
+      "targetPath": "assets/ui/ui_photo_succuba.png",
+      "key": "ui/photo/succuba",
+      "width": 256,
+      "height": 256,
+      "sha256": "55c7509d035510820e89cc3a60f27c11bc36c31d9db0e795c4e347ac0fb56b53",
+      "byteLength": 80556,
+      "workbookDecomposition": {
+        "category": "ui",
+        "name": "photo",
+        "state": "succuba"
+      },
+      "episode": "",
+      "stage": ""
+    },
+    {
+      "workbookRow": 64,
+      "sourcePath": "docs/NHN AI_image/UI/ui_photo_teahoon.png",
+      "targetPath": "assets/ui/ui_photo_teahoon.png",
+      "key": "ui/photo/teahoon",
+      "width": 256,
+      "height": 256,
+      "sha256": "c07d5d7f39814c1af865338a85efce87ae81b28b16009a53b33a9d949c8209b7",
+      "byteLength": 75727,
+      "workbookDecomposition": {
+        "category": "ui",
+        "name": "photo",
+        "state": "teahoon"
+      },
+      "episode": "",
+      "stage": ""
+    },
+    {
+      "workbookRow": 65,
+      "sourcePath": "docs/NHN AI_image/UI/ui_pin_00.png",
+      "targetPath": "assets/ui/ui_pin_00.png",
+      "key": "ui/pin/00",
+      "width": 128,
+      "height": 128,
+      "sha256": "e57273f0abc5adceaa389e3d5b191d6af0a7cf2629f2fac03bae90f6896c0758",
+      "byteLength": 18719,
+      "workbookDecomposition": {
+        "category": "ui",
+        "name": "pin",
+        "state": "0.0"
+      },
+      "episode": "",
+      "stage": ""
+    },
+    {
+      "workbookRow": 66,
+      "sourcePath": "docs/NHN AI_image/UI/ui_stamp_logic.png",
+      "targetPath": "assets/ui/ui_stamp_logic.png",
+      "key": "ui/stamp/logic",
+      "width": 620,
+      "height": 620,
+      "sha256": "fb483428c03a7ab4bd93e2555186d30740596910b997bbe83647b7e5ce7fbab1",
+      "byteLength": 158433,
+      "workbookDecomposition": {
+        "category": "ui",
+        "name": "stamp",
+        "state": "logic"
+      },
+      "episode": "",
+      "stage": ""
+    },
+    {
+      "workbookRow": 67,
+      "sourcePath": "docs/NHN AI_image/UI/ui_stamp_pushy.png",
+      "targetPath": "assets/ui/ui_stamp_pushy.png",
+      "key": "ui/stamp/pushy",
+      "width": 620,
+      "height": 620,
+      "sha256": "6de492ebefed50597085fb224a28ef1b9d6a4b129f43f48e529d0b62b15ce171",
+      "byteLength": 151454,
+      "workbookDecomposition": {
+        "category": "ui",
+        "name": "stamp",
+        "state": "pushy"
+      },
+      "episode": "",
+      "stage": ""
+    },
+    {
+      "workbookRow": 68,
+      "sourcePath": "docs/NHN AI_image/UI/ui_system_00.png",
+      "targetPath": "assets/ui/ui_system_00.png",
+      "key": "ui/system/00",
+      "width": 415,
+      "height": 310,
+      "sha256": "36d646a87fcdc87c0befeeac62e2d5638b91c09cb35171a2832ceea0dfa0d80a",
+      "byteLength": 67621,
+      "workbookDecomposition": {
+        "category": "ui",
+        "name": "system",
+        "state": "0.0"
+      },
+      "episode": "",
+      "stage": ""
+    },
+    {
+      "workbookRow": 69,
+      "sourcePath": "docs/NHN AI_image/UI/ui_tag_base.png",
+      "targetPath": "assets/ui/ui_tag_base.png",
+      "key": "ui/tag/base",
+      "width": 830,
+      "height": 330,
+      "sha256": "985a6431d2806e1c1b83526f5b522862f4eb2ea5c910a2a07ddbb494d08a63a0",
+      "byteLength": 244058,
+      "workbookDecomposition": {
+        "category": "ui",
+        "name": "tag",
+        "state": "base"
+      },
+      "episode": "",
+      "stage": ""
+    },
+    {
+      "workbookRow": 70,
+      "sourcePath": "docs/NHN AI_image/UI/ui_tag_broken.png",
+      "targetPath": "assets/ui/ui_tag_broken.png",
+      "key": "ui/tag/broken",
+      "width": 830,
+      "height": 330,
+      "sha256": "124bba63e873849014890ffa8c8d6904d798b7e6a358d943b8210e0cb80fc6ef",
+      "byteLength": 277638,
+      "workbookDecomposition": {
+        "category": "ui",
+        "name": "tag",
+        "state": "broken"
+      },
+      "episode": "",
+      "stage": ""
+    },
+    {
+      "workbookRow": 71,
+      "sourcePath": "docs/NHN AI_image/UI/ui_tag_deactivate.png",
+      "targetPath": "assets/ui/ui_tag_deactivate.png",
+      "key": "ui/tag/deactivate",
+      "width": 830,
+      "height": 330,
+      "sha256": "3a0a979982d6c627d45a543e9c6585f8f2352fce22d7b0cb20a314ed699346fe",
+      "byteLength": 186321,
+      "workbookDecomposition": {
+        "category": "ui",
+        "name": "tag",
+        "state": "deactivate"
+      },
+      "episode": "",
+      "stage": ""
+    },
+    {
+      "workbookRow": 72,
+      "sourcePath": "docs/NHN AI_image/UI/ui_tag_hidden.png",
+      "targetPath": "assets/ui/ui_tag_hidden.png",
+      "key": "ui/tag/hidden",
+      "width": 830,
+      "height": 330,
+      "sha256": "c9dca3d3d6267af00d0404e9f26e5b4d2da5d8958c9aae88245394287e4d38da",
+      "byteLength": 138455,
+      "workbookDecomposition": {
+        "category": "ui",
+        "name": "tag",
+        "state": "hidden"
+      },
+      "episode": "",
+      "stage": ""
+    },
+    {
+      "workbookRow": 73,
+      "sourcePath": "docs/NHN AI_image/UI/ui_tag_shield.png",
+      "targetPath": "assets/ui/ui_tag_shield.png",
+      "key": "ui/tag/shield",
+      "width": 830,
+      "height": 330,
+      "sha256": "10a9b8a16bd60abd3586fe086deb5312899ab016ebf3e2e7d0d32bb0c5ad40bc",
+      "byteLength": 251579,
+      "workbookDecomposition": {
+        "category": "ui",
+        "name": "tag",
+        "state": "shield"
+      },
+      "episode": "",
+      "stage": ""
+    }
+  ]
+}

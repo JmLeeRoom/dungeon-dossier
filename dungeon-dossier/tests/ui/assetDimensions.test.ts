@@ -1,4 +1,5 @@
-import { readFile, readdir } from 'node:fs/promises';
+import { Buffer } from 'node:buffer';
+import { open, readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -8,6 +9,8 @@ import { describe, expect, it } from 'vitest';
 import {
   ASSET_DIMENSIONS,
   ASSET_DIMENSION_IDS,
+  LEGACY_ASSET_DIMENSION_IDS,
+  NHN_ASSET_DIMENSION_IDS,
   assertAssetDimension,
   assetAspectRatio,
   isAssetDimensionId,
@@ -15,6 +18,7 @@ import {
   matchesAssetDimension,
   type AssetDimensionId,
 } from '../../src/ui/core/assetDimensions';
+import { RUNTIME_ASSET_CATALOG } from '../../src/ui/core/runtimeAssetCatalog';
 import {
   ASSET_MANIFEST_SCHEMA_VERSION,
   AssetManifestSchema,
@@ -63,8 +67,10 @@ async function pngFiles(directory: string, prefix = ''): Promise<readonly string
 }
 
 describe('standard asset dimensions', () => {
-  it('publishes exactly the ten specified source sizes', () => {
-    expect(ASSET_DIMENSION_IDS).toEqual([
+  it('preserves the original ten source sizes and appends the NHN ones', () => {
+    // Saved manifests, workbench fixtures and the placeholder pipeline all name
+    // these ten, so they keep their identifiers, values and order verbatim.
+    expect(LEGACY_ASSET_DIMENSION_IDS).toEqual([
       'bg_interrogation',
       'desk_foreground',
       'suspect_base',
@@ -76,7 +82,7 @@ describe('standard asset dimensions', () => {
       'icon_composure',
       'icon_coercion',
     ]);
-    expect(ASSET_DIMENSIONS).toEqual({
+    for (const [id, size] of Object.entries({
       bg_interrogation: { width: 1280, height: 800 },
       desk_foreground: { width: 1280, height: 321 },
       suspect_base: { width: 512, height: 512 },
@@ -87,8 +93,24 @@ describe('standard asset dimensions', () => {
       evidence: { width: 128, height: 128 },
       icon_composure: { width: 32, height: 32 },
       icon_coercion: { width: 32, height: 32 },
-    });
-    expect(CARD_SIZE).toEqual({ width: 640, height: 725 });
+    } satisfies Record<(typeof LEGACY_ASSET_DIMENSION_IDS)[number], { width: number; height: number }>)) {
+      expect(ASSET_DIMENSIONS[id as AssetDimensionId], id).toEqual(size);
+    }
+
+    expect(ASSET_DIMENSION_IDS).toEqual([
+      ...LEGACY_ASSET_DIMENSION_IDS,
+      ...NHN_ASSET_DIMENSION_IDS,
+    ]);
+    expect(new Set(ASSET_DIMENSION_IDS).size).toBe(ASSET_DIMENSION_IDS.length);
+    expect(Object.keys(ASSET_DIMENSIONS).sort()).toEqual([...ASSET_DIMENSION_IDS].sort());
+
+    // The approved card canvas is a separate identifier, not a redefinition:
+    // 768x1024 is 0.750 and the legacy plate is 0.883, so one cannot scale to
+    // the other and both have to remain addressable.
+    expect(ASSET_DIMENSIONS.card_base_768x1024).toEqual({ width: 768, height: 1024 });
+    expect(ASSET_DIMENSIONS.tag_830x330).toEqual({ width: 830, height: 330 });
+    expect(ASSET_DIMENSIONS.result_1024x506).toEqual({ width: 1024, height: 506 });
+    expect(CARD_SIZE).toEqual({ width: 768, height: 1024 });
   });
 
   it('validates exact sizes and scaled aspect ratios separately', () => {
@@ -133,7 +155,16 @@ describe('standard asset dimensions', () => {
     expect(unlocked[0]?.defaultRect).toEqual({ x: 0, y: 239, width: 640, height: 161 });
   });
 
-  it('ships every checked-in PNG at its declared source size', async () => {
+  it('ships every generated placeholder PNG at its declared source size', async () => {
+    // The directory heuristic below only ever described the generated set. NHN
+    // deliverables share those directories but not those sizes (256x256
+    // evidence next to 128x128, a 768x1024 card base next to the 640x725 one),
+    // so provenance — not the folder — decides which rule a file answers to.
+    const legacyPaths = new Set(
+      RUNTIME_ASSET_CATALOG.filter((entry) => entry.provenance === 'legacy-placeholder').map(
+        (entry) => entry.runtimePath.replace(/^assets\//u, ''),
+      ),
+    );
     const files = [
       ...(await pngFiles('bg')),
       ...(await pngFiles('fg')),
@@ -141,7 +172,7 @@ describe('standard asset dimensions', () => {
       ...(await pngFiles('cards')),
       ...(await pngFiles('evidence')),
       ...(await pngFiles('ui')),
-    ];
+    ].filter((relativePath) => legacyPaths.has(relativePath));
     expect(files.length).toBeGreaterThan(0);
 
     const checked: string[] = [];
@@ -159,6 +190,44 @@ describe('standard asset dimensions', () => {
     // Backgrounds, desk, 12 portraits x 3 states, partner used, card base,
     // 3 illustrations, 3 evidence icons, and the two HUD icons.
     expect(checked).toHaveLength(50);
+  });
+
+  it('records the true pixel size of every catalogued PNG', async () => {
+    // Only the IHDR header is needed, and decoding 127 full images to read two
+    // numbers is what pushed this past the default timeout.
+    const measured = await Promise.all(
+      RUNTIME_ASSET_CATALOG.map(async (entry) => {
+        const handle = await open(path.join(ASSETS_ROOT, entry.runtimePath.replace(/^assets\//u, '')));
+        try {
+          const header = Buffer.alloc(24);
+          await handle.read(header, 0, header.length, 0);
+          return {
+            runtimePath: entry.runtimePath,
+            actual: { width: header.readUInt32BE(16), height: header.readUInt32BE(20) },
+            declared: { width: entry.width, height: entry.height },
+          };
+        } finally {
+          await handle.close();
+        }
+      }),
+    );
+    for (const entry of measured) {
+      expect(entry.actual, entry.runtimePath).toEqual(entry.declared);
+    }
+  });
+
+  it('gives every NHN source size a dimension id with the measured value', () => {
+    const nhnSizes = new Set(
+      RUNTIME_ASSET_CATALOG.filter((entry) => entry.provenance === 'nhn-2026').map(
+        (entry) => `${entry.width}x${entry.height}`,
+      ),
+    );
+    const declared = new Set(
+      ASSET_DIMENSION_IDS.map((id) => `${ASSET_DIMENSIONS[id].width}x${ASSET_DIMENSIONS[id].height}`),
+    );
+    for (const size of nhnSizes) {
+      expect(declared.has(size), `no dimension id declares ${size}`).toBe(true);
+    }
   });
 });
 
@@ -212,7 +281,7 @@ describe('asset manifest schema', () => {
     expect(Object.keys(manifest.slots)).toEqual(CANONICAL_SLOTS.map((slot) => slot.id));
     expect(manifest.slots['bg-room']).toEqual({
       dimension: 'bg_interrogation',
-      image: null,
+      image: 'bg_interrogationroom_base.png',
       transform: {
         x: 0,
         y: 0,

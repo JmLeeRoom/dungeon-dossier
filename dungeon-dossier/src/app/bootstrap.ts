@@ -1,7 +1,7 @@
 import {
   createGameApplication,
+  createUiAssetPort,
   preloadRuntimeAssets,
-  resolveAsset,
   runtimeAssetRegistry,
   type ManagedUiLayer,
   type MountedGameApplication,
@@ -13,6 +13,7 @@ import {
   createJudgmentDirection,
   directionForOutcome,
   directionForResolution,
+  interrogationCardLayerAssetKey,
   type InterrogationCallbacks,
   type InterrogationSelection,
   type InterrogationScreenController,
@@ -20,7 +21,11 @@ import {
   type TimedDirectionOverlay,
 } from '../ui/screens/interrogation';
 import { createEndingScreen } from '../ui/screens/ending';
-import { createEventScreen, type EventScreenCallbacks } from '../ui/screens/event';
+import {
+  createEventScreen,
+  eventSceneAssetKeys,
+  type EventScreenCallbacks,
+} from '../ui/screens/event';
 import { createRewardScreen } from '../ui/screens/reward';
 import { createRunStripScreen } from '../ui/screens/strip';
 import {
@@ -32,6 +37,7 @@ import {
   RunCatalogRepository,
   RunStripRepository,
   StringsRepository,
+  runtimeContentUrl,
   type BalanceDefinition,
   type CaseDefinition,
   type JudgmentUiMapDefinition,
@@ -41,6 +47,7 @@ import { createErrorBanner, RUN_FLOW_ERROR_MESSAGE } from '../ui/screens/error';
 import { createDeadSceneScreen } from '../ui/screens/ending';
 import {
   DEAD_SCENE_RETRY_ACTION,
+  deadSceneAssetKeys,
   isFailureReason,
   toDeadSceneModel,
   type FailureReason,
@@ -76,6 +83,7 @@ import { createRunSaveRepository } from './autoplayStorage';
 import { installStrings } from './i18n';
 import {
   collectCutsceneOutcome,
+  cutscenePresentationAssetKeys,
   cutsceneForTiming,
   toCutsceneBeatViews,
   type CutsceneChoiceOutcome,
@@ -122,6 +130,22 @@ import {
   assertRestoredRunSaveSemantics,
   restoreRunState,
 } from './save';
+import {
+  BOARD_ASSET_KEYS,
+  CARD_ATTACHMENT_ASSET_KEYS,
+  CARD_BASE_ASSET_KEY,
+  CARD_ILLUSTRATION_ASSET_KEYS,
+  CARD_LOCK_OVERLAY_ASSET_KEY,
+  CARD_LOCKED_ILLUSTRATION_ASSET_KEY,
+  DETECTIVE_PHOTO_ASSET_KEY,
+  HUD_ICON_ASSET_KEYS,
+  INTERROGATION_BACKGROUND_ASSET_KEY,
+  INTERROGATION_DESK_ASSET_KEY,
+  PARTNER_PHOTO_ASSET_KEY,
+  RESULT_ASSET_KEYS,
+} from './uiAssetBindings';
+import { TAG_CHIP_ASSET_KEYS } from '../ui/widgets';
+import type { RunStripScreenModel } from '../ui/screens/strip';
 
 function stableDialogueSeed(parts: readonly string[]): number {
   let seed = 2_166_136_261;
@@ -151,6 +175,88 @@ function encounterSeed(state: RunState): number {
   return (state.runSeed + Math.imul(state.nodeIndex + 1, 0x9e37_79b9)) >>> 0;
 }
 
+function uniqueAssetKeys(keys: readonly (string | undefined)[]): readonly string[] {
+  return [...new Set(keys.filter((key): key is string => key !== undefined))];
+}
+
+/** Only the visible three-slot board is eligible for preload. */
+function runStripPresentationAssetKeys(model: RunStripScreenModel): readonly string[] {
+  return uniqueAssetKeys([
+    BOARD_ASSET_KEYS.background,
+    BOARD_ASSET_KEYS.pin,
+    DETECTIVE_PHOTO_ASSET_KEY,
+    PARTNER_PHOTO_ASSET_KEY,
+    ...(model.nodes.some((node) => node.visibility === 'VEILED')
+      ? [BOARD_ASSET_KEYS.veiledMarker]
+      : []),
+    ...model.nodes.flatMap((node) =>
+      node.visibility === 'KNOWN' ? [node.artAssetKey] : [],
+    ),
+  ]);
+}
+
+/** The exact images the first interrogation mount can ask its widgets for. */
+function interrogationPresentationAssetKeys(
+  model: InterrogationScreenModel,
+  availableCards: readonly { readonly card_id: string; readonly intent: string }[] = [],
+): readonly string[] {
+  const cards = model.cards.slice(0, 5);
+  const evidenceAssetKeys = model.evidenceAssetKeys ?? {};
+  return uniqueAssetKeys([
+    model.backgroundAssetKey ?? INTERROGATION_BACKGROUND_ASSET_KEY,
+    INTERROGATION_DESK_ASSET_KEY,
+    ...Object.values(HUD_ICON_ASSET_KEYS),
+    ...Object.values(TAG_CHIP_ASSET_KEYS),
+    CARD_BASE_ASSET_KEY,
+    ...Object.values(CARD_ILLUSTRATION_ASSET_KEYS),
+    ...Object.values(CARD_ATTACHMENT_ASSET_KEYS),
+    CARD_LOCKED_ILLUSTRATION_ASSET_KEY,
+    CARD_LOCK_OVERLAY_ASSET_KEY,
+    model.partnerBaseAssetKey,
+    model.partnerUsedAssetKey,
+    model.suspectAssetSet?.base,
+    model.suspectAssetSet?.upset,
+    model.suspectAssetSet?.lose,
+    ...Object.values(evidenceAssetKeys),
+    ...availableCards.map((definition) =>
+      interrogationCardLayerAssetKey(
+        {
+          cardId: definition.card_id,
+          title: '',
+          description: '',
+          intent: definition.intent,
+          cpCost: 0,
+          requiresEvidence: false,
+          ...(CARD_ILLUSTRATION_ASSET_KEYS[definition.card_id] === undefined
+            ? {}
+            : { artAssetKey: CARD_ILLUSTRATION_ASSET_KEYS[definition.card_id] }),
+        },
+        'illust',
+        undefined,
+        evidenceAssetKeys,
+      ),
+    ),
+    ...cards.flatMap((card) => [
+      interrogationCardLayerAssetKey(card, 'illust', undefined, evidenceAssetKeys),
+      interrogationCardLayerAssetKey(
+        card,
+        'stamp',
+        card.attachments?.stampId,
+        evidenceAssetKeys,
+      ),
+      interrogationCardLayerAssetKey(
+        card,
+        'post',
+        card.attachments?.postId,
+        evidenceAssetKeys,
+      ),
+      ...(card.locked === true
+        ? [card.debuffAssetKey ?? CARD_LOCK_OVERLAY_ASSET_KEY]
+        : []),
+    ]),
+  ]);
+}
+
 export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplication> {
   mount.dataset.assetCount = runtimeAssetRegistry.size.toString();
   delete mount.dataset.flowError;
@@ -162,21 +268,10 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
   const mounted = await createGameApplication(mount);
   const audio = new AudioPlayer();
   audio.registerAll(RUNTIME_SOUND_DEFINITIONS);
+  // Boot-critical bundles are awaited; event and result art is fetched behind
+  // the first frame and single-flighted with any later explicit preload.
   await preloadRuntimeAssets();
-  const fallback = runtimeAssetRegistry.get('placeholder/missing/fallback');
-  const assets = {
-    resolveUrl(key: string): string | undefined {
-      if (fallback === undefined) {
-        const exact = runtimeAssetRegistry.get(key);
-        if (exact === undefined) console.warn(`Missing asset "${key}"; no fallback is installed.`);
-        return exact?.url;
-      }
-      return resolveAsset(runtimeAssetRegistry, key, fallback).url;
-    },
-    resolveOptionalUrl(key: string): string | undefined {
-      return runtimeAssetRegistry.get(key)?.url;
-    },
-  };
+  const assets = createUiAssetPort();
 
   const balanceRepository = new BalanceRepository();
   const caseRepository = new CaseRepository();
@@ -534,7 +629,7 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
     return definition;
   };
 
-  const mountStrip = (): void => {
+  const mountStrip = async (): Promise<void> => {
     encounterSession = undefined;
     dialogueService = undefined;
     interrogation = undefined;
@@ -545,7 +640,9 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
       });
     };
     const model = toRunStripScreenModel(runStripDefinition, runSession.snapshot, { strip });
-    const view = createRunStripScreen(model, { onContinue: continueRun });
+    await assets.preloadKeys(runStripPresentationAssetKeys(model));
+    if (destroyed) return;
+    const view = createRunStripScreen(model, { assets, onContinue: continueRun });
     const node = currentRunNode(strip, runSession.snapshot.nodeIndex);
     if (node === null) {
       throw new Error('Cannot mount the run strip after the terminal node.');
@@ -562,12 +659,16 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
     });
   };
 
-  const mountEnding = (): void => {
+  const mountEnding = async (): Promise<void> => {
     encounterSession = undefined;
     dialogueService = undefined;
     interrogation = undefined;
     const endingId = endingIdForRun(runSession.snapshot);
     const model = toEndingScreenModel(endingId, ENDING_PRESENTATIONS);
+    await assets.preloadKeys(
+      model.illustrationAssetKey === undefined ? [] : [model.illustrationAssetKey],
+    );
+    if (destroyed) return;
     const restartRun = (): void => {
       try {
         activateAudio('AMBIENT');
@@ -575,7 +676,9 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
         runSession = newRunSession(freshState());
         syncDevFlags();
         devState.nodeId = strip[0]?.ref ?? 'run-complete';
-        mountStrip();
+        void mountStrip().catch((error: unknown) => {
+          handleFlowError(error, restartRun);
+        });
       } catch (error) {
         handleFlowError(error, restartRun);
       }
@@ -593,10 +696,14 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
   const routeAfterBoundary = (): void => {
     syncDevFlags();
     if (runSession.snapshot.terminal || runSession.snapshot.nodeIndex >= strip.length) {
-      mountEnding();
+      void mountEnding().catch((error: unknown) => {
+        handleFlowError(error, routeAfterBoundary);
+      });
       return;
     }
-    mountStrip();
+    void mountStrip().catch((error: unknown) => {
+      handleFlowError(error, routeAfterBoundary);
+    });
   };
 
   const mountReward = (
@@ -721,9 +828,9 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
       });
       showTimedDirection(overlay, finish);
     } catch (error) {
-      // A malformed cutscene must never strand the run on a blank screen.
-      handleFlowError(error, finish);
-      finish();
+      // A missing required plate or malformed branch is a flow error. Advancing
+      // here would silently commit/skip narrative state behind a blank scene.
+      handleFlowError(error, () => playCutscene(cutscene, onFinish));
     }
   };
 
@@ -828,9 +935,11 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
               result: placementResult.result,
             },
           };
-          const resultView = createEventScreen(resultModel, {
-            onContinue: routeAfterEvent,
-          });
+          const resultView = createEventScreen(
+            resultModel,
+            { onContinue: routeAfterEvent },
+            { assets },
+          );
           setScene({ view: resultView }, 'AMBIENT');
           setAutoplayScene({
             kind: 'EVENT_RESULT',
@@ -943,7 +1052,7 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
         );
       },
     };
-    const view = createEventScreen(model, eventCallbacks);
+    const view = createEventScreen(model, eventCallbacks, { assets });
     setScene({ view }, 'AMBIENT');
     setAutoplayScene({
       kind: 'EVENT',
@@ -1101,6 +1210,23 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
       outcomeTransitionPending = false;
       throw error;
     }
+    const outcomeAssetKeys = uniqueAssetKeys([
+      outcome === 'FAILED' ? RESULT_ASSET_KEYS.fail : RESULT_ASSET_KEYS.clear,
+      ...(outcome === 'FAILED' && lastFailureReason !== undefined
+        ? deadSceneAssetKeys(lastFailureReason)
+        : []),
+    ]);
+    let outcomeAssetsReady: Promise<void> | undefined;
+    const preloadOutcomeAssets = (): Promise<void> => {
+      outcomeAssetsReady ??= assets.preloadKeys(outcomeAssetKeys).catch((error: unknown) => {
+        outcomeAssetsReady = undefined;
+        throw error;
+      });
+      return outcomeAssetsReady;
+    };
+    // Start while the judgment treatment is still playing. The actual result
+    // overlay below still awaits this same single-flight promise.
+    void preloadOutcomeAssets().catch(() => undefined);
     const finishQueuedEncounter = (): void => {
       try {
         routeAfterDirection();
@@ -1110,7 +1236,7 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
       }
     };
     const showEndingDirection = (): void => {
-      try {
+      void preloadOutcomeAssets().then(() => {
         const outcomeCode = outcomeCodeForEvaluation(evaluation);
         const direction = directionForOutcome(outcomeCode);
         cueOutcome(audio, outcomeCode);
@@ -1119,9 +1245,9 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
           ? { assets, audio }
           : { assets });
         showTimedDirection(overlay, finishQueuedEncounter);
-      } catch (error) {
+      }).catch((error: unknown) => {
         handleFlowError(error, showEndingDirection);
-      }
+      });
     };
     if (resolution === undefined) {
       showEndingDirection();
@@ -1560,7 +1686,7 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
       ...(active.encounterId === 'enc_tutorial_slime'
         ? {
             preverifiedCacheFile: await loadPreverifiedCache(
-              '/content/ai-cache/tutorial-slime-full-statement.json',
+              runtimeContentUrl('ai-cache/tutorial-slime-full-statement.json'),
             ),
           }
         : {}),
@@ -1573,7 +1699,7 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
     try {
       const node = currentRunNode(strip, runSession.snapshot.nodeIndex);
       if (node === null) {
-        mountEnding();
+        await mountEnding();
         return;
       }
       devState.nodeId = node.ref;
@@ -1585,7 +1711,15 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
         const event = definition.events_noncombat.find(
           (candidate) => candidate.event_id === node.ref,
         );
-        const opening = event === undefined ? undefined : cutsceneForTiming(event, 'BEFORE');
+        if (event === undefined) throw new Error(`Missing event ${node.ref}.`);
+        const opening = cutsceneForTiming(event, 'BEFORE');
+        const closing = cutsceneForTiming(event, 'AFTER');
+        await assets.preloadKeys(uniqueAssetKeys([
+          ...eventSceneAssetKeys(toEventSceneModel(event)),
+          ...(opening === undefined ? [] : cutscenePresentationAssetKeys(opening)),
+          ...(closing === undefined ? [] : cutscenePresentationAssetKeys(closing)),
+        ]));
+        if (destroyed) return;
         if (opening === undefined) {
           mountEvent(node);
           return;
@@ -1612,6 +1746,13 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
         enhancementDefinitions: runCatalog.enhancements.enhancements,
       });
       if (destroyed) return;
+      await assets.preloadKeys(
+        interrogationPresentationAssetKeys(
+          active.currentModel(),
+          active.cardsDefinition.cards,
+        ),
+      );
+      if (destroyed) return;
       encounterSession = active;
       devState.nodeId = active.coordinator.snapshot.flowNodeId ?? active.encounterId;
       dialogueService = await prepareDialogue(active);
@@ -1630,9 +1771,9 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
     runSession.snapshot.terminal ||
     runSession.snapshot.nodeIndex >= strip.length
   ) {
-    mountEnding();
+    await mountEnding();
   } else {
-    mountStrip();
+    await mountStrip();
   }
 
   if (import.meta.env.DEV) {

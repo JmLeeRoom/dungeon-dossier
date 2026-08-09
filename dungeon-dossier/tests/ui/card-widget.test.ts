@@ -39,17 +39,21 @@ vi.mock('../../src/ui/core/pixelText', async () => {
   };
 });
 
-import { createCardArtwork } from '../../src/ui/widgets/cardArtwork';
+import { createCardWidget } from '../../src/ui/widgets/cardWidget';
 import {
+  CARD_ART_ZONE,
   CARD_COPY_FONT_SIZES,
   CARD_COPY_LINE_HEIGHTS,
   CARD_COPY_RECTS,
   CARD_FAN_SCALE,
   CARD_LAYER_RECTS,
+  CARD_SHEET_ZONE,
   CARD_SIZE,
   cardCopyDisplayFontSize,
   cardDescriptionLineCapacity,
 } from '../../src/ui/widgets/cardLayout';
+import { ASSET_DIMENSIONS } from '../../src/ui/core/assetDimensions';
+import { preservesAspect } from '../../src/ui/core/imageFit';
 
 const FACE = {
   title: '모순 지적',
@@ -64,7 +68,7 @@ function isMockText(node: Container): node is MockTextView {
 
 /**
  * Copy containers are never offset, so a node's local position is already its
- * position in the authored 640x725 card space.
+ * position in the authored 768x1024 card space.
  */
 function collectTexts(node: Container, collected: RecordedText[] = []): RecordedText[] {
   if (isMockText(node)) {
@@ -125,15 +129,19 @@ describe('card face three-zone layout', () => {
       expect(zone.y + zone.height).toBeLessThanOrEqual(CARD_SIZE.height);
     }
 
-    // Cost badge sits left of the title; both sit above the illustration band.
+    // Cost badge sits left of the title, and the hand ordinal right of it.
     expect(CARD_COPY_RECTS.cpBadge.x + CARD_COPY_RECTS.cpBadge.width)
       .toBeLessThanOrEqual(CARD_COPY_RECTS.title.x);
+    expect(CARD_COPY_RECTS.title.x + CARD_COPY_RECTS.title.width)
+      .toBeLessThanOrEqual(CARD_COPY_RECTS.ordinal.x);
+    // The base art is a folder holding a photograph mount above a typed sheet:
+    // every copy zone belongs to the sheet, entirely below the illustration.
+    expect(CARD_LAYER_RECTS.illust.y + CARD_LAYER_RECTS.illust.height)
+      .toBeLessThanOrEqual(CARD_COPY_RECTS.title.y);
     expect(CARD_COPY_RECTS.title.y + CARD_COPY_RECTS.title.height)
-      .toBeLessThanOrEqual(CARD_LAYER_RECTS.illust.y);
-    // Intent label owns the left column beside the right-aligned illustration.
-    expect(CARD_COPY_RECTS.intent.x + CARD_COPY_RECTS.intent.width)
-      .toBeLessThanOrEqual(CARD_LAYER_RECTS.illust.x);
-    // Description block clears the illustration entirely.
+      .toBeLessThanOrEqual(CARD_COPY_RECTS.intent.y);
+    expect(CARD_COPY_RECTS.intent.y + CARD_COPY_RECTS.intent.height)
+      .toBeLessThanOrEqual(CARD_COPY_RECTS.description.y);
     expect(CARD_COPY_RECTS.description.y)
       .toBeGreaterThanOrEqual(CARD_LAYER_RECTS.illust.y + CARD_LAYER_RECTS.illust.height);
   });
@@ -142,7 +150,7 @@ describe('card face three-zone layout', () => {
     // Attachments draw above the base layer, so any overlap would paint over
     // body copy that is now always on the face.
     const description = CARD_COPY_RECTS.description;
-    for (const layer of ['stamp', 'evidence'] as const) {
+    for (const layer of ['illust', 'stamp', 'post', 'evidence'] as const) {
       const rect = CARD_LAYER_RECTS[layer];
       const overlaps =
         rect.x < description.x + description.width &&
@@ -153,23 +161,39 @@ describe('card face three-zone layout', () => {
     }
   });
 
-  it('docks the stamp in the left column beside the illustration', () => {
+  it('presses the attribute seal over the photograph, never over the sheet', () => {
     const stamp = CARD_LAYER_RECTS.stamp;
-    expect(stamp.x + stamp.width).toBeLessThanOrEqual(CARD_LAYER_RECTS.illust.x);
-    expect(stamp.y).toBeGreaterThanOrEqual(
-      CARD_COPY_RECTS.intent.y + CARD_COPY_RECTS.intent.height,
+    // The seal is stamped onto the mount at its authored 344x176. A resized
+    // seal reads as a sticker, so this one is never scaled.
+    expect({ width: stamp.width, height: stamp.height }).toEqual(
+      ASSET_DIMENSIONS.card_badge_344x176,
     );
-    expect(stamp.y + stamp.height).toBeLessThanOrEqual(CARD_COPY_RECTS.description.y);
+    expect(stamp.y + stamp.height).toBeLessThanOrEqual(CARD_SHEET_ZONE.y);
+    expect(stamp.x + stamp.width).toBeLessThanOrEqual(CARD_ART_ZONE.x + CARD_ART_ZONE.width);
   });
 
-  it('right-aligns the illustration with the shared 40px margin', () => {
-    expect(CARD_LAYER_RECTS.illust).toEqual({ x: 344, y: 176, width: 256, height: 256 });
-    expect(CARD_SIZE.width - (CARD_LAYER_RECTS.illust.x + CARD_LAYER_RECTS.illust.width))
-      .toBe(CARD_COPY_RECTS.cpBadge.x);
+  it('centres the illustration on the photograph mount without distorting it', () => {
+    const illust = CARD_LAYER_RECTS.illust;
+    expect(illust.width).toBe(illust.height);
+    expect(illust.x - CARD_ART_ZONE.x).toBe(
+      CARD_ART_ZONE.x + CARD_ART_ZONE.width - (illust.x + illust.width),
+    );
+    expect(illust.y).toBeGreaterThanOrEqual(CARD_ART_ZONE.y);
+    expect(illust.y + illust.height).toBeLessThanOrEqual(CARD_ART_ZONE.y + CARD_ART_ZONE.height);
+  });
+
+  it('keeps every overlay aspect-true to its authored source', () => {
+    expect(preservesAspect(ASSET_DIMENSIONS.card_illust, CARD_LAYER_RECTS.illust)).toBe(true);
+    expect(preservesAspect(ASSET_DIMENSIONS.card_post_675x312, CARD_LAYER_RECTS.post)).toBe(true);
+    expect(preservesAspect(ASSET_DIMENSIONS.card_badge_344x176, CARD_LAYER_RECTS.stamp)).toBe(true);
+    expect(preservesAspect(ASSET_DIMENSIONS.card_evidence_256, CARD_LAYER_RECTS.evidence)).toBe(
+      true,
+    );
+    expect(preservesAspect(ASSET_DIMENSIONS.card_base_768x1024, CARD_LAYER_RECTS.base)).toBe(true);
   });
 
   it('renders the cost as a top-left badge with a plate behind it', () => {
-    const artwork = createCardArtwork(FACE);
+    const artwork = createCardWidget(FACE);
     const rect = CARD_COPY_RECTS.cpBadge;
     const cost = findText(artwork.view, (entry) => entry.text === '2 CP');
 
@@ -177,8 +201,8 @@ describe('card face three-zone layout', () => {
     expect(cost.y).toBe(rect.y + rect.height / 2);
     expect({ x: cost.anchorX, y: cost.anchorY }).toEqual({ x: 0.5, y: 0.5 });
     expect(cost.options.fontSize).toBe(CARD_COPY_FONT_SIZES.cpBadge);
-    // Badge is drawn top-left, never in the old bottom-right corner.
-    expect(cost.y).toBeLessThan(CARD_SIZE.height / 2);
+    // Top-left of the typed sheet, never in the old bottom-right corner.
+    expect(cost.y).toBeLessThan(CARD_SHEET_ZONE.y + CARD_SHEET_ZONE.height / 2);
     expect(cost.x).toBeLessThan(CARD_SIZE.width / 2);
 
     const badge = findParentOfText(artwork.view, '2 CP');
@@ -188,7 +212,7 @@ describe('card face three-zone layout', () => {
   });
 
   it('always renders the description block, not only in the focus modal', () => {
-    const artwork = createCardArtwork(FACE);
+    const artwork = createCardWidget(FACE);
     const rect = CARD_COPY_RECTS.description;
     const body = findText(artwork.view, (entry) => entry.text === FACE.description);
 
@@ -204,7 +228,7 @@ describe('card face three-zone layout', () => {
   });
 
   it('omits the description block when a card authors no body copy', () => {
-    const artwork = createCardArtwork({ title: '질문', intent: 'QUERY', cpCost: 1 });
+    const artwork = createCardWidget({ title: '질문', intent: 'QUERY', cpCost: 1 });
     const texts = collectTexts(artwork.view).map((entry) => entry.text);
 
     expect(texts).toContain('질문');
@@ -216,7 +240,7 @@ describe('card face three-zone layout', () => {
   });
 
   it('moves the hand-slot ordinal opposite the cost badge', () => {
-    const artwork = createCardArtwork({ ...FACE, ordinal: 3 });
+    const artwork = createCardWidget({ ...FACE, ordinal: 3 });
     const rect = CARD_COPY_RECTS.ordinal;
     const ordinal = findText(artwork.view, (entry) => entry.text === '3');
 
@@ -231,17 +255,18 @@ describe('card face three-zone layout', () => {
 });
 
 describe('authored copy sizing at hand scale', () => {
-  it('authors 40px copy so the fan renders it at exactly 8px', () => {
-    expect(CARD_FAN_SCALE).toBe(0.2);
-    expect(cardCopyDisplayFontSize(CARD_COPY_FONT_SIZES.description)).toBe(8);
-    expect(cardCopyDisplayFontSize(CARD_COPY_FONT_SIZES.title)).toBe(8);
+  it('authors 48px copy so the fan renders it at exactly 9px', () => {
+    expect(CARD_FAN_SCALE).toBe(0.1875);
+    expect(cardCopyDisplayFontSize(CARD_COPY_FONT_SIZES.description)).toBe(9);
+    expect(cardCopyDisplayFontSize(CARD_COPY_FONT_SIZES.title)).toBe(9);
     expect(cardCopyDisplayFontSize(CARD_COPY_FONT_SIZES.intent)).toBe(6);
-    // The focus modal composites at native size, so authored px are display px.
-    expect(cardCopyDisplayFontSize(CARD_COPY_FONT_SIZES.description, 1)).toBe(40);
+    // The card is 768 wide against the old 640, so authored copy grew by the
+    // same 1.2 and lands one pixel larger on a proportionally larger card.
+    expect(cardCopyDisplayFontSize(CARD_COPY_FONT_SIZES.description, 1)).toBe(48);
   });
 
-  it('fits four wrapped description lines in the fixed block', () => {
-    expect(cardDescriptionLineCapacity()).toBe(4);
+  it('fits three wrapped description lines in the fixed block', () => {
+    expect(cardDescriptionLineCapacity()).toBe(3);
     expect(
       cardDescriptionLineCapacity() * CARD_COPY_LINE_HEIGHTS.description,
     ).toBeLessThanOrEqual(CARD_COPY_RECTS.description.height);

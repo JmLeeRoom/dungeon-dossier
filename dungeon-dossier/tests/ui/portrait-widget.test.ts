@@ -59,8 +59,10 @@ describe('portrait widget rendering', () => {
       baseUrl: WHITE_TEXTURE_URL,
       statePartsUrl: WHITE_TEXTURE_URL,
     });
-    const base = portrait.view.children[1];
-    const parts = portrait.view.children[2];
+    // Authored transparent sprites no longer sit on top of the opaque
+    // placeholder panel; they are the portrait's only visual children.
+    const base = portrait.view.children[0];
+    const parts = portrait.view.children[1];
     expect(portrait.statePart).toBe('upset');
     expect(base).toBeInstanceOf(Sprite);
     expect(parts).toBeInstanceOf(Sprite);

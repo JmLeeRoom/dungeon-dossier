@@ -1,4 +1,5 @@
 import { ASSET_DIMENSIONS } from '../core/assetDimensions';
+import { containImage, fitImage, type FitBox } from '../core/imageFit';
 import {
   DEFAULT_TARGET_SCALE,
   INTERNAL_HEIGHT,
@@ -13,71 +14,136 @@ export interface CardLayerRect {
   readonly height: number;
 }
 
-/** Authored card size. Every layer rect below is in this card-local space. */
-export const CARD_SIZE = ASSET_DIMENSIONS.card_base;
+/**
+ * The canonical card canvas: the authored size of `ui_card_base.png`. Every
+ * rect below is in this card-local space, and the hand and the focus modal
+ * scale the whole composite rather than laying anything out per display size.
+ *
+ * 768x1024 is 0.750; the superseded generated plate was 640x725 (0.883). They
+ * are not a scale of one another, which is why this is a different dimension id
+ * rather than a changed value.
+ */
+export const CARD_SIZE = ASSET_DIMENSIONS.card_base_768x1024;
 
 const ILLUST = ASSET_DIMENSIONS.card_illust;
-const EVIDENCE = ASSET_DIMENSIONS.evidence;
+const EVIDENCE = ASSET_DIMENSIONS.card_evidence_256;
+const POST = ASSET_DIMENSIONS.card_post_675x312;
+const BADGE = ASSET_DIMENSIONS.card_badge_344x176;
 
-/** Outer padding shared by the copy zones and the right-aligned illustration. */
-const CARD_MARGIN = 40;
+/** Outer padding shared by the copy zones and the illustration. */
+export const CARD_MARGIN = 48;
+
+/**
+ * The base art is a dossier folder holding two sheets: an aged upper leaf that
+ * reads as the photograph mount, and a lighter loose sheet below it that reads
+ * as the typed report. Art goes in the first, copy in the second — the layout
+ * follows the painting rather than dividing the rectangle arbitrarily.
+ */
+export const CARD_ART_ZONE: FitBox = { x: 56, y: 48, width: 656, height: 440 };
+export const CARD_SHEET_ZONE: FitBox = { x: 64, y: 520, width: 640, height: 448 };
+
+/** Attachment zones, resolved aspect-true so no overlay is ever stretched. */
+// The illustration is the one layer allowed to grow: it is the subject of the
+// card and the mount is sized for it. Every card is composited once and then
+// scaled down by the hand or the modal, so the enlargement never survives to
+// the screen as a sampled-up edge.
+const ILLUST_RECT = fitImage(ILLUST, CARD_ART_ZONE, { allowUpscale: true });
+const POST_RECT = containImage(POST, { x: 32, y: 40, width: 432, height: 200 });
+const STAMP_RECT = containImage(BADGE, { x: 368, y: 312, width: BADGE.width, height: BADGE.height });
+const EVIDENCE_RECT = containImage(EVIDENCE, { x: 284, y: 16, width: 200, height: 200 });
 
 export const CARD_LAYER_RECTS: Readonly<Record<CardLayerId, CardLayerRect>> = {
   base: { x: 0, y: 0, width: CARD_SIZE.width, height: CARD_SIZE.height },
-  // Right-aligned so the left column can own the intent label without the two
-  // ever overlapping at fan scale.
-  illust: {
-    x: CARD_SIZE.width - ILLUST.width - CARD_MARGIN,
-    y: 176,
-    width: ILLUST.width,
-    height: ILLUST.height,
-  },
-  // Left column, under the intent label and beside the illustration. It used
-  // to sit bottom-right, which is now the permanent description block.
-  stamp: { x: CARD_MARGIN, y: 240, width: 192, height: 192 },
-  post: { x: 0, y: 0, width: CARD_SIZE.width, height: CARD_SIZE.height },
+  // Centred on the photograph mount at the largest aspect-true size it holds.
+  illust: { x: ILLUST_RECT.x, y: ILLUST_RECT.y, width: ILLUST_RECT.width, height: ILLUST_RECT.height },
+  // The attribute seal is pressed across the lower-right of the photograph, at
+  // its authored 344x176 — a seal that has been resized reads as a sticker.
+  stamp: { x: STAMP_RECT.x, y: STAMP_RECT.y, width: STAMP_RECT.width, height: STAMP_RECT.height },
+  // The post-it is an addition to the file, so it sits over the mount's top
+  // corner rather than covering the whole card the way the old flat tint did.
+  post: { x: POST_RECT.x, y: POST_RECT.y, width: POST_RECT.width, height: POST_RECT.height },
   evidence: {
-    x: (CARD_SIZE.width - EVIDENCE.width) / 2,
-    y: 16,
-    width: EVIDENCE.width,
-    height: EVIDENCE.height,
+    x: EVIDENCE_RECT.x,
+    y: EVIDENCE_RECT.y,
+    width: EVIDENCE_RECT.width,
+    height: EVIDENCE_RECT.height,
   },
 };
+
+/**
+ * Evidence polaroids are clipped to the card, not to the count: three at this
+ * pitch span 108..660, which is inside 0..768 with room for the rotation.
+ */
+export const CARD_EVIDENCE_LAYOUT = {
+  maxVisible: 3,
+  /** Horizontal distance between neighbouring polaroid centres. */
+  pitch: 176,
+  /** Alternating tilt, in radians, so a stack reads as loose photographs. */
+  rotationStep: 0.06,
+} as const;
+
+export interface CardEvidencePlacement {
+  readonly x: number;
+  readonly y: number;
+  readonly rotation: number;
+}
+
+/**
+ * Fans `count` polaroids around the card centre. Returns one placement per
+ * visible item; anything past `maxVisible` is dropped rather than allowed to
+ * run off the card edge.
+ */
+export function layoutCardEvidence(count: number): readonly CardEvidencePlacement[] {
+  const visible = Math.min(
+    Math.max(0, Math.floor(Number.isFinite(count) ? count : 0)),
+    CARD_EVIDENCE_LAYOUT.maxVisible,
+  );
+  const centre = (visible - 1) / 2;
+  return Array.from({ length: visible }, (_, index) => ({
+    x: CARD_LAYER_RECTS.evidence.x + Math.round((index - centre) * CARD_EVIDENCE_LAYOUT.pitch),
+    y: CARD_LAYER_RECTS.evidence.y,
+    rotation: Number(((index - centre) * CARD_EVIDENCE_LAYOUT.rotationStep).toFixed(4)),
+  }));
+}
 
 export type CardCopyZoneId = 'cpBadge' | 'ordinal' | 'title' | 'intent' | 'description';
 
 /**
- * The three fixed reading zones of a card face, in the same authored 640x725
- * space as CARD_LAYER_RECTS: cost badge top-left, illustration right, and a
- * permanent description block across the bottom.
+ * The reading zones, all on the lower sheet: cost badge top-left, hand ordinal
+ * top-right, title between them, intent under the title, and a permanent
+ * description block filling the rest.
  */
 export const CARD_COPY_RECTS: Readonly<Record<CardCopyZoneId, CardLayerRect>> = {
-  cpBadge: { x: CARD_MARGIN, y: 44, width: 88, height: 56 },
-  ordinal: { x: CARD_SIZE.width - CARD_MARGIN - 48, y: 44, width: 48, height: 44 },
-  title: { x: 140, y: 44, width: 460, height: 96 },
-  intent: { x: CARD_MARGIN, y: 192, width: 264, height: 44 },
-  description: { x: CARD_MARGIN, y: 470, width: 560, height: 215 },
+  cpBadge: { x: 96, y: 548, width: 106, height: 68 },
+  ordinal: { x: CARD_SIZE.width - 96 - 58, y: 548, width: 58, height: 54 },
+  title: { x: 216, y: 548, width: 336, height: 116 },
+  intent: { x: 96, y: 676, width: 320, height: 54 },
+  description: { x: 96, y: 740, width: 576, height: 200 },
 };
 
 /**
  * Authored sizes, not display sizes. The hand renders a card at
- * CARD_FAN_SCALE, so 40 here is the 8px the interrogation screen shows.
+ * CARD_FAN_SCALE, so 48 here is the 9px the interrogation screen shows.
  */
 export const CARD_COPY_FONT_SIZES = {
-  title: 40,
-  cpBadge: 35,
-  ordinal: 35,
-  intent: 30,
-  description: 40,
+  title: 48,
+  cpBadge: 48,
+  ordinal: 48,
+  intent: 32,
+  description: 48,
 } as const;
 
 export const CARD_COPY_LINE_HEIGHTS = {
-  title: 44,
-  description: 46,
+  title: 54,
+  description: 56,
 } as const;
 
-/** Cards render at a fifth of their authored size inside the 640x400 grid. */
-export const CARD_FAN_SCALE = 0.2;
+/**
+ * 3/16. Chosen so a card lands on exactly 144x192 in the 640x400 grid: five of
+ * them fit the stage width with the authored fan pitch, and both dimensions
+ * stay whole numbers so the reveal heights and hit areas do too.
+ */
+export const CARD_FAN_SCALE = 0.1875;
 
 /** Authored copy size as it actually lands on the 640x400 stage. */
 export function cardCopyDisplayFontSize(
@@ -93,6 +159,7 @@ export function cardDescriptionLineCapacity(
 ): number {
   return Math.max(0, Math.floor(CARD_COPY_RECTS.description.height / lineHeight));
 }
+
 export const CARD_FAN_WIDTH = CARD_SIZE.width * CARD_FAN_SCALE;
 export const CARD_FAN_HEIGHT = CARD_SIZE.height * CARD_FAN_SCALE;
 
@@ -131,8 +198,8 @@ export function layoutCardHand(
   options: CardHandLayoutOptions = {},
 ): readonly CardHandSlot[] {
   const count = Math.max(0, Math.floor(Number.isFinite(cardCount) ? cardCount : 0));
-  const stageWidth = options.stageWidth ?? 640;
-  const panelBottom = options.panelBottom ?? 400;
+  const stageWidth = options.stageWidth ?? INTERNAL_WIDTH;
+  const panelBottom = options.panelBottom ?? INTERNAL_HEIGHT;
   const cardWidth = options.cardWidth ?? CARD_FAN_WIDTH;
   const cardHeight = options.cardHeight ?? CARD_FAN_HEIGHT;
   const spacing = options.spacing ?? Math.round(cardWidth * 0.84);
@@ -162,9 +229,16 @@ export interface CardModalLayout {
 }
 
 /**
- * The focus modal always composites the card at its authored 640x725 and then
- * fits that frame into the stage, so no layer is ever laid out at a rounded-off
- * size.
+ * The focus frame, in HD source pixels. The card is contained inside it rather
+ * than filling it, so the 768x1024 canvas reaches this box's full height and
+ * keeps its ratio.
+ */
+export const CARD_MODAL_BOX = { width: 640, height: 725 } as const;
+
+/**
+ * The focus modal composites the card at its authored 768x1024 and then fits
+ * that frame into the smaller of the stage and the 640x725 focus box, so no
+ * layer is ever laid out at a rounded-off size.
  */
 export function computeCardModalLayout(
   stageWidth: number,
@@ -179,14 +253,20 @@ export function computeCardModalLayout(
     available.width / CARD_SIZE.width,
     available.height / CARD_SIZE.height,
   );
-  // Authored card pixels are already HD pixels. A 0.5 scale in the internal
-  // 640x400 grid becomes exactly 640x725 after the root stage's 2x upscale.
+  // Authored card pixels are HD pixels. A logical stage drawn at the 2x target
+  // renders one card pixel per HD pixel, so anything below that has to shrink
+  // by the same amount to stay on the texel grid.
   const logicalStageScale = Math.min(
     stageWidth / INTERNAL_WIDTH,
     stageHeight / INTERNAL_HEIGHT,
   );
   const sourcePixelScale = Math.min(1, logicalStageScale / DEFAULT_TARGET_SCALE);
-  const scale = Math.min(fitScale, sourcePixelScale);
+  const boxScale =
+    Math.min(
+      CARD_MODAL_BOX.width / CARD_SIZE.width,
+      CARD_MODAL_BOX.height / CARD_SIZE.height,
+    ) * sourcePixelScale;
+  const scale = Math.min(fitScale, boxScale);
   const width = CARD_SIZE.width * scale;
   const height = CARD_SIZE.height * scale;
   const pixelStep = sourcePixelScale > 0 ? sourcePixelScale : 1;
@@ -206,6 +286,10 @@ export function computeCardModalLayout(
 export function cardLayerZIndex(layer: CardLayerId): number {
   return CARD_LAYER_Z_INDEX[layer];
 }
+
+/** Copy and the lock overlay sit above every raster layer, in that order. */
+export const CARD_COPY_Z_INDEX = 5;
+export const CARD_LOCK_Z_INDEX = 6;
 
 export interface CardDropTargetBounds {
   readonly x: number;

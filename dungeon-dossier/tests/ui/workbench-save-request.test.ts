@@ -12,6 +12,7 @@ import {
   createInitialWorkbenchState,
   describeSaveError,
   formatSaveSuccess,
+  serializeShippingAssetManifest,
   stageSlotFileName,
   withActiveCharacter,
   withStageSlotImage,
@@ -45,6 +46,18 @@ describe('assetTargetPath', () => {
     expect(assetTargetPath('dead_과로_기본.png')).toBe('dead/dead_과로_기본.png');
   });
 
+  it('uses the catalog for NHN filenames whose prefix cannot determine the target folder', () => {
+    expect(assetTargetPath('bg_interrogationroom_desk.png')).toBe(
+      'fg/bg_interrogationroom_desk.png',
+    );
+    expect(assetTargetPath('bg_event_rest.png')).toBe('bg/bg_event_rest.png');
+    expect(assetTargetPath('ui_card_base.png')).toBe('cards/ui_card_base.png');
+    expect(assetTargetPath('ui_card_evidence03.png')).toBe(
+      'evidence/ui_card_evidence03.png',
+    );
+    expect(assetTargetPath('ui_photo_mulkung.png')).toBe('ui/ui_photo_mulkung.png');
+  });
+
   it('refuses anything the runtime registry could not key', () => {
     // Unknown category: there is no folder to route it to.
     expect(assetTargetPath('nope_이름_상태.png')).toBeUndefined();
@@ -52,6 +65,7 @@ describe('assetTargetPath', () => {
     expect(assetTargetPath('두분절.png')).toBeUndefined();
     expect(assetTargetPath('배경_심문실.png')).toBeUndefined();
     expect(assetTargetPath('배경_심문실_시안.jpg')).toBeUndefined();
+    expect(assetTargetPath('배경_심문실_시안.PNG')).toBeUndefined();
     expect(assetTargetPath('배경_심문실_시안')).toBeUndefined();
   });
 
@@ -93,6 +107,11 @@ describe('collectWorkbenchSaveRequest', () => {
     // The manifest is still assembled: placement is a planning artefact that
     // stands on its own even with no pixels attached.
     expect(request.manifest.schema_version).toBe('3.0');
+    expect(Object.values(request.manifest.slots).every((slot) => slot.image !== null)).toBe(true);
+    expect(Object.values(request.manifest.slots).every((slot) => slot.isLocked)).toBe(true);
+    expect(JSON.parse(serializeShippingAssetManifest(createInitialWorkbenchState()))).toEqual(
+      request.manifest,
+    );
   });
 
   it('collects only filled slots, deduplicated and path-sorted', () => {

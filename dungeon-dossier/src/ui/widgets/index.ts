@@ -1,4 +1,4 @@
-export * from './cardArtwork';
+export * from './cardWidget';
 export * from './cardDetailModal';
 export * from './cardFan';
 export * from './cardLayout';
@@ -8,6 +8,7 @@ export * from './evidenceTray';
 export * from './gauge';
 export * from './portrait';
 export * from './shield';
+export * from './suspectPortraitWidget';
 export * from './tagChip';
 export * from './theme';
 export * from './typewriter';

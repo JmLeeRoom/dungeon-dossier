@@ -94,7 +94,7 @@ describe('planner workbench canonical slots', () => {
       'suspect-state-parts': { x: 212, y: 34, width: 216, height: 216 },
       'suspect-lose-parts': { x: 212, y: 34, width: 216, height: 216 },
       'fg-desk': { x: 0, y: 239, width: 640, height: 161 },
-      'card-base': { x: 256, y: 371, width: 128, height: 145 },
+      'card-base': { x: 248, y: 362, width: 144, height: 192 },
       'card-art-1': { x: 176, y: 336, width: 64, height: 64 },
       'card-art-2': { x: 248, y: 336, width: 64, height: 64 },
       'card-art-3': { x: 320, y: 336, width: 64, height: 64 },
@@ -330,10 +330,10 @@ describe('workbench transform controller', () => {
     const reloaded = loadWorkbenchState(storage);
 
     expect(reloaded.geometry['card-base']).toEqual({
-      x: 276,
-      y: 361,
-      width: 128,
-      height: 145,
+      x: 268,
+      y: 352,
+      width: 144,
+      height: 192,
     });
     expect(reloaded.locks['card-base']).toBe(true);
 
@@ -374,15 +374,15 @@ describe('workbench transform controller', () => {
     expect(rotated.rotation['ev-2']).toBe(0);
 
     const initial = createInitialWorkbenchState();
-    expect(getSlotScale(initial, 'ev-1')).toEqual({ scaleX: 36 / 128, scaleY: 36 / 128 });
+    expect(getSlotScale(initial, 'ev-1')).toEqual({ scaleX: 36 / 256, scaleY: 36 / 256 });
     const scaled = withSlotScale(initial, 'ev-1', 0.5, 0.25);
-    expect(scaled.geometry['ev-1']).toEqual({ x: 12, y: 306, width: 64, height: 32 });
+    expect(scaled.geometry['ev-1']).toEqual({ x: 12, y: 306, width: 128, height: 128 });
     expect(buildSlotTransform(scaled, 'ev-1')).toEqual({
       x: 12,
       y: 306,
       rotation: 0,
       scaleX: 0.5,
-      scaleY: 0.25,
+      scaleY: 0.5,
       preserveAspectRatio: true,
     });
   });
@@ -435,14 +435,14 @@ describe('workbench transform controller', () => {
     const manifest = buildAssetManifest(state);
 
     expect(manifest.slots['card-base']).toEqual({
-      dimension: 'card_base',
-      image: null,
+      dimension: 'card_base_768x1024',
+      image: 'ui_card_base.png',
       transform: {
-        x: 256,
-        y: 371,
+        x: 248,
+        y: 362,
         rotation: Math.PI / 4,
-        scaleX: 0.2,
-        scaleY: 0.2,
+        scaleX: 0.1875,
+        scaleY: 0.1875,
         preserveAspectRatio: true,
       },
       isLocked: true,
@@ -456,7 +456,7 @@ describe('workbench transform controller', () => {
         originalName: 'planner-draft.png',
       }),
     );
-    expect(filled.slots['card-base']?.image).toBe(canonicalDownloadName('card-base'));
+    expect(filled.slots['card-base']?.image).toBe('ui_card_base.png');
   });
 });
 
@@ -533,7 +533,7 @@ describe('workbench persistence normalization', () => {
       y: 306,
       rotation: Math.PI / 3,
       scaleX: 0.5,
-      scaleY: 0.25,
+      scaleY: 0.5,
       preserveAspectRatio: true,
     });
     expect(persisted.locks['ev-3']).toBe(true);

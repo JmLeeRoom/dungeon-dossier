@@ -1,7 +1,10 @@
 import { Container, Graphics, Sprite } from 'pixi.js';
 
+import { ASSET_DIMENSIONS } from '../../core/assetDimensions';
+import { containImage } from '../../core/imageFit';
 import { createPixelText } from '../../core/pixelText';
 import type { ManagedUiLayer } from '../../core/sceneManager';
+import type { AssetResolveContext } from '../../core/uiAssetPort';
 import { UI_PALETTE } from '../../widgets/theme';
 import type {
   EndingDirectionKey,
@@ -12,6 +15,8 @@ export interface DirectionAssetLookup {
   resolveUrl(key: string): string | undefined;
   /** Exact lookup with no fallback; missing decorative art must stay invisible. */
   resolveOptionalUrl?(key: string): string | undefined;
+  /** Required scene art fails with screen/content/slot context in production. */
+  resolveRequiredUrl?(key: string, context: AssetResolveContext): string;
 }
 
 /** Structural boundary: callers can adapt AudioPlayer, Howler, or a test spy. */
@@ -561,11 +566,68 @@ export const JUDGMENT_DIRECTION_RENDERERS = {
 export const ENDING_DIRECTION_FACTORIES = ENDING_DIRECTION_RENDERERS;
 export const JUDGMENT_DIRECTION_FACTORIES = JUDGMENT_DIRECTION_RENDERERS;
 
+/**
+ * Whether each of the five treatments closes the investigation or loses it.
+ * `ENDING_BGM_MUTE` is a coerced confession: the case is closed, so it reads as
+ * a clear even though the detective did not earn it cleanly.
+ */
+export const ENDING_DIRECTION_RESULTS = {
+  ENDING_POLAROID: 'clear',
+  ENDING_TRANSFER_STAMP: 'clear',
+  ENDING_BGM_MUTE: 'clear',
+  ENDING_CARD_AND_KNOCK: 'fail',
+  ENDING_OVERWORK: 'fail',
+} as const satisfies Record<EndingDirectionKey, 'clear' | 'fail'>;
+
+export type EndingDirectionResult = (typeof ENDING_DIRECTION_RESULTS)[EndingDirectionKey];
+
+export const RESULT_PLATE_ASSET_KEYS: Readonly<Record<EndingDirectionResult, string>> = {
+  clear: 'ui/game/clear',
+  fail: 'ui/game/fail',
+};
+
+/** Band the 1024x506 result plate is fitted into, in the 640x400 grid. */
+export const RESULT_PLATE_BOUNDS = { x: 60, y: 18, width: 520, height: 110 } as const;
+
+/**
+ * The result plate is composited over the finished treatment rather than
+ * replacing it: the five directions carry the narrative beat, and this states
+ * the outcome. It is fitted, never stretched — the plate is 2.02:1 and the band
+ * is 4.7:1, so filling the band would flatten the artwork.
+ */
+function addResultPlate(
+  view: Container,
+  assets: DirectionAssetLookup | undefined,
+  result: EndingDirectionResult,
+): void {
+  const key = RESULT_PLATE_ASSET_KEYS[result];
+  const url = assets?.resolveRequiredUrl?.(key, {
+    screen: 'encounter-result',
+    contentId: result,
+    slotId: 'result-plate',
+    bundle: 'result',
+  }) ?? (
+    assets?.resolveOptionalUrl !== undefined
+      ? assets.resolveOptionalUrl(key)
+      : assets?.resolveUrl(key)
+  );
+  if (url === undefined) return;
+  const rect = containImage(ASSET_DIMENSIONS.result_1024x506, RESULT_PLATE_BOUNDS);
+  const sprite = Sprite.from(url);
+  sprite.position.set(rect.x, rect.y);
+  sprite.width = rect.width;
+  sprite.height = rect.height;
+  sprite.eventMode = 'none';
+  view.addChild(sprite);
+}
+
 export function createEndingDirection(
   key: EndingDirectionKey,
   options: DirectionRendererOptions = {},
 ): TimedDirectionOverlay {
-  return ENDING_DIRECTION_RENDERERS[key](options);
+  const overlay = ENDING_DIRECTION_RENDERERS[key](options);
+  addResultPlate(overlay.view, options.assets, ENDING_DIRECTION_RESULTS[key]);
+  return overlay;
 }
 
 export function createJudgmentDirection(

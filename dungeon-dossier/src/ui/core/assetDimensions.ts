@@ -3,7 +3,13 @@ export interface AssetDimension {
   readonly height: number;
 }
 
-export const ASSET_DIMENSION_IDS = [
+/**
+ * The first ten IDs are the pre-NHN contract: workbench fixtures, saved
+ * manifests and the placeholder pipeline all name them, so they are appended
+ * to and never renamed. `card_base` in particular stays at its legacy 640x725
+ * while `card_base_768x1024` carries the approved production canvas.
+ */
+export const LEGACY_ASSET_DIMENSION_IDS = [
   'bg_interrogation',
   'desk_foreground',
   'suspect_base',
@@ -14,6 +20,29 @@ export const ASSET_DIMENSION_IDS = [
   'evidence',
   'icon_composure',
   'icon_coercion',
+] as const;
+
+/** Source sizes introduced by the 2026 NHN deliverables. */
+export const NHN_ASSET_DIMENSION_IDS = [
+  'event_bg_1280x800',
+  'event_overlay_181x156',
+  'board_marker_1024',
+  'card_base_768x1024',
+  'card_evidence_256',
+  'card_post_675x312',
+  'card_badge_344x176',
+  'debuff_580',
+  'result_1024x506',
+  'photo_256',
+  'pin_128',
+  'feedback_stamp_620',
+  'system_panel_415x310',
+  'tag_830x330',
+] as const;
+
+export const ASSET_DIMENSION_IDS = [
+  ...LEGACY_ASSET_DIMENSION_IDS,
+  ...NHN_ASSET_DIMENSION_IDS,
 ] as const;
 
 export type AssetDimensionId = (typeof ASSET_DIMENSION_IDS)[number];
@@ -33,11 +62,30 @@ export const ASSET_DIMENSIONS: Readonly<Record<AssetDimensionId, AssetDimension>
   suspect_base: { width: 512, height: 512 },
   suspect_state_parts: { width: 512, height: 512 },
   partner: { width: 512, height: 512 },
+  // Legacy generated card template. The approved production base is
+  // `card_base_768x1024`; this entry stays so saved manifests keep parsing.
   card_base: { width: 640, height: 725 },
   card_illust: { width: 256, height: 256 },
   evidence: { width: 128, height: 128 },
   icon_composure: { width: 32, height: 32 },
   icon_coercion: { width: 32, height: 32 },
+
+  event_bg_1280x800: { width: 1280, height: 800 },
+  event_overlay_181x156: { width: 181, height: 156 },
+  board_marker_1024: { width: 1024, height: 1024 },
+  // The canonical card canvas. 768x1024 is 0.750; the legacy 640x725 is 0.883,
+  // so the two are not a scale of one another and cannot share a rect table.
+  card_base_768x1024: { width: 768, height: 1024 },
+  card_evidence_256: { width: 256, height: 256 },
+  card_post_675x312: { width: 675, height: 312 },
+  card_badge_344x176: { width: 344, height: 176 },
+  debuff_580: { width: 580, height: 580 },
+  result_1024x506: { width: 1024, height: 506 },
+  photo_256: { width: 256, height: 256 },
+  pin_128: { width: 128, height: 128 },
+  feedback_stamp_620: { width: 620, height: 620 },
+  system_panel_415x310: { width: 415, height: 310 },
+  tag_830x330: { width: 830, height: 330 },
 };
 
 const ASSET_DIMENSION_ID_SET: ReadonlySet<string> = new Set(ASSET_DIMENSION_IDS);

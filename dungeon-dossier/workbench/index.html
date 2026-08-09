@@ -288,8 +288,9 @@
 
     <footer class="footer">
       <p>
-        업로드 이미지는 서버로 전송하지 않고 이 브라우저의 <code>localStorage</code>에만 저장됩니다.
-        게임 빌드 반영은 내려받은 파일을 <code>assets/</code>에 옮기는 별도 단계입니다.
+        업로드 미리보기는 이 브라우저의 <code>localStorage</code>에 보관됩니다.
+        직접 저장을 누르면 배포용 배치 manifest와 허용된 PNG만 개발 서버의 검증을 거쳐
+        <code>assets/</code>에 기록되며, 승인 NHN 원본은 importer로만 교체할 수 있습니다.
       </p>
       <output id="save-status" aria-live="polite">준비됨</output>
     </footer>

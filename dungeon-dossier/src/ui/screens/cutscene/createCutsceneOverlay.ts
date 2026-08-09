@@ -1,5 +1,7 @@
 import { Container, Graphics, Sprite, type FederatedPointerEvent } from 'pixi.js';
 
+import { ASSET_DIMENSIONS, type AssetDimension } from '../../core/assetDimensions';
+import { fitImage, type ImageFitMode } from '../../core/imageFit';
 import { createPixelText } from '../../core/pixelText';
 import { UI_PALETTE } from '../../widgets/theme';
 import {
@@ -58,25 +60,39 @@ interface Rect {
 function resolveAssetUrl(
   assets: DirectionAssetLookup | undefined,
   key: string,
+  contentId: string,
+  slotId: string,
 ): string | undefined {
-  return assets?.resolveOptionalUrl?.(key) ?? assets?.resolveUrl(key);
+  if (assets === undefined) return undefined;
+  return assets.resolveRequiredUrl?.(key, {
+    screen: 'cutscene',
+    contentId,
+    slotId,
+    bundle: 'event',
+  }) ?? assets.resolveOptionalUrl?.(key) ?? assets.resolveUrl(key);
 }
 
-/** Decorative art is optional, so an unresolved key falls back to drawn stand-in art. */
+/** An unresolved legacy/test key falls back to drawn stand-in art. */
 function addArt(
   parent: Container,
   assets: DirectionAssetLookup | undefined,
   key: string,
   bounds: Rect,
   placeholder: Graphics,
+  source: AssetDimension,
+  mode: ImageFitMode,
+  contentId: string,
+  slotId: string,
 ): void {
   parent.addChild(placeholder);
-  const url = resolveAssetUrl(assets, key);
+  const url = resolveAssetUrl(assets, key, contentId, slotId);
   if (url === undefined) return;
+  const rect = fitImage(source, bounds, { mode, allowUpscale: true });
   const sprite = Sprite.from(url);
-  sprite.position.set(bounds.x, bounds.y);
-  sprite.width = bounds.width;
-  sprite.height = bounds.height;
+  sprite.position.set(rect.x, rect.y);
+  sprite.width = rect.width;
+  sprite.height = rect.height;
+  sprite.eventMode = 'none';
   parent.addChild(sprite);
 }
 
@@ -268,14 +284,30 @@ export function createCutsceneOverlay(
       const bounds = portraitBounds(portrait.side);
       const frame = new Container();
       frame.alpha = portrait.dim ? DIMMED_PORTRAIT_ALPHA : 1;
-      addArt(frame, options.assets, portrait.assetKey, bounds, portraitPlaceholder(bounds));
+      addArt(
+        frame,
+        options.assets,
+        portrait.assetKey,
+        bounds,
+        portraitPlaceholder(bounds),
+        ASSET_DIMENSIONS.suspect_base,
+        'contain',
+        beat.beatId,
+        `portrait-${portrait.side.toLowerCase()}`,
+      );
       portraitLayer.addChild(frame);
     }
   }
 
   function renderBackground(beat: CutsceneBeatView): void {
     const key = beat.backgroundAssetKey;
-    if (key === undefined || key === backgroundKey) return;
+    if (key === undefined) {
+      if (backgroundLayer.children.length === 0) {
+        backgroundLayer.addChild(backgroundPlaceholder());
+      }
+      return;
+    }
+    if (key === backgroundKey) return;
     backgroundKey = key;
     backgroundLayer.removeChildren().forEach((child) => {
       child.destroy({ children: true });
@@ -286,6 +318,10 @@ export function createCutsceneOverlay(
       key,
       { x: 0, y: 0, ...CUTSCENE_LAYOUT.stage },
       backgroundPlaceholder(),
+      ASSET_DIMENSIONS.event_bg_1280x800,
+      'cover',
+      beat.beatId,
+      'background',
     );
   }
 

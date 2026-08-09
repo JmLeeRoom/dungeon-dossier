@@ -9,6 +9,7 @@ import {
   DISTORTION_WARNING_THRESHOLD,
   LEGACY_ASSET_MANIFEST_SCHEMA_VERSION,
   migrateAssetManifest,
+  parseAssetManifest,
   resolveTransformSize,
   snapToRenderGrid,
   transformDistortion,
@@ -99,6 +100,28 @@ describe('asset transform arbitrary sizing', () => {
       width: 512,
       height: 320,
     });
+
+    const authoredCardHand = createAssetTransform({ scaleX: 0.1875, scaleY: 0.1875 });
+    expect(resolveTransformSize(authoredCardHand, 'card_base_768x1024')).toEqual({
+      width: 144,
+      height: 192,
+    });
+  });
+
+  it('keeps historic V3 non-uniform scales readable while new writers normalize them', () => {
+    const historic = createAssetTransform({ scaleX: 0.5, scaleY: 0.4 });
+    expect(historic).toMatchObject({
+      scaleX: 0.5,
+      scaleY: 0.4,
+      preserveAspectRatio: true,
+    });
+    expect(resolveTransformSize(historic, 'bg_interrogation')).toEqual({
+      width: 640,
+      height: 320,
+    });
+    expect(() =>
+      createAssetTransform({ preserveAspectRatio: false, scaleX: 0.5, scaleY: 0.4 }),
+    ).not.toThrow();
   });
 
   it('reports aspect deviation so the workbench can badge deliberate distortion', () => {
@@ -159,6 +182,25 @@ describe('asset manifest 2.0 to 3.0 migration', () => {
   it('accepts an already-current manifest unchanged', () => {
     const current = migrateAssetManifest(legacyManifest);
     expect(migrateAssetManifest(current)).toEqual(current);
+  });
+
+  it('accepts a historic V3 workbench manifest with rounded non-uniform scales', () => {
+    const historicV3 = {
+      ...legacyManifest,
+      schema_version: ASSET_MANIFEST_SCHEMA_VERSION,
+      slots: {
+        'ev-1': {
+          ...legacySlot,
+          transform: {
+            ...legacySlot.transform,
+            scaleY: 0.283,
+            preserveAspectRatio: true,
+          },
+        },
+      },
+    };
+
+    expect(parseAssetManifest(historicV3)).toEqual(historicV3);
   });
 
   it('rejects a manifest whose transform violates the aspect-lock contract', () => {

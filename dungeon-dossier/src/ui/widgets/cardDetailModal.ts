@@ -1,6 +1,6 @@
 import { Container, Graphics, Rectangle } from 'pixi.js';
 import { createPixelText } from '../core/pixelText';
-import { createCardArtwork, type CardArtworkFace, type CardLayerUrlResolver } from './cardArtwork';
+import { createCardWidget, type CardFace, type CardLayerUrlResolver } from './cardWidget';
 import type { CardAttachments } from './cardLayers';
 import { computeCardModalLayout, type CardModalLayout } from './cardLayout';
 import { UI_PALETTE } from './theme';
@@ -10,6 +10,8 @@ export interface CardDetailModalOptions {
   readonly stageHeight?: number;
   readonly attachments?: CardAttachments;
   readonly resolveLayerUrl?: CardLayerUrlResolver;
+  /** `ui/debuff/kiss`; only drawn when the face itself reports `locked`. */
+  readonly lockOverlayUrl?: string;
   readonly onDismiss?: () => void;
 }
 
@@ -24,7 +26,7 @@ export interface CardDetailModalController {
  * click outside the card frame.
  */
 export function createCardDetailModal(
-  face: CardArtworkFace,
+  face: CardFace,
   options: CardDetailModalOptions = {},
 ): CardDetailModalController {
   const stageWidth = options.stageWidth ?? 640;
@@ -41,8 +43,9 @@ export function createCardDetailModal(
   backdrop.eventMode = 'none';
   view.addChild(backdrop);
 
-  const artwork = createCardArtwork(face, {
+  const artwork = createCardWidget(face, {
     ...(options.attachments === undefined ? {} : { attachments: options.attachments }),
+    ...(options.lockOverlayUrl === undefined ? {} : { lockOverlayUrl: options.lockOverlayUrl }),
     ...(options.resolveLayerUrl === undefined ? {} : { resolveLayerUrl: options.resolveLayerUrl }),
   });
   const frame = new Container();

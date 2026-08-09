@@ -15,6 +15,11 @@ export type EpisodeNodeView =
       readonly role: EpisodeSlotRole;
       readonly label: string;
       readonly status: EpisodeNodeStatus;
+      /**
+       * Only a KNOWN slot may carry art. The VEILED arm has no such field, so
+       * a future node's photograph cannot be produced, preloaded or logged.
+       */
+      readonly artAssetKey?: string;
     }
   | {
       readonly visibility: 'VEILED';
@@ -52,6 +57,7 @@ export interface EpisodeBoardNodeInput {
   readonly kind: RunStripNodeKind;
   readonly role: EpisodeSlotRole;
   readonly label: string;
+  readonly artAssetKey?: string;
 }
 
 export interface EpisodeBoardInput {

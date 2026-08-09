@@ -12,6 +12,10 @@ import {
   type PlannerImageSlotElement,
 } from './image-slot.mts';
 import {
+  buildShippingSlotPreviews,
+  isStagePreviewSlotVisible,
+} from './shipping-preview.mts';
+import {
   ASSET_MANIFEST_JSON_NAME,
   CANONICAL_SLOTS,
   CHARACTER_PART_NAMES,
@@ -47,7 +51,7 @@ import {
   resolveSlotBinding,
   resolveStageSlotImage,
   saveWorkbenchState,
-  serializeAssetManifest,
+  serializeShippingAssetManifest,
   serializeCharacterPartsManifest,
   buildSlotTransform,
   collectWorkbenchSaveRequest,
@@ -69,11 +73,20 @@ import {
   type CharacterPartName,
   type Rect,
   type SlotId,
+  type SlotImageState,
   type WorkbenchDragMode,
   type WorkbenchSaveRequest,
   type WorkbenchSaveSuccess,
   type WorkbenchState,
 } from './model.mts';
+
+const shippingSlotPreviews = buildShippingSlotPreviews(
+  import.meta.glob<string>('../assets/**/*.png', {
+    eager: true,
+    import: 'default',
+    query: '?url',
+  }),
+);
 
 const RECT_FIELDS = ['x', 'y', 'width', 'height'] as const;
 const ROTATE_HANDLE_GAP = 22;
@@ -265,6 +278,10 @@ let selectedId: SlotId = 'bg-room';
 let tweakMode = false;
 let zoom = zoomSelect.value === '2' ? 2 : 1;
 
+function resolveDisplayedStageSlotImage(id: SlotId): SlotImageState {
+  return resolveStageSlotImage(state, id) ?? shippingSlotPreviews[id];
+}
+
 interface DragSession {
   readonly mode: WorkbenchDragMode;
   readonly slotId: SlotId;
@@ -342,8 +359,7 @@ function stageSlotDownloadName(id: SlotId): string {
 }
 
 function downloadSlotImage(id: SlotId): void {
-  const image = resolveStageSlotImage(state, id);
-  if (image === undefined) return;
+  const image = resolveDisplayedStageSlotImage(id);
   const filename = stageSlotDownloadName(id);
   triggerDownload(image.dataUrl, filename);
   setStatus(`${filename} 다운로드`);
@@ -445,7 +461,7 @@ function renderAssetList(): void {
   const fragment = document.createDocumentFragment();
 
   for (const definition of CANONICAL_SLOTS) {
-    const image = resolveStageSlotImage(state, definition.id);
+    const image = resolveDisplayedStageSlotImage(definition.id);
     const source = getSlotSourceDimension(definition.id);
     const row = document.createElement('div');
     row.className = 'asset-row';
@@ -542,7 +558,8 @@ function render(): void {
     element.style.height = `${rect.height}px`;
     element.style.zIndex = definition.layer.toString();
     element.style.transform = `rotate(${state.rotation[definition.id]}rad)`;
-    element.setImage(resolveStageSlotImage(state, definition.id));
+    element.style.display = isStagePreviewSlotVisible(definition.id, selectedId) ? 'block' : 'none';
+    element.setImage(resolveDisplayedStageSlotImage(definition.id));
     element.toggleAttribute('tweak-mode', tweakMode);
     element.toggleAttribute('data-locked', state.locks[definition.id]);
     element.toggleAttribute('data-selected', tweakMode && definition.id === selectedId);
@@ -596,11 +613,10 @@ function render(): void {
   partsXInput.value = String(partsOffset.x);
   partsYInput.value = String(partsOffset.y);
   partsJson.textContent = serializePortraitPartsManifest(state.geometry);
-  manifestJson.textContent = serializeAssetManifest(state);
+  manifestJson.textContent = serializeShippingAssetManifest(state);
 
-  const hasSelectedImage = resolveStageSlotImage(state, selectedId) !== undefined;
-  downloadSelectedImageButton.disabled = !hasSelectedImage;
-  clearSelectedImageButton.disabled = !hasSelectedImage;
+  downloadSelectedImageButton.disabled = false;
+  clearSelectedImageButton.disabled = resolveStageSlotImage(state, selectedId) === undefined;
 
   renderGizmo();
   renderAssetList();
@@ -949,7 +965,7 @@ downloadPartsJsonButton.addEventListener('click', () => {
 });
 
 downloadManifestButton.addEventListener('click', () => {
-  downloadTextFile(serializeAssetManifest(state), ASSET_MANIFEST_JSON_NAME);
+  downloadTextFile(serializeShippingAssetManifest(state), ASSET_MANIFEST_JSON_NAME);
   setStatus(`${ASSET_MANIFEST_JSON_NAME} 다운로드`);
 });
 

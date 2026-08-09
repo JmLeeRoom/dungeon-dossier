@@ -3,6 +3,7 @@ import {
   ValidatedRuntimeJsonRepository,
   type ValidatedRepositoryOptions,
 } from './RuntimeJsonRepository';
+import { runtimeContentUrl } from './runtimeContentUrl';
 
 /** Loads the canonical, data-owned 15-node run order. */
 export class RunStripRepository {
@@ -13,6 +14,6 @@ export class RunStripRepository {
   }
 
   load(): Promise<RunStripDefinition | undefined> {
-    return this.#repository.load('/content/common/run-strip.json');
+    return this.#repository.load(runtimeContentUrl('common/run-strip.json'));
   }
 }

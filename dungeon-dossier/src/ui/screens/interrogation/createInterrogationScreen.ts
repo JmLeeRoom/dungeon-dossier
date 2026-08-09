@@ -1,8 +1,10 @@
 import { Container, Graphics, Sprite } from 'pixi.js';
 import type { StatementTokenView, SuspectStatePart } from '../../../dto';
-import { ASSET_DIMENSIONS } from '../../core/assetDimensions';
-import { DEFAULT_TARGET_SCALE } from '../../core/integerScale';
 import { bindSecondaryKeyboardInput } from '../../core/input';
+import {
+  applyAssetPlacement,
+  requireAssetPlacement,
+} from '../../core/placementRegistry';
 import { createPixelText } from '../../core/pixelText';
 import { createSceneShake, type ShakeProfile } from '../../core/shake';
 import { createDossierScreen } from '../dossier';
@@ -13,12 +15,13 @@ import {
   createEvidenceTray,
   createGauge,
   createPartnerPortrait,
-  createPortrait,
   createShield,
+  createSuspectPortrait,
   createTagChip,
   createTypewriter,
+  applyTagChipDeactivation,
   deriveFacetTagChipState,
-  SUSPECT_PORTRAIT_SIZE,
+  TAG_CHIP_SIZE,
   UI_PALETTE,
   type CardDetailModalController,
   type CardAttachments,
@@ -27,10 +30,16 @@ import {
   type EvidenceTrayController,
   type TagChipController,
 } from '../../widgets';
+import {
+  CARD_ATTACHMENT_ASSET_KEYS,
+  CARD_BASE_ASSET_KEY,
+  CARD_LOCK_OVERLAY_ASSET_KEY,
+} from '../../../app/uiAssetBindings';
 import { createJudgmentBanner, type JudgmentBannerController } from './judgmentBanner';
 import { createPulseRings, createPunishJuice, PUNISH_TIMELINE } from './punishJuice';
 import {
   canSubmitInterrogationSelection,
+  interrogationCardAllowsFacet,
   type InterrogationAssetLookup,
   type InterrogationCallbacks,
   type InterrogationCardView,
@@ -45,16 +54,26 @@ const FACETS: readonly PublicFacet[] = ['WHO', 'WHEN', 'WHERE', 'WHAT', 'HOW', '
 
 const STAGE_WIDTH = 640;
 const STAGE_HEIGHT = 400;
+const BACKGROUND_PLACEMENT = requireAssetPlacement('bg-room');
+const DESK_PLACEMENT = requireAssetPlacement('fg-desk');
+const SUSPECT_PLACEMENT = requireAssetPlacement('suspect-base');
+const PARTNER_PLACEMENT = requireAssetPlacement('partner-base');
+const COMPOSURE_ICON_PLACEMENT = requireAssetPlacement('icon-composure');
+const COERCION_ICON_PLACEMENT = requireAssetPlacement('icon-coercion');
 /**
  * Desk height in the 640x400 grid, rounded up so the plate always reaches the
  * stage floor. The authored 1280x321 plate is 160.5 logical units tall; rounding
  * down would leave a 1px gap, so it is drawn one HD pixel taller instead.
  */
-export const DESK_LOGICAL_HEIGHT = Math.ceil(
-  ASSET_DIMENSIONS.desk_foreground.height / DEFAULT_TARGET_SCALE,
-);
-export const DESK_TOP = STAGE_HEIGHT - DESK_LOGICAL_HEIGHT;
-const TAG_ROW_HEIGHT = 26;
+export const DESK_LOGICAL_HEIGHT = DESK_PLACEMENT.height;
+export const DESK_TOP = DESK_PLACEMENT.y;
+/**
+ * The authored tag plate is 830x330. At the 98px row width the desk allots, an
+ * aspect-true chip is 39px tall, not the 26px the vector chip used.
+ */
+export const TAG_ROW_HEIGHT = TAG_CHIP_SIZE.height;
+export const TAG_CHIP_WIDTH = TAG_CHIP_SIZE.width;
+export const TAG_CHIP_PITCH = 103;
 /** Clearance between the tag chips and the desk edge they sit above. */
 const TAG_ROW_GAP = 8;
 export const TAG_ROW_Y = DESK_TOP - TAG_ROW_HEIGHT - TAG_ROW_GAP;
@@ -70,9 +89,13 @@ export const DESK_ACTION_INSET = 57;
 export const DESK_SECURE_INSET = 83;
 export const DESK_DOSSIER_INSET = 105;
 const CARD_HAND_SPACING = 76;
-const DEFAULT_BACKGROUND_ASSET_KEY = '배경/심문실/시안';
-const CARD_BASE_ASSET_KEY = 'card/기본/템플릿';
-const CARD_ILLUSTRATION_ASSET_KEYS: Readonly<Record<string, string>> = {
+/**
+ * Fallback illustrations for the three cards with no approved art yet. They are
+ * chosen by intent because that is all the generated set ever distinguished;
+ * every card that *does* have approved art is bound by card id in
+ * `uiAssetBindings`, never by intent.
+ */
+const LEGACY_CARD_ILLUSTRATION_ASSET_KEYS: Readonly<Record<string, string>> = {
   QUERY: 'card/질문/일러',
   CLARIFY: 'card/질문/일러',
   CONFIRM: 'card/질문/일러',
@@ -83,11 +106,6 @@ const CARD_ILLUSTRATION_ASSET_KEYS: Readonly<Record<string, string>> = {
   SPECIAL: 'card/압박/일러',
   COMMIT: 'card/모순/일러',
 };
-const EVIDENCE_ASSET_KEYS = [
-  'ev/사건/증거1',
-  'ev/사건/증거2',
-  'ev/사건/증거3',
-] as const;
 
 export interface InterrogationScreenServices {
   readonly assets?: InterrogationAssetLookup;
@@ -122,6 +140,19 @@ interface ActionButtonController {
   readonly view: Container;
   setEnabled(enabled: boolean): void;
   setLabel(label: string): void;
+}
+
+function resolveRequiredSceneAsset(
+  assets: InterrogationAssetLookup | undefined,
+  key: string,
+  slotId: string,
+): string | undefined {
+  if (assets === undefined) return undefined;
+  return assets.resolveRequiredUrl?.(key, {
+    screen: 'interrogation',
+    slotId,
+    bundle: 'interrogation',
+  }) ?? assets.resolveUrl(key);
 }
 
 function createActionButton(
@@ -168,11 +199,14 @@ function addBackground(
   assets: InterrogationAssetLookup | undefined,
   assetKey: string | undefined,
 ): void {
-  const backgroundUrl = assets?.resolveUrl(assetKey ?? DEFAULT_BACKGROUND_ASSET_KEY);
+  const backgroundUrl = resolveRequiredSceneAsset(
+    assets,
+    assetKey ?? BACKGROUND_PLACEMENT.assetKey,
+    BACKGROUND_PLACEMENT.slotId,
+  );
   if (backgroundUrl !== undefined) {
     const background = Sprite.from(backgroundUrl);
-    background.width = STAGE_WIDTH;
-    background.height = STAGE_HEIGHT;
+    applyAssetPlacement(background, BACKGROUND_PLACEMENT);
     view.addChild(background);
     return;
   }
@@ -200,12 +234,14 @@ function addBackground(
  * pixel taller to sit flush against the stage floor.
  */
 function addDeskForeground(view: Container, assets: InterrogationAssetLookup | undefined): void {
-  const deskUrl = assets?.resolveUrl('전경/책상/기본');
+  const deskUrl = resolveRequiredSceneAsset(
+    assets,
+    DESK_PLACEMENT.assetKey,
+    DESK_PLACEMENT.slotId,
+  );
   if (deskUrl !== undefined) {
     const desk = Sprite.from(deskUrl);
-    desk.position.set(0, DESK_TOP);
-    desk.width = STAGE_WIDTH;
-    desk.height = DESK_LOGICAL_HEIGHT;
+    applyAssetPlacement(desk, DESK_PLACEMENT);
     view.addChild(desk);
     return;
   }
@@ -225,9 +261,6 @@ interface HudAnchors {
   readonly coercionIcon?: Container;
 }
 
-const COERCION_ICON_POSITION = { x: 326, y: 5 } as const;
-const HUD_ICON_SIZE = 16;
-const SUSPECT_PORTRAIT_POSITION = { x: 212, y: 34 } as const;
 const LOSE_SCENE_SHAKE: ShakeProfile = {
   durationMs: 400,
   amplitude: 6,
@@ -272,18 +305,16 @@ function addHud(
 
   // The 32x32 source icons render as 16x16 anchors for each gauge.
   let coercionIcon: Sprite | undefined;
-  for (const [key, x] of [
-    ['아이콘/평정심/기본', 139],
-    ['아이콘/강압/기본', COERCION_ICON_POSITION.x],
+  for (const placement of [
+    COMPOSURE_ICON_PLACEMENT,
+    COERCION_ICON_PLACEMENT,
   ] as const) {
-    const url = assets?.resolveUrl(key);
+    const url = resolveRequiredSceneAsset(assets, placement.assetKey, placement.slotId);
     if (url === undefined) continue;
     const icon = Sprite.from(url);
-    icon.position.set(x, COERCION_ICON_POSITION.y);
-    icon.width = HUD_ICON_SIZE;
-    icon.height = HUD_ICON_SIZE;
+    applyAssetPlacement(icon, placement);
     hud.addChild(icon);
-    if (x === COERCION_ICON_POSITION.x) coercionIcon = icon;
+    if (placement.slotId === COERCION_ICON_PLACEMENT.slotId) coercionIcon = icon;
   }
 
   const slips = coercionWarningSlipCount(model.dto.resources.coercion, model.coercionMax);
@@ -305,8 +336,8 @@ function addHud(
   view.addChild(hud);
   return {
     coercionAnchor: {
-      x: COERCION_ICON_POSITION.x + HUD_ICON_SIZE / 2,
-      y: COERCION_ICON_POSITION.y + HUD_ICON_SIZE / 2,
+      x: COERCION_ICON_PLACEMENT.x + COERCION_ICON_PLACEMENT.width / 2,
+      y: COERCION_ICON_PLACEMENT.y + COERCION_ICON_PLACEMENT.height / 2,
     },
     ...(coercionIcon === undefined ? {} : { coercionIcon }),
   };
@@ -338,26 +369,34 @@ function firstStatementText(model: InterrogationScreenModel): string {
   return model.dto.statement.find((token) => token.presentation !== 'HIDDEN')?.text ?? '진술을 기다리는 중입니다.';
 }
 
+/**
+ * Which PNG each card layer draws.
+ *
+ * Evidence used to be picked by `handIndex % 3`, which meant the same exhibit
+ * showed a different photograph depending on the order it happened to be
+ * acquired in. It is now looked up by evidence id through the app layer's
+ * approved table, and an id with no entry draws nothing rather than the wrong
+ * thing.
+ */
 export function interrogationCardLayerAssetKey(
   card: InterrogationCardView,
   layer: CardLayerId,
   attachmentId: string | undefined,
-  evidence: InterrogationScreenModel['dto']['evidence'],
+  evidenceAssetKeys: Readonly<Record<string, string>> = {},
 ): string | undefined {
   if (layer === 'base') return CARD_BASE_ASSET_KEY;
   if (layer === 'illust') {
-    return card.artAssetKey ?? CARD_ILLUSTRATION_ASSET_KEYS[card.intent];
+    return card.artAssetKey ?? LEGACY_CARD_ILLUSTRATION_ASSET_KEYS[card.intent];
   }
-  if (layer === 'evidence' && attachmentId !== undefined) {
-    const evidenceIndex = evidence.findIndex((item) => item.evidenceId === attachmentId);
-    const assetIndex = evidenceIndex < 0 ? 0 : evidenceIndex % EVIDENCE_ASSET_KEYS.length;
-    return EVIDENCE_ASSET_KEYS[assetIndex];
+  if (layer === 'evidence') {
+    return attachmentId === undefined ? undefined : evidenceAssetKeys[attachmentId];
   }
-  // Stamp/post IDs such as BLUE, RED, HOW, or CLIP are presentation tokens.
-  // If authored art later supplies a registry key it can pass that key through;
-  // otherwise cardArtwork renders the built-in placeholder for the layer.
-  if ((layer === 'stamp' || layer === 'post') && attachmentId?.includes('/') === true) {
-    return attachmentId;
+  if (layer === 'stamp' || layer === 'post') {
+    if (attachmentId === undefined) return undefined;
+    // A token such as BLUE, HOW or CLIP names an overlay; an authored key that
+    // already reads as `category/name/state` passes straight through.
+    return CARD_ATTACHMENT_ASSET_KEYS[attachmentId] ??
+      (attachmentId.includes('/') ? attachmentId : undefined);
   }
   return undefined;
 }
@@ -401,22 +440,31 @@ export function createInterrogationScreen(
   addStatusStrip(content, model);
 
   const suspectStatePart = model.suspectStatePart;
-  const baseUrl =
-    model.portraitBaseAssetKey === undefined
-      ? undefined
-      : services.assets?.resolveUrl(model.portraitBaseAssetKey);
-  const statePartsKey = suspectStatePart === 'base'
-    ? undefined
-    : model.portraitStatePartsAssetKeys?.[suspectStatePart];
-  const statePartsUrl =
-    statePartsKey === undefined ? undefined : services.assets?.resolveUrl(statePartsKey);
-  const portrait = createPortrait({
+  // The whole suspect is rebuilt on every submission, so the widget resolves
+  // one frame for the state it is mounted in; `bootstrap` compares the state
+  // across mounts and drives the shake on the container that survives.
+  const portrait = createSuspectPortrait({
     label: model.suspectName,
     statePart: suspectStatePart,
-    ...(baseUrl === undefined ? {} : { baseUrl }),
-    ...(statePartsUrl === undefined ? {} : { statePartsUrl }),
+    ...(model.suspectAssetSet === undefined ? {} : { assetSet: model.suspectAssetSet }),
+    width: SUSPECT_PLACEMENT.width,
+    height: SUSPECT_PLACEMENT.height,
+    ...(services.assets === undefined
+      ? {}
+      : {
+          resolveUrl: (key: string) =>
+            resolveRequiredSceneAsset(
+              services.assets,
+              key,
+              suspectStatePart === 'base'
+                ? 'suspect-base'
+                : suspectStatePart === 'upset'
+                  ? 'suspect-state-parts'
+                  : 'suspect-lose-parts',
+            ),
+        }),
   });
-  portrait.view.position.set(SUSPECT_PORTRAIT_POSITION.x, SUSPECT_PORTRAIT_POSITION.y);
+  applyAssetPlacement(portrait.view, SUSPECT_PLACEMENT);
   content.addChild(portrait.view);
 
   const tagControllers = new Map<PublicFacet, TagChipController>();
@@ -432,13 +480,18 @@ export function createInterrogationScreen(
 
   const tagBounds = new Map<PublicFacet, { x: number; y: number; width: number; height: number }>();
   FACETS.forEach((facet, index) => {
-    const width = index === FACETS.length - 1 ? 101 : 99;
+    // Uniform width: the authored plate is one image, so a wider final chip
+    // would stretch it. 6 x 98 at a 103 pitch spans 12..625 of the 640 stage.
+    const width = TAG_CHIP_WIDTH;
     const controller = createTagChip(facet, deriveFacetTagChipState(facet, model.dto.statement), {
       width,
       height: TAG_ROW_HEIGHT,
       onSelect: () => selectFacet(facet),
+      ...(services.assets === undefined
+        ? {}
+        : { resolveUrl: (key: string) => services.assets?.resolveOptionalUrl?.(key) }),
     });
-    const x = 12 + index * 103;
+    const x = 12 + index * TAG_CHIP_PITCH;
     controller.view.position.set(x, TAG_ROW_Y);
     tagBounds.set(facet, { x, y: TAG_ROW_Y, width, height: TAG_ROW_HEIGHT });
     const shieldToken = model.dto.statement.find(
@@ -483,8 +536,13 @@ export function createInterrogationScreen(
     layer: CardLayerId,
     attachmentId: string | undefined,
   ): string | undefined => {
-    const key = interrogationCardLayerAssetKey(card, layer, attachmentId, model.dto.evidence);
+    const key = interrogationCardLayerAssetKey(card, layer, attachmentId, model.evidenceAssetKeys);
     return key === undefined ? undefined : services.assets?.resolveUrl(key);
+  };
+
+  const resolveCardLockOverlayUrl = (card: InterrogationCardView): string | undefined => {
+    const key = card.debuffAssetKey ?? CARD_LOCK_OVERLAY_ASSET_KEY;
+    return services.assets?.resolveOptionalUrl?.(key) ?? services.assets?.resolveUrl(key);
   };
 
   const selectionSnapshot = (): InterrogationSelection => ({
@@ -494,6 +552,13 @@ export function createInterrogationScreen(
   });
 
   const refreshSelection = (notify = true): void => {
+    const selectedCard = visibleCards.find((card) => card.cardId === selectedCardId);
+    if (
+      selectedFacet !== undefined &&
+      !interrogationCardAllowsFacet(selectedCard, selectedFacet)
+    ) {
+      selectedFacet = undefined;
+    }
     cardFan.setSelected(selectedCardId);
     for (const card of visibleCards) {
       const attachments = attachmentsForCard(card);
@@ -502,9 +567,16 @@ export function createInterrogationScreen(
       renderedAttachmentSignatures.set(card.cardId, signature);
       cardFan.setAttachments(card.cardId, attachments);
     }
-    tagControllers.forEach((controller, facet) =>
-      controller.setSelected(facet === selectedFacet || facet === highlightedFacet),
-    );
+    tagControllers.forEach((controller, facet) => {
+      const publicState = deriveFacetTagChipState(facet, model.dto.statement);
+      controller.setState(
+        applyTagChipDeactivation(
+          publicState,
+          interrogationCardAllowsFacet(selectedCard, facet),
+        ),
+      );
+      controller.setSelected(facet === selectedFacet || facet === highlightedFacet);
+    });
     evidenceTray.setEvidence(model.dto.evidence, selectedEvidenceIds);
     submitButton.setEnabled(canSubmitInterrogationSelection(model.cards, selectionSnapshot()));
     if (notify) callbacks.onSelectionChange?.(selectionSnapshot());
@@ -516,6 +588,8 @@ export function createInterrogationScreen(
   }
 
   function selectFacet(facet: PublicFacet): void {
+    const selectedCard = visibleCards.find((card) => card.cardId === selectedCardId);
+    if (!interrogationCardAllowsFacet(selectedCard, facet)) return;
     selectedFacet = facet;
     refreshSelection();
   }
@@ -554,17 +628,23 @@ export function createInterrogationScreen(
     closeCardModal();
     const card = model.cards.find((candidate) => candidate.cardId === cardId);
     if (card === undefined) return;
+    const lockOverlayUrl = card.locked === true ? resolveCardLockOverlayUrl(card) : undefined;
     cardModal = createCardDetailModal(
       {
         title: card.title,
         intent: card.intent,
         cpCost: card.cpCost,
         description: card.description,
+        ...(card.locked === undefined ? {} : { locked: card.locked }),
+        ...(card.lockTurnsRemaining === undefined
+          ? {}
+          : { lockTurnsRemaining: card.lockTurnsRemaining }),
       },
       {
         stageWidth: STAGE_WIDTH,
         stageHeight: STAGE_HEIGHT,
         attachments: attachmentsForCard(card),
+        ...(lockOverlayUrl === undefined ? {} : { lockOverlayUrl }),
         resolveLayerUrl: (layer, attachmentId) =>
           resolveCardLayerUrl(card, layer, attachmentId),
         onDismiss: closeCardModal,
@@ -599,6 +679,7 @@ export function createInterrogationScreen(
     spacing: CARD_HAND_SPACING,
     attachments: initialAttachments,
     resolveLayerUrl: resolveCardLayerUrl,
+    resolveLockOverlayUrl: resolveCardLockOverlayUrl,
     onSelect(card): void {
       selectCard(card.cardId);
     },
@@ -612,7 +693,7 @@ export function createInterrogationScreen(
     },
     onDropOnTarget(card, targetId): void {
       const facet = FACETS.find((candidate) => candidate === targetId);
-      if (facet === undefined) return;
+      if (facet === undefined || !interrogationCardAllowsFacet(card, facet)) return;
       selectedCardId = card.cardId;
       selectedFacet = facet;
       highlightedFacet = undefined;
@@ -626,21 +707,23 @@ export function createInterrogationScreen(
   const partnerBaseUrl =
     model.partnerBaseAssetKey === undefined
       ? undefined
-      : services.assets?.resolveUrl(model.partnerBaseAssetKey);
+      : resolveRequiredSceneAsset(services.assets, model.partnerBaseAssetKey, 'partner-base');
   const partnerUsedUrl =
     model.partnerUsedAssetKey === undefined
       ? undefined
-      : services.assets?.resolveUrl(model.partnerUsedAssetKey);
+      : resolveRequiredSceneAsset(services.assets, model.partnerUsedAssetKey, 'partner-used');
   const partner = createPartnerPortrait({
     label: model.partnerName,
     cooldown: model.partnerCooldown,
+    width: PARTNER_PLACEMENT.width,
+    height: PARTNER_PLACEMENT.height,
     ...(model.partnerSkillAvailable === true && callbacks.onUsePartner !== undefined
       ? { onUse: callbacks.onUsePartner }
       : {}),
     ...(partnerBaseUrl === undefined ? {} : { baseUrl: partnerBaseUrl }),
     ...(partnerUsedUrl === undefined ? {} : { usedUrl: partnerUsedUrl }),
   });
-  partner.view.position.set(546, DESK_TOP + DESK_PARTNER_INSET);
+  applyAssetPlacement(partner.view, PARTNER_PLACEMENT);
   content.addChild(partner.view);
 
   const submitButton = createActionButton('제출 / RETURN', 82, 22, () => {
@@ -681,8 +764,8 @@ export function createInterrogationScreen(
   const loseShake = createSceneShake(content, LOSE_SCENE_SHAKE);
   const loseRings = createPulseRings({ radius: 48, colour: UI_PALETTE.red, lineWidth: 2 });
   loseRings.setCentre(
-    SUSPECT_PORTRAIT_POSITION.x + SUSPECT_PORTRAIT_SIZE.width / 2,
-    SUSPECT_PORTRAIT_POSITION.y + SUSPECT_PORTRAIT_SIZE.height / 2,
+    SUSPECT_PLACEMENT.x + SUSPECT_PLACEMENT.width / 2,
+    SUSPECT_PLACEMENT.y + SUSPECT_PLACEMENT.height / 2,
   );
   loseRings.update(PUNISH_TIMELINE.ringDurationMs);
   let loseRingsElapsedMs: number = PUNISH_TIMELINE.ringDurationMs;

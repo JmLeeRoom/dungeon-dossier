@@ -11,6 +11,7 @@ export default defineConfig(
     ignores: [
       "dist/**",
       "coverage/**",
+      "artifacts/**",
       "node_modules/**",
       ".vite/**",
       "**/*.d.ts",

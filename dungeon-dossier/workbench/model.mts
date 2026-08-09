@@ -10,6 +10,12 @@ import {
   type AssetManifestSlot,
   type AssetTransform,
 } from '../src/ui/core/assetManifest';
+import { catalogEntryByFileName } from '../src/ui/core/runtimeAssetCatalog';
+import {
+  WORKBENCH_MANIFEST_SLOTS,
+  WORKBENCH_SLOT_IDS,
+  type WorkbenchSlotId,
+} from '../src/ui/core/workbenchManifestContract.ts';
 
 export const STAGE_WIDTH = 640;
 export const STAGE_HEIGHT = 400;
@@ -78,26 +84,9 @@ export interface WorkbenchDragInput {
   readonly startRotation: number;
 }
 
-export const SLOT_IDS = [
-  'bg-room',
-  'suspect-base',
-  'suspect-state-parts',
-  'suspect-lose-parts',
-  'fg-desk',
-  'card-base',
-  'card-art-1',
-  'card-art-2',
-  'card-art-3',
-  'ev-1',
-  'ev-2',
-  'ev-3',
-  'icon-composure',
-  'icon-coercion',
-  'partner-base',
-  'partner-used',
-] as const;
+export const SLOT_IDS = WORKBENCH_SLOT_IDS;
 
-export type SlotId = (typeof SLOT_IDS)[number];
+export type SlotId = WorkbenchSlotId;
 
 export interface SlotDefinition {
   readonly id: SlotId;
@@ -106,6 +95,8 @@ export interface SlotDefinition {
   readonly defaultRect: Rect;
   readonly layer: number;
   readonly downloadName: string;
+  /** Canonical production basename written to the shipped V3 manifest. */
+  readonly manifestImage: string;
   /** Authored PNG size this slot must be filled with. */
   readonly dimension: AssetDimensionId;
   /**
@@ -129,7 +120,7 @@ export const CANONICAL_SLOTS: readonly SlotDefinition[] = [
     defaultRect: { x: 0, y: 0, width: 640, height: 400 },
     layer: 0,
     downloadName: '배경_심문실_시안.png',
-    dimension: 'bg_interrogation',
+    ...WORKBENCH_MANIFEST_SLOTS['bg-room'],
   },
   {
     id: 'suspect-base',
@@ -138,7 +129,7 @@ export const CANONICAL_SLOTS: readonly SlotDefinition[] = [
     defaultRect: { x: 212, y: 34, width: 216, height: 216 },
     layer: 10,
     downloadName: 'portrait_용의자_base.png',
-    dimension: 'suspect_base',
+    ...WORKBENCH_MANIFEST_SLOTS['suspect-base'],
   },
   {
     id: 'suspect-state-parts',
@@ -147,7 +138,7 @@ export const CANONICAL_SLOTS: readonly SlotDefinition[] = [
     defaultRect: { x: 212, y: 34, width: 216, height: 216 },
     layer: 20,
     downloadName: 'portrait_용의자_upset.png',
-    dimension: 'suspect_state_parts',
+    ...WORKBENCH_MANIFEST_SLOTS['suspect-state-parts'],
   },
   {
     id: 'suspect-lose-parts',
@@ -156,7 +147,7 @@ export const CANONICAL_SLOTS: readonly SlotDefinition[] = [
     defaultRect: { x: 212, y: 34, width: 216, height: 216 },
     layer: 21,
     downloadName: 'portrait_용의자_lose.png',
-    dimension: 'suspect_state_parts',
+    ...WORKBENCH_MANIFEST_SLOTS['suspect-lose-parts'],
   },
   {
     id: 'fg-desk',
@@ -165,7 +156,7 @@ export const CANONICAL_SLOTS: readonly SlotDefinition[] = [
     defaultRect: { x: 0, y: 239, width: 640, height: 161 },
     layer: 30,
     downloadName: '전경_책상_기본.png',
-    dimension: 'desk_foreground',
+    ...WORKBENCH_MANIFEST_SLOTS['fg-desk'],
     // 321 / 2 = 160.5. Rounding down would leave a 1px gap at the stage floor,
     // so the plate is placed at 161 and its aspect lock is released.
     preserveAspectRatio: false,
@@ -174,10 +165,10 @@ export const CANONICAL_SLOTS: readonly SlotDefinition[] = [
     id: 'card-base',
     label: '카드 베이스',
     description: '카드 최하단 템플릿 · 하단 20%만 노출',
-    defaultRect: { x: 256, y: 371, width: 128, height: 145 },
+    defaultRect: { x: 248, y: 362, width: 144, height: 192 },
     layer: 40,
     downloadName: 'card_기본_템플릿.png',
-    dimension: 'card_base',
+    ...WORKBENCH_MANIFEST_SLOTS['card-base'],
   },
   {
     id: 'card-art-1',
@@ -186,7 +177,7 @@ export const CANONICAL_SLOTS: readonly SlotDefinition[] = [
     defaultRect: { x: 176, y: 336, width: 64, height: 64 },
     layer: 50,
     downloadName: 'card_질문_일러.png',
-    dimension: 'card_illust',
+    ...WORKBENCH_MANIFEST_SLOTS['card-art-1'],
   },
   {
     id: 'card-art-2',
@@ -195,7 +186,7 @@ export const CANONICAL_SLOTS: readonly SlotDefinition[] = [
     defaultRect: { x: 248, y: 336, width: 64, height: 64 },
     layer: 50,
     downloadName: 'card_모순_일러.png',
-    dimension: 'card_illust',
+    ...WORKBENCH_MANIFEST_SLOTS['card-art-2'],
   },
   {
     id: 'card-art-3',
@@ -204,7 +195,7 @@ export const CANONICAL_SLOTS: readonly SlotDefinition[] = [
     defaultRect: { x: 320, y: 336, width: 64, height: 64 },
     layer: 50,
     downloadName: 'card_압박_일러.png',
-    dimension: 'card_illust',
+    ...WORKBENCH_MANIFEST_SLOTS['card-art-3'],
   },
   {
     id: 'ev-1',
@@ -213,7 +204,7 @@ export const CANONICAL_SLOTS: readonly SlotDefinition[] = [
     defaultRect: { x: 12, y: 306, width: 36, height: 36 },
     layer: 50,
     downloadName: 'ev_사건_증거1.png',
-    dimension: 'evidence',
+    ...WORKBENCH_MANIFEST_SLOTS['ev-1'],
   },
   {
     id: 'ev-2',
@@ -222,7 +213,7 @@ export const CANONICAL_SLOTS: readonly SlotDefinition[] = [
     defaultRect: { x: 52, y: 306, width: 36, height: 36 },
     layer: 50,
     downloadName: 'ev_사건_증거2.png',
-    dimension: 'evidence',
+    ...WORKBENCH_MANIFEST_SLOTS['ev-2'],
   },
   {
     id: 'ev-3',
@@ -231,7 +222,7 @@ export const CANONICAL_SLOTS: readonly SlotDefinition[] = [
     defaultRect: { x: 92, y: 306, width: 36, height: 36 },
     layer: 50,
     downloadName: 'ev_사건_증거3.png',
-    dimension: 'evidence',
+    ...WORKBENCH_MANIFEST_SLOTS['ev-3'],
   },
   {
     id: 'icon-composure',
@@ -240,7 +231,7 @@ export const CANONICAL_SLOTS: readonly SlotDefinition[] = [
     defaultRect: { x: 139, y: 5, width: 16, height: 16 },
     layer: 60,
     downloadName: '아이콘_평정심_기본.png',
-    dimension: 'icon_composure',
+    ...WORKBENCH_MANIFEST_SLOTS['icon-composure'],
   },
   {
     id: 'icon-coercion',
@@ -249,7 +240,7 @@ export const CANONICAL_SLOTS: readonly SlotDefinition[] = [
     defaultRect: { x: 326, y: 5, width: 16, height: 16 },
     layer: 60,
     downloadName: '아이콘_강압_기본.png',
-    dimension: 'icon_coercion',
+    ...WORKBENCH_MANIFEST_SLOTS['icon-coercion'],
   },
   {
     id: 'partner-base',
@@ -258,7 +249,7 @@ export const CANONICAL_SLOTS: readonly SlotDefinition[] = [
     defaultRect: { x: 546, y: 296, width: 88, height: 88 },
     layer: 50,
     downloadName: 'portrait_김_인턴_base.png',
-    dimension: 'partner',
+    ...WORKBENCH_MANIFEST_SLOTS['partner-base'],
   },
   {
     id: 'partner-used',
@@ -267,7 +258,7 @@ export const CANONICAL_SLOTS: readonly SlotDefinition[] = [
     defaultRect: { x: 546, y: 296, width: 88, height: 88 },
     layer: 50,
     downloadName: 'portrait_김_인턴_used.png',
-    dimension: 'partner',
+    ...WORKBENCH_MANIFEST_SLOTS['partner-used'],
   },
 ] as const;
 
@@ -467,6 +458,19 @@ export function createInitialWorkbenchState(): WorkbenchState {
 }
 
 /**
+ * Canonical production placement state. The interactive workbench deliberately
+ * starts unlocked, while the checked-in manifest is a shipping contract and
+ * must not be movable at runtime.
+ */
+export function createShippingWorkbenchState(): WorkbenchState {
+  const initial = createInitialWorkbenchState();
+  return {
+    ...initial,
+    locks: fromEntriesBySlot(() => true),
+  };
+}
+
+/**
  * Constrains a rectangle to integer pixels whose origin stays on the 640x400
  * stage. Width and height may run past the right or bottom edge because the
  * card hand is deliberately parked below the screen.
@@ -574,10 +578,23 @@ export function withSlotScale(
   if (isSlotLocked(state, id)) return state;
   const source = getSlotSourceDimension(id);
   const rect = state.geometry[id];
+  const requestedScaleX = Math.max(0, finiteNumber(scaleX, 1));
+  const requestedScaleY = Math.max(0, finiteNumber(scaleY, 1));
+  if (state.aspectLocks[id]) {
+    const current = getSlotScale(state, id);
+    const xDelta = Math.abs(requestedScaleX - current.scaleX);
+    const yDelta = Math.abs(requestedScaleY - current.scaleY);
+    const uniformScale = yDelta > xDelta ? requestedScaleY : requestedScaleX;
+    return withSlotRect(state, id, {
+      ...rect,
+      width: Math.max(1, Math.round(source.width * uniformScale)),
+      height: Math.max(1, Math.round(source.height * uniformScale)),
+    });
+  }
   return withSlotRect(state, id, {
     ...rect,
-    width: Math.max(1, Math.round(source.width * Math.max(0, finiteNumber(scaleX, 1)))),
-    height: Math.max(1, Math.round(source.height * Math.max(0, finiteNumber(scaleY, 1)))),
+    width: Math.max(1, Math.round(source.width * requestedScaleX)),
+    height: Math.max(1, Math.round(source.height * requestedScaleY)),
   });
 }
 
@@ -1122,12 +1139,17 @@ export function buildSlotTransform(state: WorkbenchState, id: SlotId): AssetTran
   const rect = state.geometry[id];
   const scale = getSlotScale(state, id);
   const preserveAspectRatio = state.aspectLocks[id];
+  const scaleX = scale.scaleX;
+  // Integer workbench rectangles can make the second ratio differ by a tiny
+  // rounding amount. The V3 aspect lock treats width as authoritative and
+  // serializes one uniform scale so the runtime never stretches the source.
+  const scaleY = preserveAspectRatio ? scaleX : scale.scaleY;
   return {
     x: rect.x,
     y: rect.y,
     rotation: state.rotation[id],
-    scaleX: scale.scaleX,
-    scaleY: scale.scaleY,
+    scaleX,
+    scaleY,
     preserveAspectRatio,
     // An unlocked slot records its exact on-stage rect so the renderer never has
     // to reconstruct a distorted size from two independently rounded scales.
@@ -1175,15 +1197,13 @@ export function setSlotSize(
 export function buildAssetManifest(state: WorkbenchState): AssetManifest {
   const slots: Record<string, AssetManifestSlot> = {};
   for (const definition of CANONICAL_SLOTS) {
-    const binding = resolveSlotBinding(state, definition.id);
     slots[definition.id] = {
       dimension: definition.dimension,
-      image:
-        resolveStageSlotImage(state, definition.id) === undefined
-          ? null
-          : binding === undefined
-            ? canonicalDownloadName(definition.id)
-            : characterPartFileName(binding.character, binding.part),
+      // Placement identity is independent from whether the planner currently
+      // previews a local data URL. Keeping all 16 canonical basenames here
+      // means editing one slot can never erase the other 15 from the shipped
+      // manifest and make the runtime fail on its next boot.
+      image: definition.manifestImage,
       transform: buildSlotTransform(state, definition.id),
       isLocked: state.locks[definition.id],
     };
@@ -1191,8 +1211,24 @@ export function buildAssetManifest(state: WorkbenchState): AssetManifest {
   return createAssetManifest(slots);
 }
 
+/**
+ * Publishable manifest for assets/. Workbench locks are editor affordances;
+ * every production placement is immutable once it crosses the save endpoint.
+ */
+export function buildShippingAssetManifest(state: WorkbenchState): AssetManifest {
+  return buildAssetManifest({
+    ...state,
+    locks: fromEntriesBySlot(() => true),
+  });
+}
+
 export function serializeAssetManifest(state: WorkbenchState): string {
   return serializeManifestDocument(buildAssetManifest(state));
+}
+
+/** Serializes the exact document the HTTP publish path writes to assets/. */
+export function serializeShippingAssetManifest(state: WorkbenchState): string {
+  return serializeManifestDocument(buildShippingAssetManifest(state));
 }
 
 /**
@@ -1493,16 +1529,9 @@ export const PROTECTED_ASSET_PATH = 'ui/placeholder_missing_fallback.png';
 
 /** `배경_심문실_시안.png` -> `bg/배경_심문실_시안.png`. */
 export function assetTargetPath(fileName: string): string | undefined {
-  if (!fileName.toLowerCase().endsWith('.png')) return undefined;
-  const stem = fileName.slice(0, -'.png'.length);
-  const segments = stem.split('_');
-  // `parseAssetFilename` requires category_name_state, so anything shorter would
-  // crash the registry on the next boot even if it landed in the right folder.
-  if (segments.length < 3) return undefined;
-  const category = segments[0];
-  if (category === undefined) return undefined;
-  const directory = (ASSET_CATEGORY_DIRECTORIES as Readonly<Record<string, string>>)[category];
-  return directory === undefined ? undefined : `${directory}/${fileName}`;
+  if (!fileName.endsWith('.png')) return undefined;
+  const catalogued = catalogEntryByFileName(fileName);
+  return catalogued?.runtimePath.slice('assets/'.length);
 }
 
 export interface WorkbenchSaveFile {
@@ -1540,7 +1569,7 @@ export function collectWorkbenchSaveRequest(state: WorkbenchState): WorkbenchSav
     byPath.set(target, { path: target, dataUrl: image.dataUrl });
   }
   return {
-    manifest: buildAssetManifest(state),
+    manifest: buildShippingAssetManifest(state),
     files: [...byPath.values()].sort((left, right) => left.path.localeCompare(right.path)),
   };
 }

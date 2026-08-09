@@ -36,6 +36,7 @@
 | 📄 [prompt_claude_episode_progression_implementation.md](./prompt_claude_episode_progression_implementation.md) | **Claude Episode Impl** | **설계 문서 기반 Claude 전용 에피소드 3단계 흐름 & 3노드 Fog-of-War 국소 공개 구현 마스터 프롬프트** |
 | 📄 [prompt_png_asset_integration_design.md](./prompt_png_asset_integration_design.md) | **PNG Asset Binding** | **`NHN AI_image/` PNG 에셋 및 엑셀 규칙 분석 기반 UI/캐릭터 이미지 채우기 통합 개발 설계 마스터 프롬프트** |
 | 📄 [prompt_pure_code_submit_impact_effects.md](./prompt_pure_code_submit_impact_effects.md) | **Pure Code FX** | **이미지 에셋 추가 없이 100% 코드(PixiJS/CSS)만으로 "받아라!" 대사·화면흔들림·플래시 이펙트 연출 프롬프트** |
+| 📄 [prompt_claude_png_asset_integration_implementation.md](./prompt_claude_png_asset_integration_implementation.md) | **Claude PNG Impl** | **설계 문서 기반 Claude 전용 72개 PNG 에셋 통합 & UI/캐릭터/5계층카드/배경 구현 마스터 프롬프트** |
 
 ---
 

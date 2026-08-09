@@ -3,14 +3,14 @@ import {
   ASSET_DIMENSION_IDS,
   assetDimension,
   type AssetDimensionId,
-} from './assetDimensions';
+} from './assetDimensions.ts';
 import {
   DEFAULT_TARGET_SCALE,
   HD_HEIGHT,
   HD_WIDTH,
   INTERNAL_HEIGHT,
   INTERNAL_WIDTH,
-} from './integerScale';
+} from './integerScale.ts';
 
 export const ASSET_MANIFEST_SCHEMA_VERSION = '3.0';
 /** Manifests written before arbitrary sizing existed. Read-only; migrated on load. */
@@ -105,7 +105,10 @@ export function snapToRenderGrid(
 }
 
 /** Reciprocal integer ratios (1, 1/2, 1/3, ...) keep pixel art perfectly sharp. */
-const RECIPROCAL_SNAP_TOLERANCE = 0.02;
+// Only repair floating-point noise around an intended reciprocal. A wider
+// window changes authored scales such as 3/16 (card hand) and 11/64 (partner)
+// into 1/5 and 1/6, moving otherwise exact placements by several pixels.
+const RECIPROCAL_SNAP_TOLERANCE = 0.002;
 
 function snapToReciprocalScale(ratio: number): number {
   if (!Number.isFinite(ratio) || ratio <= 0 || ratio > 1) return ratio;

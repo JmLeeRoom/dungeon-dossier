@@ -16,7 +16,11 @@ vi.mock('../../src/ui/core/pixelText', async () => {
 });
 
 import type { PublicDTO } from '../../src/dto';
-import { createInterrogationScreen } from '../../src/ui/screens/interrogation/createInterrogationScreen';
+import {
+  createInterrogationScreen,
+  TAG_CHIP_PITCH,
+  TAG_ROW_Y,
+} from '../../src/ui/screens/interrogation/createInterrogationScreen';
 import { PUNISH_TIMELINE } from '../../src/ui/screens/interrogation/punishJuice';
 import type {
   InterrogationScreenModel,
@@ -94,7 +98,70 @@ function content(screen: Readonly<{ view: Container }>): Container {
   return first;
 }
 
+function keyboardEvent(code: string): Event {
+  const event = new Event('keydown', { cancelable: true });
+  Object.defineProperty(event, 'code', { value: code });
+  return event;
+}
+
+function tagView(scene: Container, facetIndex: number): Container {
+  const x = 12 + facetIndex * TAG_CHIP_PITCH;
+  const view = scene.children.find(
+    (child) => child instanceof Container && child.position.x === x && child.position.y === TAG_ROW_Y,
+  );
+  if (!(view instanceof Container)) throw new Error(`Expected tag chip ${facetIndex}.`);
+  return view;
+}
+
 describe('interrogation screen impact juice', () => {
+  it('deactivates visible facets that the selected card cannot target', () => {
+    const inputTarget = new EventTarget();
+    const model = screenModel({
+      dto: {
+        ...DTO,
+        statement: [
+          {
+            claimId: 'clm_who',
+            speakerId: 'suspect',
+            facet: 'WHO',
+            text: '나는 혼자였다',
+            epistemic: 'UNKNOWN',
+            presentation: 'NORMAL',
+            resistance: 0,
+          },
+          ...DTO.statement,
+        ],
+      },
+      cards: [{
+        ...screenModel().cards[0]!,
+        allowedFacets: ['WHEN'],
+      }],
+    });
+    const screen = createInterrogationScreen(model, {}, { inputTarget });
+    const scene = content(screen);
+    const who = tagView(scene, 0);
+    const when = tagView(scene, 1);
+
+    // With no card chosen yet both public claims remain available.
+    expect(who.eventMode).toBe('static');
+    expect(when.eventMode).toBe('static');
+
+    inputTarget.dispatchEvent(keyboardEvent('Digit1'));
+    expect(screen.selection.cardId).toBe('card_contradict_basic');
+    expect(who.eventMode).toBe('none');
+    expect(when.eventMode).toBe('static');
+
+    // The controller guard mirrors eventMode, so a synthetic pointer event
+    // cannot bypass the deactivated plate.
+    (who as unknown as { emit(event: string): void }).emit('pointertap');
+    expect(screen.selection.facet).toBeUndefined();
+    (when as unknown as { emit(event: string): void }).emit('pointertap');
+    expect(screen.selection.facet).toBe('WHEN');
+
+    screen.destroy();
+    screen.view.destroy({ children: true });
+  });
+
   it('builds with the juice overlay above the scene and below nothing else', () => {
     const screen = createInterrogationScreen(screenModel());
 

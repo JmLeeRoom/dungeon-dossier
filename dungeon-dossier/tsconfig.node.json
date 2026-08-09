@@ -21,5 +21,10 @@
     "skipLibCheck": true,
     "types": ["node"]
   },
-  "include": ["vite.config.ts", "playwright.config.ts", "tools/**/*.ts"]
+  "include": [
+    "vite.config.ts",
+    "playwright.config.ts",
+    "playwright.preview.config.ts",
+    "tools/**/*.ts"
+  ]
 }

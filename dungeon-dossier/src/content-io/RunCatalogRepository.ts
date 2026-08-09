@@ -14,6 +14,7 @@ import {
   ValidatedRuntimeJsonRepository,
   type ValidatedRepositoryOptions,
 } from './RuntimeJsonRepository';
+import { runtimeContentUrl } from './runtimeContentUrl';
 
 export interface RunCatalogDefinition {
   readonly flags: FlagsDefinition;
@@ -41,11 +42,11 @@ export class RunCatalogRepository {
 
   async load(): Promise<RunCatalogDefinition | undefined> {
     const [flags, grades, rewards, relics, enhancements] = await Promise.all([
-      this.#flags.load('/content/common/flags.json'),
-      this.#grades.load('/content/common/grades.json'),
-      this.#rewards.load('/content/common/rewards.json'),
-      this.#relics.load('/content/common/relics.json'),
-      this.#enhancements.load('/content/common/enhancements.json'),
+      this.#flags.load(runtimeContentUrl('common/flags.json')),
+      this.#grades.load(runtimeContentUrl('common/grades.json')),
+      this.#rewards.load(runtimeContentUrl('common/rewards.json')),
+      this.#relics.load(runtimeContentUrl('common/relics.json')),
+      this.#enhancements.load(runtimeContentUrl('common/enhancements.json')),
     ]);
     if (
       flags === undefined ||

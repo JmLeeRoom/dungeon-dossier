@@ -8,6 +8,7 @@ export * from './JudgmentUiMapRepository';
 export * from './RuntimeJsonRepository';
 export * from './RunCatalogRepository';
 export * from './RunStripRepository';
+export * from './runtimeContentUrl';
 export * from './StringsRepository';
 export * from './SchemaValidator';
 export * from './schemas';

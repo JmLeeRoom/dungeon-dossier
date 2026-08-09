@@ -3,6 +3,7 @@ import {
   ValidatedRuntimeJsonRepository,
   type ValidatedRepositoryOptions,
 } from './RuntimeJsonRepository';
+import { runtimeContentUrl } from './runtimeContentUrl';
 
 /**
  * Loads the authored judgment presentation map: the label and feedback string
@@ -16,6 +17,6 @@ export class JudgmentUiMapRepository {
   }
 
   load(): Promise<JudgmentUiMapDefinition | undefined> {
-    return this.#repository.load('/content/common/judgment-ui-map.json');
+    return this.#repository.load(runtimeContentUrl('common/judgment-ui-map.json'));
   }
 }

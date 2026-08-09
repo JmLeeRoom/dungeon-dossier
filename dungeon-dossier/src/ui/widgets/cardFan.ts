@@ -1,6 +1,6 @@
 import { Container, Graphics, type FederatedPointerEvent } from 'pixi.js';
 import type { InterrogationCardView } from '../screens/interrogation/model';
-import { createCardArtwork, type CardLayerUrlResolver } from './cardArtwork';
+import { createCardWidget, type CardLayerUrlResolver } from './cardWidget';
 import type { CardAttachments, CardLayerId } from './cardLayers';
 import {
   CARD_FAN_HEIGHT,
@@ -67,6 +67,8 @@ export interface CardFanOptions {
     layer: CardLayerId,
     attachmentId: string | undefined,
   ) => string | undefined;
+  /** `ui/debuff/kiss` for a locked card; absent means no overlay art. */
+  readonly resolveLockOverlayUrl?: (card: InterrogationCardView) => string | undefined;
   readonly attachments?: Readonly<Record<string, CardAttachments>>;
   readonly stageWidth?: number;
   readonly panelBottom?: number;
@@ -175,16 +177,22 @@ export function createCardFan(
 
   const buildArtwork = (card: InterrogationCardView, index: number): Container => {
     const attachments = attachmentsByCard.get(card.cardId);
-    const artwork = createCardArtwork(
+    const lockOverlayUrl = options.resolveLockOverlayUrl?.(card);
+    const artwork = createCardWidget(
       {
         title: card.title,
         intent: card.intent,
         cpCost: card.cpCost,
         description: card.description,
         ordinal: index + 1,
+        ...(card.locked === undefined ? {} : { locked: card.locked }),
+        ...(card.lockTurnsRemaining === undefined
+          ? {}
+          : { lockTurnsRemaining: card.lockTurnsRemaining }),
       },
       {
         ...(attachments === undefined ? {} : { attachments }),
+        ...(lockOverlayUrl === undefined ? {} : { lockOverlayUrl }),
         ...(options.resolveLayerUrl === undefined
           ? {}
           : {
@@ -204,8 +212,11 @@ export function createCardFan(
     const artwork = buildArtwork(card, index);
     const outline = new Graphics();
     cardView.addChild(artwork, outline);
-    cardView.eventMode = 'static';
-    cardView.cursor = 'pointer';
+    // A locked card still reads in the hand, but every pointer path through it
+    // is closed: it cannot be selected, dragged onto a tag, or focused.
+    const locked = card.locked === true;
+    cardView.eventMode = locked ? 'none' : 'static';
+    cardView.cursor = locked ? 'not-allowed' : 'pointer';
 
     cardView.on('pointerover', () => {
       if (dragging) return;
@@ -274,6 +285,10 @@ export function createCardFan(
     selectByIndex(index): void {
       const card = cards[index];
       if (card === undefined) return;
+      // The keyboard reaches the same cards the pointer does, so it has to
+      // honour the same lock. Without this, Digit1-9 could select a card the
+      // engine will refuse to play and leave the selection visibly wrong.
+      if (card.locked === true) return;
       selectedId = card.cardId;
       applyLayout();
       options.onSelect?.(card, index);

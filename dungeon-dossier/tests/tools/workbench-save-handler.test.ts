@@ -20,7 +20,10 @@ import {
   respondToWorkbenchSave,
   type SaveRequestLike,
 } from '../../tools/workbench-save/index';
-import { createAssetManifest } from '../../src/ui/core/assetManifest';
+import {
+  buildShippingAssetManifest,
+  createInitialWorkbenchState,
+} from '../../workbench/model.mts';
 
 let root = '';
 
@@ -47,7 +50,7 @@ function pngDataUrl(colourCount: number): string {
 
 const SMALL_PNG = pngDataUrl(4);
 const OTHER_PNG = pngDataUrl(5);
-const MANIFEST = createAssetManifest({});
+const MANIFEST = buildShippingAssetManifest(createInitialWorkbenchState());
 
 function request(files: readonly { path: string; dataUrl: string }[]): unknown {
   return { manifest: MANIFEST, files };
@@ -108,7 +111,8 @@ describe('handleWorkbenchSave · happy path', () => {
       path.join(assetsRoot, ASSET_MANIFEST_FILE_NAME),
       'utf8',
     );
-    expect(manifest).toBe(`${JSON.stringify(MANIFEST, null, 2)}\n`);
+    expect(manifest.endsWith('\n')).toBe(true);
+    expect(JSON.parse(manifest)).toEqual(MANIFEST);
   });
 
   it('reports every saved path with forward slashes', async () => {
@@ -230,6 +234,31 @@ describe('handleWorkbenchSave · path defence matrix', () => {
     expect(await listFiles(assetsRoot)).toEqual([]);
   });
 
+  it('rejects a catalogued basename routed to the wrong directory', async () => {
+    const assetsRoot = await freshRoot('catalog-path');
+    const body = error(
+      await handleWorkbenchSave(
+        request([{ path: 'bg/ui_card_base.png', dataUrl: SMALL_PNG }]),
+        { assetsRoot },
+      ),
+    );
+    expect(body.code).toBe('E_CATALOG_PATH');
+    expect(body.message).toContain('cards/ui_card_base.png');
+    expect(await listFiles(assetsRoot)).toEqual([]);
+  });
+
+  it('rejects an otherwise valid filename that has no catalog identity', async () => {
+    const assetsRoot = await freshRoot('catalog-unknown');
+    const body = error(
+      await handleWorkbenchSave(
+        request([{ path: 'bg/nope_asset_state.png', dataUrl: SMALL_PNG }]),
+        { assetsRoot },
+      ),
+    );
+    expect(body.code).toBe('E_CATALOG');
+    expect(await listFiles(assetsRoot)).toEqual([]);
+  });
+
   it('refuses to overwrite the missing-asset fallback', async () => {
     const assetsRoot = await freshRoot('protected');
     const body = error(
@@ -256,6 +285,97 @@ describe('handleWorkbenchSave · path defence matrix', () => {
       ),
     );
     expect(body.code).toBe('E_NOT_PNG');
+    expect(await listFiles(assetsRoot)).toEqual([]);
+  });
+
+  it('rejects a manifest image basename that has no catalog entry', async () => {
+    const assetsRoot = await freshRoot('manifest-catalog');
+    const background = MANIFEST.slots['bg-room'];
+    if (background === undefined) throw new Error('canonical bg-room slot is missing');
+    const manifest = {
+      ...MANIFEST,
+      slots: {
+        ...MANIFEST.slots,
+        'bg-room': { ...background, image: 'bg_missing_unknown.png' },
+      },
+    };
+    const body = error(
+      await handleWorkbenchSave({ manifest, files: [] }, { assetsRoot }),
+    );
+    expect(body.code).toBe('E_MANIFEST');
+    expect(body.message).toContain('bg-room');
+    expect(await listFiles(assetsRoot)).toEqual([]);
+  });
+
+  it('refuses altered bytes at an importer-owned production path', async () => {
+    const assetsRoot = await freshRoot('production-art');
+    const body = error(
+      await handleWorkbenchSave(
+        request([{ path: 'cards/ui_card_base.png', dataUrl: SMALL_PNG }]),
+        { assetsRoot },
+      ),
+    );
+
+    expect(body.code).toBe('E_PRODUCTION_ART');
+    expect(await listFiles(assetsRoot)).toEqual([]);
+  });
+});
+
+describe('handleWorkbenchSave · canonical manifest topology', () => {
+  const background = MANIFEST.slots['bg-room'];
+  if (background === undefined) throw new Error('canonical bg-room slot is missing');
+  const missingSlots = Object.fromEntries(
+    Object.entries(MANIFEST.slots).filter(([id]) => id !== 'bg-room'),
+  );
+  const cases = [
+    {
+      label: 'missing slot',
+      manifest: { ...MANIFEST, slots: missingSlots },
+    },
+    {
+      label: 'extra slot',
+      manifest: {
+        ...MANIFEST,
+        slots: { ...MANIFEST.slots, unexpected: background },
+      },
+    },
+    {
+      label: 'null production image',
+      manifest: {
+        ...MANIFEST,
+        slots: {
+          ...MANIFEST.slots,
+          'bg-room': { ...background, image: null },
+        },
+      },
+    },
+    {
+      label: 'wrong dimension id',
+      manifest: {
+        ...MANIFEST,
+        slots: {
+          ...MANIFEST.slots,
+          'bg-room': { ...background, dimension: 'event_bg_1280x800' as const },
+        },
+      },
+    },
+    {
+      label: 'unlocked production slot',
+      manifest: {
+        ...MANIFEST,
+        slots: {
+          ...MANIFEST.slots,
+          'bg-room': { ...background, isLocked: false },
+        },
+      },
+    },
+  ] as const;
+
+  it.each(cases)('rejects $label before writing any file', async ({ label, manifest }) => {
+    const assetsRoot = await freshRoot(`manifest-topology-${label.replaceAll(' ', '-')}`);
+    const body = error(await handleWorkbenchSave({ manifest, files: [] }, { assetsRoot }));
+
+    expect(body.code).toBe('E_MANIFEST');
     expect(await listFiles(assetsRoot)).toEqual([]);
   });
 });

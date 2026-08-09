@@ -1,4 +1,4 @@
-import { Container } from 'pixi.js';
+import { Container, Sprite } from 'pixi.js';
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../src/ui/core/pixelText', async () => {
@@ -26,6 +26,8 @@ import {
   type CutsceneBeatView,
   type CutsceneOverlayOptions,
 } from '../../src/ui/screens/cutscene';
+import { ASSET_DIMENSIONS } from '../../src/ui/core/assetDimensions';
+import { preservesAspect } from '../../src/ui/core/imageFit';
 
 const BEAT_MS = 100;
 /** Long enough for the typewriter to emit every fixture character in one tick. */
@@ -304,6 +306,51 @@ describe('createCutsceneOverlay', () => {
     expect(play).toHaveBeenCalledExactlyOnceWith('rain_loop');
     expect(overlay.complete).toBe(true);
 
+    overlay.view.destroy({ children: true });
+  });
+
+  it('fits required background and portrait art without stretching it', () => {
+    const resolveRequiredUrl = vi.fn(() =>
+      'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+    );
+    const overlay = overlayFor([
+      beat('beat-art', {
+        backgroundAssetKey: 'bg/event/scene0',
+        portraits: [{ side: 'LEFT', assetKey: 'ui/photo/teahoon', dim: false }],
+      }),
+    ], {
+      assets: { resolveUrl: () => undefined, resolveRequiredUrl },
+    });
+
+    const stage = overlay.view.children[0];
+    expect(stage).toBeInstanceOf(Container);
+    if (!(stage instanceof Container)) return;
+    const backgroundLayer = stage.children[0];
+    const portraitLayer = stage.children[1];
+    if (!(backgroundLayer instanceof Container) || !(portraitLayer instanceof Container)) {
+      throw new Error('Expected cutscene art layers.');
+    }
+    const background = backgroundLayer.children.find((child) => child instanceof Sprite);
+    const portraitFrame = portraitLayer.children[0];
+    const portrait = portraitFrame instanceof Container
+      ? portraitFrame.children.find((child) => child instanceof Sprite)
+      : undefined;
+    expect(background).toBeInstanceOf(Sprite);
+    expect(portrait).toBeInstanceOf(Sprite);
+    if (!(background instanceof Sprite) || !(portrait instanceof Sprite)) return;
+
+    expect(preservesAspect(ASSET_DIMENSIONS.event_bg_1280x800, background)).toBe(true);
+    expect(preservesAspect(ASSET_DIMENSIONS.suspect_base, portrait)).toBe(true);
+    expect(background.eventMode).toBe('none');
+    expect(portrait.eventMode).toBe('none');
+    expect(resolveRequiredUrl).toHaveBeenCalledWith(
+      'bg/event/scene0',
+      expect.objectContaining({ screen: 'cutscene', slotId: 'background', bundle: 'event' }),
+    );
+    expect(resolveRequiredUrl).toHaveBeenCalledWith(
+      'ui/photo/teahoon',
+      expect.objectContaining({ screen: 'cutscene', slotId: 'portrait-left', bundle: 'event' }),
+    );
     overlay.view.destroy({ children: true });
   });
 

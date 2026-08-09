@@ -50,14 +50,22 @@ describe('encounter app session', () => {
     expect(model.cards.map((card) => card.cardId)).toEqual(
       session.coordinator.snapshot.deck.hand,
     );
+    for (const card of model.cards) {
+      const authored = cardsDefinition.cards.find((entry) => entry.card_id === card.cardId);
+      expect(card.allowedFacets).toEqual(authored?.target.facets);
+    }
     expect(model.suspectName).toBe('물컹이');
-    expect(model.backgroundAssetKey).toBe('배경/심문실/시안');
-    expect(model.portraitBaseAssetKey).toBe('portrait/물컹이/base');
-    expect(model.portraitStatePartsAssetKeys).toEqual({
-      base: model.portraitBaseAssetKey,
-      upset: 'portrait/물컹이/upset',
-      lose: 'portrait/물컹이/lose',
+    // The case authors a tinted room that the delivery does not contain, so the
+    // app layer rebinds it to the one approved interrogation background.
+    expect(model.backgroundAssetKey).toBe('bg/interrogationroom/base');
+    expect(model.suspectAssetSet).toEqual({
+      base: 'idle/mulkung/base',
+      upset: 'idle/mulkung/upset',
+      lose: 'idle/mulkung/lose',
+      stateMode: 'replace',
     });
+    expect(model.partnerBaseAssetKey).toBe('idle/coffee/base');
+    expect(model.partnerUsedAssetKey).toBe('idle/coffee/used');
     expect(model.suspectStatePart).toBe('base');
     expect(model.partnerCooldown).toEqual({ state: 'base', cooldownTurns: 0 });
     // Partner skill is live now that balance.json ships a configured cooldown (U-1).

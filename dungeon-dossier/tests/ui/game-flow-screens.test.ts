@@ -5,7 +5,10 @@ import { createRewardScreen } from '../../src/ui/screens/reward';
 import {
   createRunStripModel,
   createRunStripScreen,
+  CASE_FILE_PHOTO_LAYOUT,
   EPISODE_BOARD_SLOT_COUNT,
+  episodeSlotX,
+  RUN_STRIP_STAGE_SIZE,
   type EpisodeBoardInput,
   type EpisodeBoardNodeInput,
   type EpisodeNodeView,
@@ -49,6 +52,31 @@ function shape(nodes: readonly EpisodeNodeView[]): readonly string[] {
 }
 
 describe('game completion presentation models', () => {
+  it('keeps both case-file portraits inside the stage and outside every node card', () => {
+    const nodeCards = [0, 1, 2].map((index) => ({
+      x: episodeSlotX(index),
+      y: 128,
+      width: 148,
+      height: 128,
+    }));
+    const overlaps = (
+      left: Readonly<{ x: number; y: number; width: number; height: number }>,
+      right: Readonly<{ x: number; y: number; width: number; height: number }>,
+    ): boolean =>
+      left.x < right.x + right.width &&
+      left.x + left.width > right.x &&
+      left.y < right.y + right.height &&
+      left.y + left.height > right.y;
+
+    for (const photo of CASE_FILE_PHOTO_LAYOUT) {
+      expect(photo.x).toBeGreaterThanOrEqual(0);
+      expect(photo.y).toBeGreaterThanOrEqual(0);
+      expect(photo.x + photo.width).toBeLessThanOrEqual(RUN_STRIP_STAGE_SIZE.width);
+      expect(photo.y + photo.height).toBeLessThanOrEqual(RUN_STRIP_STAGE_SIZE.height);
+      expect(nodeCards.some((card) => overlaps(photo, card))).toBe(false);
+    }
+  });
+
   it('builds the exact 3-stage episode board with cleared/current/veiled states', () => {
     expect(EPISODE_BOARD_SLOT_COUNT).toBe(3);
 

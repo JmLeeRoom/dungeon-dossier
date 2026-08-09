@@ -3,6 +3,7 @@ import {
   ValidatedRuntimeJsonRepository,
   type ValidatedRepositoryOptions,
 } from './RuntimeJsonRepository';
+import { runtimeContentUrl } from './runtimeContentUrl';
 
 export type BalanceDiffKind = 'ADDED' | 'REMOVED' | 'CHANGED';
 
@@ -171,7 +172,7 @@ export class BalanceRepository {
   }
 
   async reload(): Promise<BalanceDefinition | undefined> {
-    const balance = await this.#repository.load('/content/common/balance.json');
+    const balance = await this.#repository.load(runtimeContentUrl('common/balance.json'));
     if (!balance) return undefined;
 
     const snapshot = immutableSnapshot(balance);

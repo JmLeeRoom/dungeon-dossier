@@ -20,6 +20,8 @@ export interface DeadSceneAction {
 export interface DeadSceneScreenModel {
   readonly title: string;
   readonly cause: string;
+  /** Full-stage failure location, separate from the reason illustration. */
+  readonly backgroundAssetKey: string;
   readonly illustrationAssetKey: string;
   readonly treatment: DeadSceneTreatment;
   readonly stats: readonly DeadSceneStat[];

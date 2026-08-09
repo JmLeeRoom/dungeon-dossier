@@ -77,17 +77,21 @@ export function createPortrait(options: PortraitOptions = {}): PortraitControlle
     height,
   };
   const view = new Container();
-  const placeholder = new Graphics()
-    .rect(0, 0, width, height)
-    .fill(UI_PALETTE.panel)
-    .stroke({ color: UI_PALETTE.panelLight, width: 1 })
-    .ellipse(width / 2, height * 0.32, width * 0.18, height * 0.21)
-    .fill(UI_PALETTE.parchmentDark)
-    .poly([width / 2, height * 0.49, width - width * 0.14, height, width * 0.14, height])
-    .fill(UI_PALETTE.panelLight);
-  view.addChild(placeholder);
-
-  if (options.baseUrl !== undefined) {
+  if (options.baseUrl === undefined) {
+    // Production portraits are transparent standing sprites. Keeping this
+    // fallback panel underneath them turns every transparent pixel into a
+    // large opaque square and hides the interrogation-room background.
+    view.addChild(
+      new Graphics()
+        .rect(0, 0, width, height)
+        .fill(UI_PALETTE.panel)
+        .stroke({ color: UI_PALETTE.panelLight, width: 1 })
+        .ellipse(width / 2, height * 0.32, width * 0.18, height * 0.21)
+        .fill(UI_PALETTE.parchmentDark)
+        .poly([width / 2, height * 0.49, width - width * 0.14, height, width * 0.14, height])
+        .fill(UI_PALETTE.panelLight),
+    );
+  } else {
     const base = Sprite.from(options.baseUrl);
     base.width = width;
     base.height = height;

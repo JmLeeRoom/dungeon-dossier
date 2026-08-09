@@ -1,9 +1,41 @@
+import { createHash } from 'node:crypto';
 import { mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { z } from 'zod';
 
-import { AssetManifestSchema } from '../../src/ui/core/assetManifest';
+import { AssetManifestSchema } from '../../src/ui/core/assetManifest.ts';
+import { assetDimension } from '../../src/ui/core/assetDimensions.ts';
+import { catalogEntryByFileName } from '../../src/ui/core/runtimeAssetCatalog.ts';
+import {
+  WORKBENCH_MANIFEST_SLOTS,
+  WORKBENCH_SLOT_IDS,
+} from '../../src/ui/core/workbenchManifestContract.ts';
+
+const NhnAllowlistSchema = z.object({
+  entries: z.array(z.object({ targetPath: z.string(), sha256: z.string() })),
+});
+
+let approvedDigestCache: ReadonlyMap<string, string> | undefined;
+
+/**
+ * Runtime path to the digest the importer approved for it. Read lazily so the
+ * handler stays usable in fixtures that never touch production art.
+ */
+async function approvedProductionDigests(): Promise<ReadonlyMap<string, string>> {
+  approvedDigestCache ??= new Map(
+    NhnAllowlistSchema.parse(
+      JSON.parse(
+        await readFile(
+          fileURLToPath(new URL('../assets/nhn-png-allowlist.json', import.meta.url)),
+          'utf8',
+        ),
+      ),
+    ).entries.map((entry) => [entry.targetPath, entry.sha256]),
+  );
+  return approvedDigestCache;
+}
 
 /**
  * The workbench writes real PNGs into the repository, so every check that keeps
@@ -62,8 +94,12 @@ export type WorkbenchSaveErrorCode =
   | 'E_PROTECTED'
   | 'E_PATH'
   | 'E_FILENAME'
+  | 'E_CATALOG'
+  | 'E_CATALOG_PATH'
+  | 'E_MANIFEST'
   | 'E_DATA_URL'
   | 'E_NOT_PNG'
+  | 'E_PRODUCTION_ART'
   | 'E_PALETTE'
   | 'E_WRITE';
 
@@ -209,6 +245,22 @@ export function resolveAssetTarget(
       message: `파일명은 카테고리_이름_상태.png 형식이어야 합니다: ${fileName}`,
     };
   }
+  const catalogued = catalogEntryByFileName(fileName);
+  if (catalogued === undefined) {
+    return {
+      path: posix,
+      code: 'E_CATALOG',
+      message: `런타임 카탈로그에 등록되지 않은 파일입니다: ${fileName}`,
+    };
+  }
+  const expectedPath = catalogued.runtimePath.slice('assets/'.length);
+  if (posix !== expectedPath) {
+    return {
+      path: posix,
+      code: 'E_CATALOG_PATH',
+      message: `${fileName}의 승인된 저장 경로는 ${expectedPath}입니다.`,
+    };
+  }
   const absolutePath = path.resolve(assetsRoot, directory, fileName);
   const relative = path.relative(path.resolve(assetsRoot), absolutePath);
   if (relative.startsWith('..') || path.isAbsolute(relative)) {
@@ -221,6 +273,47 @@ function isFailure(
   value: { readonly absolutePath: string } | WorkbenchSaveFailure,
 ): value is WorkbenchSaveFailure {
   return 'code' in value;
+}
+
+function manifestContractProblem(
+  manifest: z.infer<typeof AssetManifestSchema>,
+): string | undefined {
+  const actualIds = Object.keys(manifest.slots);
+  const actualIdSet = new Set(actualIds);
+  const missing = WORKBENCH_SLOT_IDS.filter((id) => !actualIdSet.has(id));
+  const canonicalIdSet = new Set<string>(WORKBENCH_SLOT_IDS);
+  const extra = actualIds.filter((id) => !canonicalIdSet.has(id));
+  if (missing.length > 0 || extra.length > 0) {
+    return [
+      missing.length === 0 ? undefined : `missing slots: ${missing.join(', ')}`,
+      extra.length === 0 ? undefined : `unexpected slots: ${extra.join(', ')}`,
+    ]
+      .filter((part) => part !== undefined)
+      .join('; ');
+  }
+
+  for (const slotId of WORKBENCH_SLOT_IDS) {
+    const definition = WORKBENCH_MANIFEST_SLOTS[slotId];
+    const slot = manifest.slots[slotId];
+    if (slot === undefined) return `missing slot: ${slotId}`;
+    if (slot.image === null) return `slot ${slotId} has no production image`;
+    if (!slot.isLocked) return `slot ${slotId} must be locked for production`;
+    if (slot.dimension !== definition.dimension) {
+      return `slot ${slotId} dimension must be ${definition.dimension}, received ${slot.dimension}`;
+    }
+    if (slot.image !== definition.manifestImage) {
+      return `slot ${slotId} image must be ${definition.manifestImage}, received ${slot.image}`;
+    }
+    const entry = catalogEntryByFileName(slot.image);
+    if (entry === undefined) {
+      return `slot ${slotId} references uncatalogued image ${slot.image}`;
+    }
+    const source = assetDimension(definition.dimension);
+    if (entry.width !== source.width || entry.height !== source.height) {
+      return `slot ${slotId} image dimensions do not match ${definition.dimension}`;
+    }
+  }
+  return undefined;
 }
 
 async function sameBytesOnDisk(absolutePath: string, bytes: Buffer): Promise<boolean> {
@@ -256,6 +349,15 @@ export async function handleWorkbenchSave(
   }
   const request = parsed.data;
   const assetsRootLabel = options.assetsRootLabel ?? toPosix(options.assetsRoot);
+
+  const manifestProblem = manifestContractProblem(request.manifest);
+  if (manifestProblem !== undefined) {
+    return failure(
+      400,
+      'E_MANIFEST',
+      `asset_manifest.json does not match the canonical 16-slot contract: ${manifestProblem}`,
+    );
+  }
 
   const seen = new Set<string>();
   for (const file of request.files) {
@@ -303,7 +405,19 @@ export async function handleWorkbenchSave(
       });
       continue;
     }
-    if (opaqueColours > MAX_OPAQUE_RGBA_COLOURS) {
+    // Approved production art is importer-only. Its palette exemption is bound
+    // to an exact digest, so letting the workbench write different bytes to the
+    // same path would ship art nobody reviewed and red the palette gate.
+    const approvedDigest = (await approvedProductionDigests()).get(`assets/${toPosix(file.path)}`);
+    if (approvedDigest !== undefined && createHash('sha256').update(bytes).digest('hex') !== approvedDigest) {
+      failures.push({
+        path: file.path,
+        code: 'E_PRODUCTION_ART',
+        message: `${file.path}: 승인된 프로덕션 아트는 워크벤치에서 덮어쓸 수 없습니다. tools/assets/import-nhn-assets.mjs 로만 갱신하세요.`,
+      });
+      continue;
+    }
+    if (approvedDigest === undefined && opaqueColours > MAX_OPAQUE_RGBA_COLOURS) {
       failures.push({
         path: file.path,
         code: 'E_PALETTE',

@@ -1,7 +1,29 @@
-import { Container, Graphics } from 'pixi.js';
+import { Container, Graphics, Sprite } from 'pixi.js';
+import { ASSET_DIMENSIONS } from '../../core/assetDimensions';
+import { containImage, coverImage } from '../../core/imageFit';
 import { createPixelText } from '../../core/pixelText';
 import { UI_PALETTE } from '../../widgets/theme';
 import { placementResultLabel, type EventSceneModel } from './model';
+
+export interface EventAssetLookup {
+  resolveUrl(key: string): string | undefined;
+  resolveOptionalUrl?(key: string): string | undefined;
+  resolveRequiredUrl?(
+    key: string,
+    context: {
+      readonly screen: string;
+      readonly contentId?: string;
+      readonly slotId?: string;
+      readonly bundle?: 'event';
+    },
+  ): string;
+}
+
+export interface EventScreenServices {
+  readonly assets?: EventAssetLookup;
+}
+
+export const EVENT_STAGE_BOUNDS = { x: 0, y: 0, width: 640, height: 400 } as const;
 
 export interface EventScreenCallbacks {
   readonly onChoice?: (choiceId: string) => void;
@@ -82,10 +104,72 @@ function attemptFooter(
   return text;
 }
 
-export function createEventScreen(model: EventSceneModel, callbacks: EventScreenCallbacks = {}): Container {
+function requiredEventUrl(
+  assets: EventAssetLookup | undefined,
+  key: string,
+  model: EventSceneModel,
+  slotId: string,
+): string | undefined {
+  if (assets === undefined) return undefined;
+  return assets.resolveRequiredUrl?.(key, {
+    screen: 'event',
+    contentId: model.eventId,
+    slotId,
+    bundle: 'event',
+  }) ?? assets.resolveUrl(key);
+}
+
+function addEventBackground(
+  view: Container,
+  model: EventSceneModel,
+  assets: EventAssetLookup | undefined,
+): void {
+  if (model.backgroundAssetKey !== undefined) {
+    const url = requiredEventUrl(assets, model.backgroundAssetKey, model, 'background');
+    if (url !== undefined) {
+      const rect = coverImage(ASSET_DIMENSIONS.event_bg_1280x800, EVENT_STAGE_BOUNDS);
+      const sprite = Sprite.from(url);
+      sprite.position.set(rect.x, rect.y);
+      sprite.width = rect.width;
+      sprite.height = rect.height;
+      sprite.eventMode = 'none';
+      view.addChild(sprite);
+    }
+  }
+}
+
+function addEventDecoration(
+  view: Container,
+  model: EventSceneModel,
+  assets: EventAssetLookup | undefined,
+): void {
+  const decoration = model.decoration;
+  if (decoration === undefined) return;
+  const url = requiredEventUrl(assets, decoration.assetKey, model, 'decoration');
+  if (url === undefined) return;
+  const rect = containImage(ASSET_DIMENSIONS.event_overlay_181x156, decoration);
+  const sprite = Sprite.from(url);
+  sprite.position.set(rect.x, rect.y);
+  sprite.width = rect.width;
+  sprite.height = rect.height;
+  sprite.alpha = 0.9;
+  sprite.eventMode = 'none';
+  view.addChild(sprite);
+}
+
+export function createEventScreen(
+  model: EventSceneModel,
+  callbacks: EventScreenCallbacks = {},
+  services: EventScreenServices = {},
+): Container {
   const view = new Container();
   view.addChild(new Graphics().rect(0, 0, 640, 400).fill(UI_PALETTE.deepInk));
-  view.addChild(new Graphics().rect(30, 24, 580, 352).fill(UI_PALETTE.panel).stroke({ color: UI_PALETTE.parchmentDark, width: 2 }));
+  addEventBackground(view, model, services.assets);
+  // The old opaque panel hid a full-screen background completely. The dark
+  // wash keeps copy readable while leaving the scene legible underneath.
+  view.addChild(new Graphics().rect(30, 24, 580, 352).fill({ color: UI_PALETTE.panel, alpha: 0.82 }).stroke({ color: UI_PALETTE.parchmentDark, width: 2 }));
+  // Small transparent props sit above the wash but below all copy and controls.
+  addEventDecoration(view, model, services.assets);
   const title = createPixelText(model.title, { fontSize: 15, fill: UI_PALETTE.paper });
   title.position.set(48, 42);
   const pattern = createPixelText(`EVENT ${model.pattern}`, { fontSize: 8, fill: UI_PALETTE.cyan });

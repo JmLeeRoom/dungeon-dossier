@@ -4,10 +4,17 @@ import { resolve } from "node:path";
 import type { Plugin } from "vite";
 import { defineConfig } from "vitest/config";
 
-import { saveWorkbenchAssetsPlugin } from "./tools/workbench-save";
+import { saveWorkbenchAssetsPlugin } from "./tools/workbench-save/index.ts";
 
 const projectRoot = import.meta.dirname;
-const staticDirectories = ["content", "assets", "schemas"] as const;
+/**
+ * `assets` is deliberately absent. Every PNG, the font and every audio file
+ * reach the bundle through `import.meta.glob`, so copying the directory as well
+ * shipped each image twice — once hashed under `_app/`, once verbatim under
+ * `assets/` — which a fresh build measured at 238 PNGs for 127 source files.
+ * `content` and `schemas` stay: those are fetched by URL at runtime.
+ */
+const staticDirectories = ["content", "schemas"] as const;
 
 async function isDirectory(path: string): Promise<boolean> {
   try {

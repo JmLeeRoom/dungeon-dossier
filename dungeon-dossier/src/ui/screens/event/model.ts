@@ -32,15 +32,29 @@ export interface EventInvestigationSpotView {
   readonly affordable: boolean;
 }
 
+export interface EventDecorationView {
+  readonly assetKey: string;
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+}
+
+/** Presentation-only scene art selected by the app layer. */
+export interface EventSceneArtView {
+  readonly backgroundAssetKey?: string;
+  readonly decoration?: EventDecorationView;
+}
+
 export type EventSceneModel =
-  | Readonly<{
+  | Readonly<EventSceneArtView & {
       eventId: string;
       title: string;
       description: string;
       pattern: 'A';
       choices: readonly EventChoiceView[];
     }>
-  | Readonly<{
+  | Readonly<EventSceneArtView & {
       eventId: string;
       title: string;
       description: string;
@@ -52,7 +66,7 @@ export type EventSceneModel =
       partialRatio: number;
       placementResult?: PlacementScore;
     }>
-  | Readonly<{
+  | Readonly<EventSceneArtView & {
       eventId: string;
       title: string;
       description: string;
@@ -63,7 +77,7 @@ export type EventSceneModel =
       /** Per-attempt price, rendered so the player knows what a probe costs. */
       attemptCosts: readonly EventEffectView[];
     }>
-  | Readonly<{
+  | Readonly<EventSceneArtView & {
       eventId: string;
       title: string;
       description: string;
@@ -75,7 +89,7 @@ export type EventSceneModel =
       /** Set when no owned card is eligible; the node pays out and moves on. */
       fallbackNotice?: string;
     }>
-  | Readonly<{
+  | Readonly<EventSceneArtView & {
       eventId: string;
       title: string;
       description: string;
@@ -85,7 +99,7 @@ export type EventSceneModel =
       attemptsUsed: number;
       attemptCosts: readonly EventEffectView[];
     }>
-  | Readonly<{
+  | Readonly<EventSceneArtView & {
       eventId: string;
       title: string;
       description: string;
@@ -95,6 +109,13 @@ export type EventSceneModel =
       attemptsUsed: number;
       attemptCosts: readonly EventEffectView[];
     }>;
+
+/** Exact route preload set. It never includes another event's art. */
+export function eventSceneAssetKeys(model: EventSceneModel): readonly string[] {
+  return [model.backgroundAssetKey, model.decoration?.assetKey].filter(
+    (key): key is string => key !== undefined,
+  );
+}
 
 export interface EventTuningOptionView {
   readonly optionId: string;

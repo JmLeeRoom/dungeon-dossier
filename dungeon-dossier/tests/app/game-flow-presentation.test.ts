@@ -16,6 +16,10 @@ import {
   toRewardScreenModel,
   toRunStripScreenModel,
 } from '../../src/app/gameFlowPresentation';
+import {
+  BOARD_NODE_PHOTO_ASSET_KEYS,
+  EVENT_ART_BINDINGS,
+} from '../../src/app/uiAssetBindings';
 
 async function json(relativePath: string): Promise<unknown> {
   return JSON.parse(
@@ -124,14 +128,18 @@ describe('game-flow presentation adapters', () => {
         node.visibility === 'KNOWN' ? node.status : 'VEILED',
       )).toEqual(['CLEARED', 'CLEARED', 'CURRENT']);
       expect(stripModel.nodes).toEqual(
-        CANONICAL_ROUTE.slice(3, 6).map((entry, index) => ({
-          visibility: 'KNOWN',
-          nodeId: entry.nodeId,
-          kind: entry.kind,
-          role: entry.role,
-          label: entry.label,
-          status: index === 2 ? 'CURRENT' : 'CLEARED',
-        })),
+        CANONICAL_ROUTE.slice(3, 6).map((entry, index) => {
+          const artAssetKey = BOARD_NODE_PHOTO_ASSET_KEYS[entry.ref];
+          return {
+            visibility: 'KNOWN',
+            nodeId: entry.nodeId,
+            kind: entry.kind,
+            role: entry.role,
+            label: entry.label,
+            status: index === 2 ? 'CURRENT' : 'CLEARED',
+            ...(artAssetKey === undefined ? {} : { artAssetKey }),
+          };
+        }),
       );
       expect(stripModel.clearedEpisodes).toEqual([
         { episodeId: 'tutorial', displayIndex: 1, label: EPISODE_LABELS.tutorial },
@@ -140,6 +148,10 @@ describe('game-flow presentation adapters', () => {
 
       expect(eventModels.map((event) => event.pattern))
         .toEqual(['A', 'B', 'C', 'F', 'C', 'D', 'E']);
+      expect(eventModels.every((event) => event.backgroundAssetKey !== undefined)).toBe(true);
+      for (const event of eventModels) {
+        expect(event).toMatchObject(EVENT_ART_BINDINGS[event.eventId] ?? {});
+      }
       expect(rewardModel.choices).toHaveLength(rewards.length);
       expect(endingModel.kind).toBe('TRUE');
       expect(rawKeyPaths([stripModel, ...eventModels, rewardModel, endingModel]))
@@ -189,6 +201,7 @@ describe('game-flow presentation adapters', () => {
         model.nodes.forEach((node, slotIndex) => {
           if (node.visibility !== 'KNOWN') return;
           const entry = routeEntry(episodeStart + slotIndex);
+          const artAssetKey = BOARD_NODE_PHOTO_ASSET_KEYS[entry.ref];
           expect(node).toEqual({
             visibility: 'KNOWN',
             nodeId: entry.nodeId,
@@ -196,6 +209,7 @@ describe('game-flow presentation adapters', () => {
             role: entry.role,
             label: entry.label,
             status: slotIndex === activeSlot ? 'CURRENT' : 'CLEARED',
+            ...(artAssetKey === undefined ? {} : { artAssetKey }),
           });
         });
 

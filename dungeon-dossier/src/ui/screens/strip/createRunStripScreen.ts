@@ -1,5 +1,9 @@
-import { Container, Graphics } from 'pixi.js';
+import { Container, Graphics, Sprite } from 'pixi.js';
+import { ASSET_DIMENSIONS, type AssetDimension } from '../../core/assetDimensions';
+import { containImage, type FitBox } from '../../core/imageFit';
 import { createPixelText } from '../../core/pixelText';
+import type { AssetResolveContext } from '../../core/uiAssetPort';
+import { createProfilePhoto } from '../../widgets/suspectPortraitWidget';
 import { UI_PALETTE } from '../../widgets/theme';
 import type {
   EpisodeNodeView,
@@ -8,8 +12,52 @@ import type {
   RunStripScreenModel,
 } from './model';
 
+export interface StripAssetLookup {
+  resolveUrl(key: string): string | undefined;
+  resolveOptionalUrl?(key: string): string | undefined;
+  resolveRequiredUrl?(key: string, context: AssetResolveContext): string;
+}
+
 export interface RunStripScreenOptions {
   readonly onContinue?: () => void;
+  readonly assets?: StripAssetLookup;
+}
+
+/**
+ * Board art the renderer owns outright. The generic marker is a renderer
+ * constant precisely so a VEILED slot needs no key of its own: the model has
+ * nothing to redact because it never carried anything.
+ */
+export const BOARD_BACKGROUND_ASSET_KEY = 'bg/event/crazyboard';
+export const BOARD_VEILED_MARKER_ASSET_KEY = 'ui/board/event';
+export const BOARD_PIN_ASSET_KEY = 'ui/pin/00';
+export const BOARD_DETECTIVE_PHOTO_ASSET_KEY = 'ui/photo/teahoon';
+export const BOARD_PARTNER_PHOTO_ASSET_KEY = 'ui/photo/mulkung';
+
+function requiredUrl(
+  assets: StripAssetLookup | undefined,
+  key: string,
+  contentId: string,
+  slotId: string,
+): string | undefined {
+  if (assets === undefined) return undefined;
+  return assets.resolveRequiredUrl?.(key, {
+    screen: 'run-strip',
+    contentId,
+    slotId,
+    bundle: 'board',
+  }) ?? assets.resolveOptionalUrl?.(key) ?? assets.resolveUrl(key);
+}
+
+/** A decoration sprite: fitted, never stretched, and never a hit target. */
+function decorate(url: string, source: AssetDimension, box: FitBox): Sprite {
+  const rect = containImage(source, box);
+  const sprite = Sprite.from(url);
+  sprite.position.set(rect.x, rect.y);
+  sprite.width = rect.width;
+  sprite.height = rect.height;
+  sprite.eventMode = 'none';
+  return sprite;
 }
 
 const KIND_COLORS: Readonly<Record<RunStripNodeKind, number>> = {
@@ -31,6 +79,32 @@ const CARD_GAP = 26;
 const BOARD_TOP = 128;
 const BOARD_LEFT = Math.round((640 - (CARD_WIDTH * 3 + CARD_GAP * 2)) / 2);
 
+export const RUN_STRIP_STAGE_SIZE = { width: 640, height: 400 } as const;
+
+/**
+ * Decorative case-file portraits live in the right gutter, never on top of a
+ * node card. Keeping the complete rectangles in one exported table lets the
+ * renderer and its geometry regression test share the same source of truth.
+ */
+export const CASE_FILE_PHOTO_LAYOUT = [
+  {
+    key: BOARD_DETECTIVE_PHOTO_ASSET_KEY,
+    caption: '김태훈 형사',
+    x: 584,
+    y: 92,
+    width: 46,
+    height: 46,
+  },
+  {
+    key: BOARD_PARTNER_PHOTO_ASSET_KEY,
+    caption: '김 인턴',
+    x: 584,
+    y: 150,
+    width: 46,
+    height: 46,
+  },
+] as const;
+
 export function episodeSlotX(slotIndex: number): number {
   return BOARD_LEFT + slotIndex * (CARD_WIDTH + CARD_GAP);
 }
@@ -47,7 +121,10 @@ function drawConnector(view: Container, slotIndex: number, dim: boolean): void {
 }
 
 /** The veil: same silhouette, no content. A question mark stands in for the stage. */
-function createFogOverlay(role: EpisodeSlotRole): Container {
+function createFogOverlay(
+  role: EpisodeSlotRole,
+  assets: StripAssetLookup | undefined,
+): Container {
   const node = new Container();
   node.addChild(
     new Graphics()
@@ -55,6 +132,24 @@ function createFogOverlay(role: EpisodeSlotRole): Container {
       .fill({ color: UI_PALETTE.panel, alpha: 0.92 })
       .stroke({ color: UI_PALETTE.panelLight, width: 1 }),
   );
+  // One generic marker for every veiled slot. It is chosen by the renderer, not
+  // supplied per node, so no future node's identity reaches this code path.
+  const markerUrl = requiredUrl(
+    assets,
+    BOARD_VEILED_MARKER_ASSET_KEY,
+    `veiled-${role.toLowerCase()}`,
+    'veiled-marker',
+  );
+  if (markerUrl !== undefined) {
+    node.addChild(
+      decorate(markerUrl, ASSET_DIMENSIONS.board_marker_1024, {
+        x: 24,
+        y: 10,
+        width: CARD_WIDTH - 48,
+        height: CARD_HEIGHT - 44,
+      }),
+    );
+  }
   // Drifting banks, drawn as flat pixel bars so nothing needs a texture.
   for (let band = 0; band < 4; band += 1) {
     const inset = 12 + band * 9;
@@ -74,7 +169,10 @@ function createFogOverlay(role: EpisodeSlotRole): Container {
   return node;
 }
 
-function createKnownNode(node: Extract<EpisodeNodeView, { visibility: 'KNOWN' }>): Container {
+function createKnownNode(
+  node: Extract<EpisodeNodeView, { visibility: 'KNOWN' }>,
+  assets: StripAssetLookup | undefined,
+): Container {
   const container = new Container();
   const color = KIND_COLORS[node.kind];
   const current = node.status === 'CURRENT';
@@ -84,6 +182,34 @@ function createKnownNode(node: Extract<EpisodeNodeView, { visibility: 'KNOWN' }>
       .fill({ color: UI_PALETTE.panel, alpha: current ? 1 : 0.85 })
       .stroke({ color, width: current ? 3 : 1 }),
   );
+
+  const photoUrl =
+    node.artAssetKey === undefined
+      ? undefined
+      : requiredUrl(assets, node.artAssetKey, node.nodeId, 'node-photo');
+  if (photoUrl !== undefined) {
+    container.addChild(
+      decorate(photoUrl, ASSET_DIMENSIONS.photo_256, {
+        x: CARD_WIDTH / 2 - 30,
+        y: 30,
+        width: 60,
+        height: 60,
+      }),
+    );
+  }
+  const pinUrl = requiredUrl(assets, BOARD_PIN_ASSET_KEY, node.nodeId, 'node-pin');
+  if (pinUrl !== undefined) {
+    // Decoration above the card: it changes nothing about the card's bounds or
+    // its place in the input order.
+    container.addChild(
+      decorate(pinUrl, ASSET_DIMENSIONS.pin_128, {
+        x: CARD_WIDTH / 2 - 9,
+        y: -6,
+        width: 18,
+        height: 18,
+      }),
+    );
+  }
 
   const roleBadge = createPixelText(ROLE_LABELS[node.role], {
     fontSize: 8,
@@ -125,12 +251,49 @@ function createKnownNode(node: Extract<EpisodeNodeView, { visibility: 'KNOWN' }>
   return container;
 }
 
+/**
+ * The detective's own file card and his partner's, pinned to the corkboard.
+ * They are decoration: the board's three stages remain the only interactive
+ * elements.
+ */
+function addCaseFilePhotos(view: Container, assets: StripAssetLookup | undefined): void {
+  CASE_FILE_PHOTO_LAYOUT.forEach((entry) => {
+    const url = requiredUrl(assets, entry.key, entry.caption, 'case-file-photo');
+    if (url === undefined) return;
+    const pinUrl = requiredUrl(assets, BOARD_PIN_ASSET_KEY, entry.caption, 'case-file-pin');
+    const photo = createProfilePhoto({
+      url,
+      caption: entry.caption,
+      width: entry.width,
+      height: entry.height,
+      ...(pinUrl === undefined ? {} : { pinUrl }),
+    });
+    photo.position.set(entry.x, entry.y);
+    view.addChild(photo);
+  });
+}
+
 export function createRunStripScreen(
   model: RunStripScreenModel,
   options: RunStripScreenOptions = {},
 ): Container {
   const view = new Container();
   view.addChild(new Graphics().rect(0, 0, 640, 400).fill(UI_PALETTE.deepInk));
+  const boardUrl = requiredUrl(
+    options.assets,
+    BOARD_BACKGROUND_ASSET_KEY,
+    model.episodeId,
+    'background',
+  );
+  if (boardUrl !== undefined) {
+    // 1280x800 at exactly half size: the board fills the stage without any
+    // fractional sampling, and the card coordinates below are unchanged.
+    const board = Sprite.from(boardUrl);
+    board.width = 640;
+    board.height = 400;
+    board.eventMode = 'none';
+    view.addChild(board);
+  }
 
   const title = createPixelText(model.title, { fontSize: 16, fill: UI_PALETTE.paper });
   title.anchor.set(0.5, 0);
@@ -159,8 +322,8 @@ export function createRunStripScreen(
       drawConnector(view, index, index >= model.activeSlotIndex);
     }
     const child = node.visibility === 'VEILED'
-      ? createFogOverlay(node.role)
-      : createKnownNode(node);
+      ? createFogOverlay(node.role, options.assets)
+      : createKnownNode(node, options.assets);
     child.position.set(episodeSlotX(index), BOARD_TOP);
     view.addChild(child);
   });
@@ -193,6 +356,8 @@ export function createRunStripScreen(
     veil.addChild(mark, caption);
     view.addChild(veil);
   }
+
+  addCaseFilePhotos(view, options.assets);
 
   if (options.onContinue !== undefined) {
     const button = new Container();

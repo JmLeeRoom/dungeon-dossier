@@ -7,7 +7,7 @@ import {
   handleWorkbenchSave,
   MAX_BODY_BYTES,
   type WorkbenchSaveResult,
-} from './handler';
+} from './handler.ts';
 
 export const WORKBENCH_SAVE_ENDPOINT = '/api/workbench/save';
 

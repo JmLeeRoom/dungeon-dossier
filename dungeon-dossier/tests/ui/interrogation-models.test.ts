@@ -9,6 +9,7 @@ import {
 import {
   canSubmitInterrogationSelection,
   cardNeedsEvidence,
+  interrogationCardAllowsFacet,
   type InterrogationCardView,
 } from '../../src/ui/screens/interrogation/model';
 import {
@@ -22,6 +23,7 @@ import {
 } from '../../src/ui/widgets/gauge';
 import { buildShieldDisplayModel } from '../../src/ui/widgets/shield';
 import {
+  applyTagChipDeactivation,
   deriveFacetTagChipState,
   deriveTagChipState,
   type TagChipState,
@@ -131,15 +133,31 @@ describe('tag-chip display derivation', () => {
 
     expect(deriveFacetTagChipState('WHO', tokens)).toBe('BROKEN');
     expect(deriveFacetTagChipState('WHEN', tokens)).toBe('BROKEN');
-    expect(deriveFacetTagChipState('WHY', tokens)).toBe('DEFAULT');
+    // A facet the statement says nothing public about is an empty slot, not a
+    // default one, so it gets its own plate.
+    expect(deriveFacetTagChipState('WHY', tokens)).toBe('HIDDEN_SLOT');
   });
 
-  it('does not let hidden tokens affect a facet', () => {
+  it('reports a facet with only hidden tokens as an empty slot, and nothing more', () => {
+    // `toPublicDTO` already dropped the claim. All that survives is the boolean
+    // "nothing public here" — never the hidden claim's id or wording.
     expect(
       deriveFacetTagChipState('WHO', [
         statementToken({ epistemic: 'REFUTED', presentation: 'HIDDEN' }),
       ]),
+    ).toBe('HIDDEN_SLOT');
+    expect(deriveFacetTagChipState('WHO', [])).toBe('HIDDEN_SLOT');
+    expect(
+      deriveFacetTagChipState('WHO', [statementToken({ epistemic: 'SUPPORTED' })]),
     ).toBe('DEFAULT');
+  });
+
+  it('layers DEACTIVATED over any state except an empty slot', () => {
+    expect(applyTagChipDeactivation('DEFAULT', true)).toBe('DEFAULT');
+    expect(applyTagChipDeactivation('DEFAULT', false)).toBe('DEACTIVATED');
+    expect(applyTagChipDeactivation('BROKEN', false)).toBe('DEACTIVATED');
+    // An empty slot stays empty: there is nothing there to deactivate.
+    expect(applyTagChipDeactivation('HIDDEN_SLOT', false)).toBe('HIDDEN_SLOT');
   });
 });
 
@@ -273,17 +291,37 @@ describe('card, evidence, and submit selection models', () => {
       evidenceIds: ['ev1', 'ev2'],
     });
     expect(interrogationCardAttachments(card, ['ev2'], false).evidenceIds).toEqual(['ev1']);
-    expect(interrogationCardLayerAssetKey(card, 'base', undefined, EVIDENCE)).toBe(
-      'card/기본/템플릿',
+    const evidenceKeys = { ev1: 'ui/card/evidence00', ev2: 'ui/card/evidence02' };
+    expect(interrogationCardLayerAssetKey(card, 'base', undefined, evidenceKeys)).toBe(
+      'ui/card/base',
     );
-    expect(interrogationCardLayerAssetKey(card, 'illust', undefined, EVIDENCE)).toBe(
+    // No approved art for this card id, so it falls back to its intent plate.
+    expect(interrogationCardLayerAssetKey(card, 'illust', undefined, evidenceKeys)).toBe(
       'card/모순/일러',
     );
-    expect(interrogationCardLayerAssetKey(card, 'evidence', 'ev2', EVIDENCE)).toBe(
-      'ev/사건/증거2',
+    expect(
+      interrogationCardLayerAssetKey(
+        { ...card, artAssetKey: 'ui/card/illust02' },
+        'illust',
+        undefined,
+        evidenceKeys,
+      ),
+    ).toBe('ui/card/illust02');
+    // Evidence resolves by id, never by its position in the tray.
+    expect(interrogationCardLayerAssetKey(card, 'evidence', 'ev2', evidenceKeys)).toBe(
+      'ui/card/evidence02',
     );
-    expect(interrogationCardLayerAssetKey(card, 'stamp', 'RED', EVIDENCE)).toBeUndefined();
-    expect(interrogationCardLayerAssetKey(card, 'post', 'card/clip/기본', EVIDENCE)).toBe(
+    expect(
+      interrogationCardLayerAssetKey(card, 'evidence', 'ev_unmapped', evidenceKeys),
+    ).toBeUndefined();
+    expect(interrogationCardLayerAssetKey(card, 'stamp', 'RED', evidenceKeys)).toBe(
+      'ui/card_stamp/pushy',
+    );
+    expect(interrogationCardLayerAssetKey(card, 'post', 'HOW', evidenceKeys)).toBe('ui/card/post');
+    expect(interrogationCardLayerAssetKey(card, 'post', 'CLIP', evidenceKeys)).toBe(
+      'ui/card/pushy',
+    );
+    expect(interrogationCardLayerAssetKey(card, 'post', 'card/clip/기본', evidenceKeys)).toBe(
       'card/clip/기본',
     );
   });
@@ -306,6 +344,9 @@ describe('card, evidence, and submit selection models', () => {
   it('requires a known card, a facet, and evidence when the card declares it', () => {
     expect(cardNeedsEvidence(CARDS, 'query')).toBe(false);
     expect(cardNeedsEvidence(CARDS, 'contradict')).toBe(true);
+    expect(interrogationCardAllowsFacet({ ...CARDS[0]!, allowedFacets: ['WHEN'] }, 'WHO'))
+      .toBe(false);
+    expect(interrogationCardAllowsFacet(CARDS[0], 'WHO')).toBe(true);
     expect(
       canSubmitInterrogationSelection(CARDS, {
         cardId: 'query',
@@ -339,6 +380,20 @@ describe('card, evidence, and submit selection models', () => {
         cardId: 'query',
         evidenceIds: [],
       }),
+    ).toBe(false);
+    expect(
+      canSubmitInterrogationSelection(
+        CARDS.map((card) => card.cardId === 'query' ? { ...card, locked: true } : card),
+        { cardId: 'query', facet: 'WHO', evidenceIds: [] },
+      ),
+    ).toBe(false);
+    expect(
+      canSubmitInterrogationSelection(
+        CARDS.map((card) =>
+          card.cardId === 'query' ? { ...card, allowedFacets: ['WHEN'] as const } : card,
+        ),
+        { cardId: 'query', facet: 'WHO', evidenceIds: [] },
+      ),
     ).toBe(false);
   });
 });

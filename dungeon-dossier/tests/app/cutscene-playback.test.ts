@@ -2,9 +2,13 @@ import { describe, expect, it } from 'vitest';
 
 import {
   collectCutsceneOutcome,
+  cutscenePresentationAssetKeys,
   cutsceneForTiming,
   toCutsceneBeatViews,
 } from '../../src/app/cutscenePlayback';
+import {
+  DETECTIVE_PHOTO_ASSET_KEY,
+} from '../../src/app/uiAssetBindings';
 import { clearStrings, installStrings } from '../../src/app/i18n';
 import {
   CUTSCENE_TREATMENTS,
@@ -85,6 +89,30 @@ describe('toCutsceneBeatViews', () => {
     expect(views[1]?.treatment).toBe('SHAKE');
     expect(views[1]?.defaultChoiceId).toBe('choice_press');
     expect(views[0]?.defaultChoiceId).toBeUndefined();
+  });
+
+  it('preserves authored backgrounds and only applies approved portrait aliases', () => {
+    const authoredBackgroundAssetKey = 'background/authored-cutscene';
+    const authored = CutsceneSchema.parse({
+      cutscene_id: 'cutscene_ep001_forensic_open',
+      timing: 'BEFORE',
+      skippable: false,
+      beats: [{
+        beat_id: 'beat_ep001_forensic_arrive',
+        text_key: 'cutscene.forensic.arrive',
+        treatment: 'NONE',
+        duration_ms: 500,
+        background_asset_key: authoredBackgroundAssetKey,
+        portraits: [{ side: 'LEFT', asset_key: 'portrait/김태훈/base', dim: false }],
+      }],
+    });
+    const [view] = toCutsceneBeatViews(authored);
+    expect(view?.backgroundAssetKey).toBe(authoredBackgroundAssetKey);
+    expect(view?.portraits[0]?.assetKey).toBe(DETECTIVE_PHOTO_ASSET_KEY);
+    expect(cutscenePresentationAssetKeys(authored)).toEqual([
+      authoredBackgroundAssetKey,
+      DETECTIVE_PHOTO_ASSET_KEY,
+    ]);
   });
 });
 

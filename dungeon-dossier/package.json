@@ -10,13 +10,16 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && node tools/assets/validate-dist.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.node.json",
     "lint": "eslint . --max-warnings 0",
     "arch": "depcruise --config dependency-cruiser.config.cjs src",
     "test": "vitest run",
     "test:gates": "vitest run tests/ai tests/ai-contract tests/app tests/arch tests/audio tests/content tests/content-io tests/dev tests/e2e tests/engine tests/judgment tests/leakage tests/schema tests/tools tests/ui",
     "test:e2e": "vitest run tests/e2e",
+    "assets:import": "node tools/assets/import-nhn-assets.mjs",
+    "assets:catalog": "node tools/assets/build-runtime-catalog.mjs",
+    "assets:validate": "node tools/assets/import-nhn-assets.mjs --check && node tools/assets/build-runtime-catalog.mjs --check",
     "autoplay": "vite --open \"/?autoplay=1&mode=watch\"",
     "autoplay:video": "vite --open \"/?autoplay=true&mode=video\"",
     "content:validate": "node tools/validate/index.mjs",
@@ -25,10 +28,11 @@
     "palette:check": "node tools/palette-check/index.mjs",
     "simulate:smoke": "vitest run tests/routes/smoke-best.test.ts tests/flags tests/replay",
     "simulate:full": "vitest run tests/routes tests/flags tests/replay",
-    "check": "pnpm lint && pnpm arch && pnpm typecheck && pnpm test && pnpm content:validate && pnpm palette:check && pnpm simulate:smoke && pnpm build",
+    "check": "corepack pnpm lint && corepack pnpm arch && corepack pnpm typecheck && corepack pnpm test && corepack pnpm content:validate && corepack pnpm assets:validate && corepack pnpm palette:check && corepack pnpm simulate:smoke && corepack pnpm build",
     "e2e:install": "playwright install --with-deps chromium",
     "e2e:browser": "playwright test",
-    "e2e:browser:turbo": "playwright test --project=chromium-dpr1 br04"
+    "e2e:browser:turbo": "playwright test --project=chromium-dpr1 br04",
+    "e2e:preview": "playwright test --config=playwright.preview.config.ts"
   },
   "dependencies": {
     "howler": "2.2.4",

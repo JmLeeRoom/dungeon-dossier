@@ -17,6 +17,7 @@ import {
   type CardsDefinition,
   type CaseDefinition,
 } from '../../src/engine/domain';
+import { SUSPECT_ASSET_SETS } from '../../src/app/uiAssetBindings';
 import { buildAssetRegistry } from '../../src/ui/core/assetRegistry';
 
 const execFileAsync = promisify(execFile);
@@ -278,7 +279,7 @@ describe('portrait placeholder catalog', () => {
     });
   });
 
-  it('builds the 37 checked-in runtime portrait keys including the partner cooldown sheet', async () => {
+  it('builds the 37 generated portrait keys and the 20 imported idle sheets side by side', async () => {
     const files = (await readdir(PORTRAIT_DIRECTORY))
       .filter((file) => file.endsWith('.png'))
       .sort();
@@ -290,16 +291,30 @@ describe('portrait placeholder catalog', () => {
         ]),
       ),
     );
-    const expectedKeys = [
+    const generatedKeys = [
       ...PORTRAIT_NAMES.flatMap((name) => [
         `portrait/${name}/base`,
         `portrait/${name}/upset`,
         `portrait/${name}/lose`,
       ]),
       'portrait/김_인턴/used',
-    ].sort();
+    ];
+    // Approved art lands beside the generated set rather than overwriting it:
+    // only four suspects have an approved alias, so the rest still need their
+    // placeholder to exist.
+    const importedKeys = [
+      ...['bensi', 'goblin', 'kimyongsa', 'minota', 'mulkung', 'succuba'].flatMap((name) => [
+        `idle/${name}/base`,
+        `idle/${name}/upset`,
+        `idle/${name}/lose`,
+      ]),
+      'idle/coffee/base',
+      'idle/coffee/used',
+    ];
 
-    expect([...registry.keys()].sort()).toEqual(expectedKeys);
+    expect([...registry.keys()].sort()).toEqual([...generatedKeys, ...importedKeys].sort());
+    expect(generatedKeys).toHaveLength(37);
+    expect(importedKeys).toHaveLength(20);
   });
 
   it('maps all nine encounter races to real portrait slots and the intern partner', async () => {
@@ -323,17 +338,29 @@ describe('portrait placeholder catalog', () => {
         balanceRepository: { reload: async () => balance },
       });
       const model = session.currentModel();
-      expect(model.portraitBaseAssetKey).toBe(`portrait/${portraitName}/base`);
-      expect(model.portraitStatePartsAssetKeys).toEqual({
-        base: `portrait/${portraitName}/base`,
-        upset: `portrait/${portraitName}/upset`,
-        lose: `portrait/${portraitName}/lose`,
-      });
-      expect(model.partnerBaseAssetKey).toBe('portrait/김_인턴/base');
-      expect(model.partnerUsedAssetKey).toBe('portrait/김_인턴/used');
+      const assetSet = model.suspectAssetSet;
+      if (assetSet === undefined) throw new Error(`Missing suspect art for ${encounterId}.`);
+      const approved = SUSPECT_ASSET_SETS[portraitName];
+      if (approved === undefined) {
+        // No approved art: the generated overlay sheets stay, unchanged.
+        expect(assetSet).toEqual({
+          base: `portrait/${portraitName}/base`,
+          upset: `portrait/${portraitName}/upset`,
+          lose: `portrait/${portraitName}/lose`,
+          stateMode: 'overlay',
+        });
+      } else {
+        // Approved art is whole-frame, so a state swap replaces rather than
+        // stacks a second character on top of the first.
+        expect(assetSet).toEqual(approved);
+        expect(assetSet.stateMode).toBe('replace');
+      }
+      expect(model.partnerBaseAssetKey).toBe('idle/coffee/base');
+      expect(model.partnerUsedAssetKey).toBe('idle/coffee/used');
       const keys = [
-        model.portraitBaseAssetKey,
-        ...Object.values(model.portraitStatePartsAssetKeys ?? {}),
+        assetSet.base,
+        assetSet.upset,
+        assetSet.lose,
         model.partnerBaseAssetKey,
         model.partnerUsedAssetKey,
       ];

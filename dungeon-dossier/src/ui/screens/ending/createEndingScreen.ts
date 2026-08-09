@@ -1,8 +1,17 @@
-import { Container, Graphics, Sprite, Texture } from 'pixi.js';
+import { Container, Graphics, Sprite } from 'pixi.js';
 import type { InterrogationAssetLookup } from '../interrogation';
+import { ASSET_DIMENSIONS } from '../../core/assetDimensions';
+import { containImage } from '../../core/imageFit';
 import { createPixelText } from '../../core/pixelText';
 import { UI_PALETTE } from '../../widgets/theme';
 import { endingTone, type EndingScreenModel } from './model';
+
+export const ENDING_ILLUSTRATION_BOUNDS = {
+  x: 0,
+  y: 0,
+  width: 640,
+  height: 240,
+} as const;
 
 export function createEndingScreen(
   model: EndingScreenModel,
@@ -11,12 +20,18 @@ export function createEndingScreen(
 ): Container {
   const view = new Container();
   view.addChild(new Graphics().rect(0, 0, 640, 400).fill(UI_PALETTE.deepInk));
-  const url = model.illustrationAssetKey === undefined ? undefined : assets?.resolveUrl(model.illustrationAssetKey);
+  const url = model.illustrationAssetKey === undefined
+    ? undefined
+    : assets?.resolveOptionalUrl?.(model.illustrationAssetKey) ??
+      assets?.resolveUrl(model.illustrationAssetKey);
   if (url !== undefined) {
-    const image = new Sprite(Texture.from(url));
-    image.width = 640;
-    image.height = 240;
+    const rect = containImage(ASSET_DIMENSIONS.result_1024x506, ENDING_ILLUSTRATION_BOUNDS);
+    const image = Sprite.from(url);
+    image.position.set(rect.x, rect.y);
+    image.width = rect.width;
+    image.height = rect.height;
     image.alpha = 0.6;
+    image.eventMode = 'none';
     view.addChild(image);
   }
   const title = createPixelText(model.title, { fontSize: 20, fill: model.kind === 'BAD' ? UI_PALETTE.red : UI_PALETTE.paper });

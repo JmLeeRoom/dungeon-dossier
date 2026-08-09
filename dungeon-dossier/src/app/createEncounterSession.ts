@@ -32,6 +32,16 @@ import { resolveFlagEffects, type RunState } from '../engine/run';
 import { deriveSuspectStatePart } from '../engine/suspectState';
 import type { InterrogationScreenModel } from '../ui/screens/interrogation';
 import { t } from './i18n';
+import {
+  CARD_ILLUSTRATION_ASSET_KEYS,
+  CARD_LOCK_OVERLAY_ASSET_KEY,
+  CARD_LOCKED_ILLUSTRATION_ASSET_KEY,
+  EVIDENCE_ASSET_KEYS,
+  PARTNER_ASSET_SET,
+  PARTNER_USED_ASSET_KEY,
+  interrogationBackgroundAssetKey,
+  suspectAssetSet,
+} from './uiAssetBindings';
 
 interface CaseLoader {
   load(caseDirectory: string): Promise<CaseDefinition | undefined>;
@@ -310,6 +320,7 @@ export async function createEncounterSession(
   };
   const fallbackCatalog = createFallbackCatalog(dialogue);
   const portraitName = entityPortraitAssetName(loadedCase, encounter.target_entity);
+  const suspectArt = suspectAssetSet(portraitName);
   let currentBalance = loadedBalance;
 
   const session: EncounterSession = {
@@ -376,6 +387,14 @@ export async function createEncounterSession(
       const cards = snapshot.deck.hand.flatMap((cardId) => {
         const definition = loadedCards.cards.find((card) => card.card_id === cardId);
         if (definition === undefined) return [];
+        // A lock is already engine state: the succubus modifier writes
+        // `lockedUntilTurn`, so the view only has to project it.
+        const lockedUntilTurn = snapshot.cards[cardId]?.lockedUntilTurn ?? -1;
+        const lockTurnsRemaining = Math.max(0, lockedUntilTurn - snapshot.resources.turn + 1);
+        const locked = lockTurnsRemaining > 0;
+        const artAssetKey = locked
+          ? CARD_LOCKED_ILLUSTRATION_ASSET_KEY
+          : CARD_ILLUSTRATION_ASSET_KEYS[cardId];
         return [{
           cardId,
           title: t(definition.name_key ?? definition.title_key, definition.card_id),
@@ -383,6 +402,17 @@ export async function createEncounterSession(
           intent: definition.intent,
           cpCost: definition.cost.cp ?? 0,
           requiresEvidence: (definition.target.min_evidence ?? 0) > 0,
+          ...(definition.target.facets === undefined
+            ? {}
+            : { allowedFacets: [...definition.target.facets] }),
+          ...(artAssetKey === undefined ? {} : { artAssetKey }),
+          ...(locked
+            ? {
+                locked,
+                lockTurnsRemaining,
+                debuffAssetKey: CARD_LOCK_OVERLAY_ASSET_KEY,
+              }
+            : {}),
           attachments: {
             ...(definition.card_modifier?.stamp === undefined
               ? {}
@@ -405,8 +435,9 @@ export async function createEncounterSession(
         composureMax: limits.composureMax,
         confessed,
       });
-      const backgroundAssetKey =
-        options.backgroundAssetKey ?? loadedCase.metadata.background_asset_key;
+      const backgroundAssetKey = interrogationBackgroundAssetKey(
+        options.backgroundAssetKey ?? loadedCase.metadata.background_asset_key,
+      );
       const partnerSkillId =
         options.partnerSkillId ?? Object.keys(currentBalance.partner.cooldowns)[0];
       const partnerSkillDuration = partnerSkillId === undefined
@@ -428,20 +459,16 @@ export async function createEncounterSession(
         sweetSpotUnlocked: inSweetSpot,
         cards,
         evidenceCosts: Object.fromEntries(dto.evidence.map((item) => [item.evidenceId, 0])),
-        ...(portraitName === undefined
-          ? {}
-          : {
-              portraitBaseAssetKey: `portrait/${portraitName}/base`,
-              portraitStatePartsAssetKeys: {
-                base: `portrait/${portraitName}/base`,
-                upset: `portrait/${portraitName}/upset`,
-                lose: `portrait/${portraitName}/lose`,
-              },
-            }),
+        ...(suspectArt === undefined ? {} : { suspectAssetSet: suspectArt }),
         ...(backgroundAssetKey === undefined ? {} : { backgroundAssetKey }),
+        evidenceAssetKeys: Object.fromEntries(
+          dto.evidence
+            .map((item) => [item.evidenceId, EVIDENCE_ASSET_KEYS[item.evidenceId]] as const)
+            .filter((pair): pair is readonly [string, string] => pair[1] !== undefined),
+        ),
         suspectStatePart,
-        partnerBaseAssetKey: 'portrait/김_인턴/base',
-        partnerUsedAssetKey: 'portrait/김_인턴/used',
+        partnerBaseAssetKey: PARTNER_ASSET_SET.base,
+        partnerUsedAssetKey: PARTNER_USED_ASSET_KEY,
         partnerCooldown: coordinator.partnerCooldown(partnerSkillId),
         partnerSkillAvailable:
           partnerSkillDuration !== undefined && partnerSkillDuration > 0,

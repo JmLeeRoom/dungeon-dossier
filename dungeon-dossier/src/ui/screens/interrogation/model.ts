@@ -1,5 +1,7 @@
 import type { PartnerCooldownView, PublicDTO, SuspectStatePart } from '../../../dto';
+import type { AssetResolveContext } from '../../core/uiAssetPort';
 import type { CardAttachments } from '../../widgets/cardLayers';
+import type { SuspectAssetSet } from '../../widgets/suspectPortraitWidget';
 
 export interface InterrogationCardView {
   readonly cardId: string;
@@ -8,8 +10,18 @@ export interface InterrogationCardView {
   readonly intent: string;
   readonly cpCost: number;
   readonly requiresEvidence: boolean;
+  /** Undefined means the authored target accepts every public facet. */
+  readonly allowedFacets?: readonly PublicDTO['statement'][number]['facet'][];
   readonly artAssetKey?: string;
   readonly attachments?: CardAttachments;
+  /**
+   * Derived from the snapshot's `cards[cardId].lockedUntilTurn`; it is a
+   * projection of existing engine state, not a new one. A locked card renders
+   * its debuff overlay and refuses every pointer path.
+   */
+  readonly locked?: boolean;
+  readonly lockTurnsRemaining?: number;
+  readonly debuffAssetKey?: string;
 }
 
 export interface InterrogationTurnView {
@@ -59,11 +71,15 @@ export interface InterrogationScreenModel {
   readonly selectedEvidenceIds?: readonly string[];
   readonly evidenceCosts?: Readonly<Record<string, number>>;
   readonly backgroundAssetKey?: string;
-  readonly portraitBaseAssetKey?: string;
-  /** One asset key per suspect state sheet; `base` may be omitted. */
-  readonly portraitStatePartsAssetKeys?: Readonly<Partial<Record<SuspectStatePart, string>>>;
+  /**
+   * The suspect's three frames plus how they composite. Approved art replaces
+   * the whole frame; generated placeholders overlay a difference layer.
+   */
+  readonly suspectAssetSet?: SuspectAssetSet;
   readonly partnerBaseAssetKey?: string;
   readonly partnerUsedAssetKey?: string;
+  /** Authored evidence id to polaroid key, resolved by the app layer. */
+  readonly evidenceAssetKeys?: Readonly<Record<string, string>>;
   readonly suspectStatePart: SuspectStatePart;
   readonly partnerCooldown: PartnerCooldownView;
   readonly partnerSkillAvailable: boolean;
@@ -88,7 +104,12 @@ export interface InterrogationCallbacks {
 }
 
 export interface InterrogationAssetLookup {
+  /** Falls back to the placeholder plate when a required key is absent. */
   resolveUrl(key: string): string | undefined;
+  /** Exact lookup with no fallback; missing decorative art stays invisible. */
+  resolveOptionalUrl?(key: string): string | undefined;
+  /** Exact required lookup used by production scene bindings. */
+  resolveRequiredUrl?(key: string, context: AssetResolveContext): string;
 }
 
 export function cardNeedsEvidence(
@@ -98,6 +119,13 @@ export function cardNeedsEvidence(
   return cards.find((card) => card.cardId === cardId)?.requiresEvidence ?? false;
 }
 
+export function interrogationCardAllowsFacet(
+  card: InterrogationCardView | undefined,
+  facet: PublicDTO['statement'][number]['facet'],
+): boolean {
+  return card?.allowedFacets === undefined || card.allowedFacets.includes(facet);
+}
+
 export function canSubmitInterrogationSelection(
   cards: readonly InterrogationCardView[],
   selection: InterrogationSelection,
@@ -105,5 +133,7 @@ export function canSubmitInterrogationSelection(
   if (selection.cardId === undefined || selection.facet === undefined) return false;
   const card = cards.find((candidate) => candidate.cardId === selection.cardId);
   if (card === undefined) return false;
+  if (card.locked === true) return false;
+  if (!interrogationCardAllowsFacet(card, selection.facet)) return false;
   return !card.requiresEvidence || selection.evidenceIds.length > 0;
 }

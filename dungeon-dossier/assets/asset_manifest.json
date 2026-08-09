@@ -1,0 +1,222 @@
+{
+  "schema_version": "3.0",
+  "stage": {
+    "width": 640,
+    "height": 400,
+    "render_width": 1280,
+    "render_height": 800,
+    "render_scale": 2
+  },
+  "slots": {
+    "bg-room": {
+      "dimension": "bg_interrogation",
+      "image": "bg_interrogationroom_base.png",
+      "transform": {
+        "x": 0,
+        "y": 0,
+        "rotation": 0,
+        "scaleX": 0.5,
+        "scaleY": 0.5,
+        "preserveAspectRatio": true
+      },
+      "isLocked": true
+    },
+    "suspect-base": {
+      "dimension": "suspect_base",
+      "image": "idle_mulkung_base.png",
+      "transform": {
+        "x": 212,
+        "y": 34,
+        "rotation": 0,
+        "scaleX": 0.421875,
+        "scaleY": 0.421875,
+        "preserveAspectRatio": true
+      },
+      "isLocked": true
+    },
+    "suspect-state-parts": {
+      "dimension": "suspect_state_parts",
+      "image": "idle_mulkung_upset.png",
+      "transform": {
+        "x": 212,
+        "y": 34,
+        "rotation": 0,
+        "scaleX": 0.421875,
+        "scaleY": 0.421875,
+        "preserveAspectRatio": true
+      },
+      "isLocked": true
+    },
+    "suspect-lose-parts": {
+      "dimension": "suspect_state_parts",
+      "image": "idle_mulkung_lose.png",
+      "transform": {
+        "x": 212,
+        "y": 34,
+        "rotation": 0,
+        "scaleX": 0.421875,
+        "scaleY": 0.421875,
+        "preserveAspectRatio": true
+      },
+      "isLocked": true
+    },
+    "fg-desk": {
+      "dimension": "desk_foreground",
+      "image": "bg_interrogationroom_desk.png",
+      "transform": {
+        "x": 0,
+        "y": 239,
+        "rotation": 0,
+        "scaleX": 0.5,
+        "scaleY": 0.5015576323987538,
+        "customWidth": 640,
+        "customHeight": 161,
+        "preserveAspectRatio": false
+      },
+      "isLocked": true
+    },
+    "card-base": {
+      "dimension": "card_base_768x1024",
+      "image": "ui_card_base.png",
+      "transform": {
+        "x": 248,
+        "y": 362,
+        "rotation": 0,
+        "scaleX": 0.1875,
+        "scaleY": 0.1875,
+        "preserveAspectRatio": true
+      },
+      "isLocked": true
+    },
+    "card-art-1": {
+      "dimension": "card_illust",
+      "image": "ui_card_illust00.png",
+      "transform": {
+        "x": 176,
+        "y": 336,
+        "rotation": 0,
+        "scaleX": 0.25,
+        "scaleY": 0.25,
+        "preserveAspectRatio": true
+      },
+      "isLocked": true
+    },
+    "card-art-2": {
+      "dimension": "card_illust",
+      "image": "ui_card_illust01.png",
+      "transform": {
+        "x": 248,
+        "y": 336,
+        "rotation": 0,
+        "scaleX": 0.25,
+        "scaleY": 0.25,
+        "preserveAspectRatio": true
+      },
+      "isLocked": true
+    },
+    "card-art-3": {
+      "dimension": "card_illust",
+      "image": "ui_card_illust02.png",
+      "transform": {
+        "x": 320,
+        "y": 336,
+        "rotation": 0,
+        "scaleX": 0.25,
+        "scaleY": 0.25,
+        "preserveAspectRatio": true
+      },
+      "isLocked": true
+    },
+    "ev-1": {
+      "dimension": "card_evidence_256",
+      "image": "ui_card_evidence00.png",
+      "transform": {
+        "x": 12,
+        "y": 306,
+        "rotation": 0,
+        "scaleX": 0.140625,
+        "scaleY": 0.140625,
+        "preserveAspectRatio": true
+      },
+      "isLocked": true
+    },
+    "ev-2": {
+      "dimension": "card_evidence_256",
+      "image": "ui_card_evidence01.png",
+      "transform": {
+        "x": 52,
+        "y": 306,
+        "rotation": 0,
+        "scaleX": 0.140625,
+        "scaleY": 0.140625,
+        "preserveAspectRatio": true
+      },
+      "isLocked": true
+    },
+    "ev-3": {
+      "dimension": "card_evidence_256",
+      "image": "ui_card_evidence02.png",
+      "transform": {
+        "x": 92,
+        "y": 306,
+        "rotation": 0,
+        "scaleX": 0.140625,
+        "scaleY": 0.140625,
+        "preserveAspectRatio": true
+      },
+      "isLocked": true
+    },
+    "icon-composure": {
+      "dimension": "icon_composure",
+      "image": "ui_icon_composure.png",
+      "transform": {
+        "x": 139,
+        "y": 5,
+        "rotation": 0,
+        "scaleX": 0.5,
+        "scaleY": 0.5,
+        "preserveAspectRatio": true
+      },
+      "isLocked": true
+    },
+    "icon-coercion": {
+      "dimension": "icon_coercion",
+      "image": "ui_icon_pushy.png",
+      "transform": {
+        "x": 326,
+        "y": 5,
+        "rotation": 0,
+        "scaleX": 0.5,
+        "scaleY": 0.5,
+        "preserveAspectRatio": true
+      },
+      "isLocked": true
+    },
+    "partner-base": {
+      "dimension": "partner",
+      "image": "idle_coffee_base.png",
+      "transform": {
+        "x": 546,
+        "y": 296,
+        "rotation": 0,
+        "scaleX": 0.171875,
+        "scaleY": 0.171875,
+        "preserveAspectRatio": true
+      },
+      "isLocked": true
+    },
+    "partner-used": {
+      "dimension": "partner",
+      "image": "idle_coffee_used.png",
+      "transform": {
+        "x": 546,
+        "y": 296,
+        "rotation": 0,
+        "scaleX": 0.171875,
+        "scaleY": 0.171875,
+        "preserveAspectRatio": true
+      },
+      "isLocked": true
+    }
+  }
+}

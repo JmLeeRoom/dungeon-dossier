@@ -19,6 +19,7 @@ import {
   type RunStripScreenModel,
 } from '../ui/screens/strip';
 import { t } from './i18n';
+import { boardNodePhotoAssetKey, eventArtBinding } from './uiAssetBindings';
 
 const RESOURCE_LABELS: Readonly<Record<string, string>> = {
   dp: 'DP',
@@ -99,12 +100,18 @@ export function toRunStripScreenModel(
   const activeEpisodeIndex = episodes.findIndex(
     (episode) => episode.episodeId === activeNode.episodeId,
   );
-  const nodes = episodeNodes(strip, activeNode.episodeId).map((node) => ({
-    nodeId: node.nodeId,
-    kind: node.kind,
-    role: node.slotRole,
-    label: t(`node.${node.ref}`, node.ref),
-  }));
+  const nodes = episodeNodes(strip, activeNode.episodeId).map((node) => {
+    // Attached to the board input, which `createRunStripModel` keeps on KNOWN
+    // slots and drops from VEILED ones along with the id and the label.
+    const artAssetKey = boardNodePhotoAssetKey(node.ref);
+    return {
+      nodeId: node.nodeId,
+      kind: node.kind,
+      role: node.slotRole,
+      label: t(`node.${node.ref}`, node.ref),
+      ...(artAssetKey === undefined ? {} : { artAssetKey }),
+    };
+  });
   const clearedEpisodes = episodes.slice(0, Math.max(0, activeEpisodeIndex)).map(
     (episode, index) => ({
       episodeId: episode.episodeId,
@@ -216,6 +223,7 @@ export function toEventSceneModel(
   event: NonCombatEventDefinition,
   state: EventPresentationState = {},
 ): EventSceneModel {
+  const art = eventArtBinding(event.event_id);
   const base = {
     eventId: event.event_id,
     title: t(event.title_key),
@@ -223,6 +231,7 @@ export function toEventSceneModel(
       event.description_key ?? `event.${event.event_id}.description`,
       '',
     ),
+    ...(art === undefined ? {} : art),
   };
   if (event.pattern === 'A') {
     return {

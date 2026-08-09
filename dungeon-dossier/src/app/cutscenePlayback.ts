@@ -10,6 +10,10 @@ import type {
   PresentationTreatment,
 } from '../ui/screens/cutscene';
 import { t } from './i18n';
+import {
+  cutsceneBackgroundAssetKey,
+  cutscenePortraitAssetKey,
+} from './uiAssetBindings';
 
 /**
  * Engine treatments and presentation treatments are separate vocabularies on
@@ -33,32 +37,50 @@ function toPresentationTreatment(
 export function toCutsceneBeatViews(
   cutscene: CutsceneDefinition,
 ): readonly CutsceneBeatView[] {
-  return cutscene.beats.map((beat) => ({
-    beatId: beat.beat_id,
-    ...(beat.background_asset_key === undefined
-      ? {}
-      : { backgroundAssetKey: beat.background_asset_key }),
-    portraits: beat.portraits.map((portrait) => ({
-      side: portrait.side,
-      assetKey: portrait.asset_key,
-      dim: portrait.dim,
-    })),
-    ...(beat.speaker_name_key === undefined
-      ? {}
-      : { speakerName: t(beat.speaker_name_key) }),
-    text: t(beat.text_key),
-    treatment: toPresentationTreatment(beat.treatment),
-    ...(beat.audio_cue === undefined ? {} : { audioCue: beat.audio_cue }),
-    durationMs: beat.duration_ms,
-    choices: beat.choices.map((choice) => ({
-      choiceId: choice.choice_id,
-      label: t(choice.label_key),
-    })),
-    // Skip needs a default branch it can take without asking the player.
-    ...(beat.choices[0] === undefined
-      ? {}
-      : { defaultChoiceId: beat.choices[0].choice_id }),
-  }));
+  return cutscene.beats.map((beat) => {
+    const backgroundAssetKey = cutsceneBackgroundAssetKey(
+      beat.beat_id,
+      beat.background_asset_key,
+    );
+    return {
+      beatId: beat.beat_id,
+      ...(backgroundAssetKey === undefined ? {} : { backgroundAssetKey }),
+      portraits: beat.portraits.map((portrait) => ({
+        side: portrait.side,
+        assetKey: cutscenePortraitAssetKey(portrait.asset_key),
+        dim: portrait.dim,
+      })),
+      ...(beat.speaker_name_key === undefined
+        ? {}
+        : { speakerName: t(beat.speaker_name_key) }),
+      text: t(beat.text_key),
+      treatment: toPresentationTreatment(beat.treatment),
+      ...(beat.audio_cue === undefined ? {} : { audioCue: beat.audio_cue }),
+      durationMs: beat.duration_ms,
+      choices: beat.choices.map((choice) => ({
+        choiceId: choice.choice_id,
+        label: t(choice.label_key),
+      })),
+      // Skip needs a default branch it can take without asking the player.
+      ...(beat.choices[0] === undefined
+        ? {}
+        : { defaultChoiceId: beat.choices[0].choice_id }),
+    };
+  });
+}
+
+/** Exact asset set for one authored cutscene, suitable for route preload. */
+export function cutscenePresentationAssetKeys(
+  cutscene: CutsceneDefinition,
+): readonly string[] {
+  return [
+    ...new Set(
+      toCutsceneBeatViews(cutscene).flatMap((beat) => [
+        ...(beat.backgroundAssetKey === undefined ? [] : [beat.backgroundAssetKey]),
+        ...beat.portraits.map((portrait) => portrait.assetKey),
+      ]),
+    ),
+  ];
 }
 
 export function cutsceneForTiming(

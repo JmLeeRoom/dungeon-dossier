@@ -21,6 +21,7 @@ vi.mock('../../src/ui/core/pixelText', async () => {
 import type { InterrogationCardView } from '../../src/ui/screens/interrogation/model';
 import { createCardDetailModal } from '../../src/ui/widgets/cardDetailModal';
 import { createCardFan } from '../../src/ui/widgets/cardFan';
+import { CARD_FAN_HEIGHT, CARD_FAN_WIDTH } from '../../src/ui/widgets/cardLayout';
 
 const CARDS: readonly InterrogationCardView[] = [
   {
@@ -59,16 +60,16 @@ describe('card fan pointer interactions', () => {
     const first = fan.view.children[0];
     if (!(first instanceof Container)) throw new Error('Expected a card container.');
 
-    expect(first.position.y).toBe(371);
+    expect(first.position.y).toBe(362);
     expect(first.rotation).toBe(-0.01);
 
     emit(first, 'pointerover');
-    expect(first.position.y).toBe(342);
+    expect(first.position.y).toBe(323);
     expect(first.rotation).toBe(0);
     expect(first.zIndex).toBe(100);
 
     emit(first, 'pointerout');
-    expect(first.position.y).toBe(371);
+    expect(first.position.y).toBe(362);
     expect(first.rotation).toBe(-0.01);
     expect(first.zIndex).toBe(0);
 
@@ -98,8 +99,9 @@ describe('card fan pointer interactions', () => {
 
     emit(first, 'globalpointermove', { global: { x: 60, y: 260 } });
     expect(fan.linkView.visible).toBe(true);
-    expect(first.position.x).toBe(-4);
-    expect(first.position.y).toBe(107);
+    // The card rides above the cursor so it never covers the chip it targets.
+    expect(first.position.x).toBe(60 - CARD_FAN_WIDTH / 2);
+    expect(first.position.y).toBe(260 - CARD_FAN_HEIGHT - 8);
     expect(onTargetHighlight).toHaveBeenLastCalledWith('WHO');
 
     emit(first, 'pointerup', { global: { x: 60, y: 260 } });
@@ -107,7 +109,7 @@ describe('card fan pointer interactions', () => {
     expect(onDropOnTarget).toHaveBeenCalledWith(CARDS[0], 'WHO');
     expect(onTargetHighlight).toHaveBeenLastCalledWith(undefined);
     expect(fan.linkView.visible).toBe(false);
-    expect(first.position.y).toBe(371);
+    expect(first.position.y).toBe(362);
 
     // A bubbled/global release after the card release must not duplicate docking.
     emit(fan.view, 'globalpointerup', { global: { x: 60, y: 260 } });
@@ -133,6 +135,32 @@ describe('card fan pointer interactions', () => {
 
     fan.destroy();
   });
+
+  it('closes every input path into a locked card, pointer and keyboard alike', () => {
+    const onSelect = vi.fn();
+    const onFocus = vi.fn();
+    const locked = { ...CARDS[0]!, locked: true, lockTurnsRemaining: 2 };
+    const fan = createCardFan([locked, CARDS[1]!], { spacing: 76, onSelect, onFocus });
+
+    const first = fan.view.children[0];
+    if (!(first instanceof Container)) throw new Error('Expected a card container.');
+    // Pointer: the card is inert, so a press cannot even start a selection.
+    expect(first.eventMode).toBe('none');
+    expect(first.cursor).toBe('not-allowed');
+
+    // Keyboard: Digit1 routes here, and it must honour the same lock rather
+    // than selecting a card the engine will refuse to play.
+    fan.selectByIndex(0);
+    expect(onSelect).not.toHaveBeenCalled();
+    expect(onFocus).not.toHaveBeenCalled();
+
+    // The unlocked neighbour is unaffected.
+    fan.selectByIndex(1);
+    expect(onSelect).toHaveBeenCalledOnce();
+    expect(onSelect).toHaveBeenCalledWith(CARDS[1], 1);
+
+    fan.destroy();
+  });
 });
 
 describe('card detail modal pointer partition', () => {
@@ -149,12 +177,11 @@ describe('card detail modal pointer partition', () => {
     );
 
     expect(modal.layout).toMatchObject({
-      nativeWidth: 640,
-      nativeHeight: 725,
-      scale: 0.5,
-      width: 320,
+      nativeWidth: 768,
+      nativeHeight: 1024,
+      width: 271.875,
       height: 362.5,
-      x: 160,
+      x: 184,
       y: 19,
     });
 

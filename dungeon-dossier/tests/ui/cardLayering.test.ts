@@ -22,15 +22,22 @@ import {
   CARD_FAN_WIDTH,
   CARD_HOVER_REVEAL_RATIO,
   CARD_LAYER_RECTS,
+  CARD_MODAL_BOX,
   CARD_REST_REVEAL_RATIO,
   CARD_SIZE,
   cardLayerZIndex,
   cardRevealHeight,
   computeCardModalLayout,
   findCardDropTarget,
+  layoutCardEvidence,
   layoutCardHand,
 } from '../../src/ui/widgets/cardLayout';
 import { dottedLinkControlPoint, dottedLinkSegments } from '../../src/ui/widgets/dottedLink';
+import { INTERNAL_WIDTH } from '../../src/ui/core/integerScale';
+import {
+  TAG_ROW_HEIGHT,
+  TAG_ROW_Y,
+} from '../../src/ui/screens/interrogation/createInterrogationScreen';
 
 describe('five-layer card stack', () => {
   it('orders the layers base, illust, stamp, post, evidence', () => {
@@ -88,11 +95,11 @@ describe('five-layer card stack', () => {
     expect(base.evidenceIds).toEqual([]);
   });
 
-  it('lays every layer out inside the authored 640x725 card frame', () => {
-    expect(CARD_LAYER_RECTS.base).toEqual({ x: 0, y: 0, width: 640, height: 725 });
-    expect(CARD_LAYER_RECTS.post).toEqual(CARD_LAYER_RECTS.base);
-    expect(CARD_LAYER_RECTS.illust).toMatchObject(ASSET_DIMENSIONS.card_illust);
-    expect(CARD_LAYER_RECTS.evidence).toMatchObject(ASSET_DIMENSIONS.evidence);
+  it('lays every layer out inside the authored 768x1024 card frame', () => {
+    expect(CARD_SIZE).toEqual(ASSET_DIMENSIONS.card_base_768x1024);
+    expect(CARD_LAYER_RECTS.base).toEqual({ x: 0, y: 0, width: 768, height: 1024 });
+    // The post-it is an addition clipped to the file, not a full-card tint.
+    expect(CARD_LAYER_RECTS.post.width).toBeLessThan(CARD_SIZE.width);
     expect(CARD_LAYER_RECTS.evidence.y).toBeLessThan(CARD_LAYER_RECTS.illust.y);
 
     for (const layer of CARD_LAYER_IDS) {
@@ -103,17 +110,37 @@ describe('five-layer card stack', () => {
       expect(rect.y + rect.height, layer).toBeLessThanOrEqual(CARD_SIZE.height);
     }
   });
+
+  it('fans up to three evidence polaroids without leaving the card', () => {
+    expect(layoutCardEvidence(0)).toEqual([]);
+    expect(layoutCardEvidence(1)).toEqual([
+      { x: CARD_LAYER_RECTS.evidence.x, y: CARD_LAYER_RECTS.evidence.y, rotation: 0 },
+    ]);
+
+    const three = layoutCardEvidence(3);
+    expect(three).toHaveLength(3);
+    expect(three.map((placement) => placement.rotation)).toEqual([-0.06, 0, 0.06]);
+    // A fourth docked item is dropped rather than run off the card edge.
+    expect(layoutCardEvidence(9)).toHaveLength(DEFAULT_MAX_CARD_EVIDENCE);
+
+    for (const placement of layoutCardEvidence(3)) {
+      expect(placement.x).toBeGreaterThanOrEqual(0);
+      expect(placement.x + CARD_LAYER_RECTS.evidence.width).toBeLessThanOrEqual(CARD_SIZE.width);
+    }
+  });
 });
 
 describe('card hand reveal and focus modal', () => {
   it('shows the top 20% at rest and lifts to 40% on hover', () => {
     expect(CARD_REST_REVEAL_RATIO).toBe(0.2);
     expect(CARD_HOVER_REVEAL_RATIO).toBe(0.4);
-    expect({ width: CARD_FAN_WIDTH, height: CARD_FAN_HEIGHT }).toEqual({ width: 128, height: 145 });
-    expect(CARD_FAN_SCALE).toBe(0.2);
+    // 3/16 of 768x1024. Both dimensions stay whole, so the reveal heights and
+    // the hit rectangle land on integers too.
+    expect({ width: CARD_FAN_WIDTH, height: CARD_FAN_HEIGHT }).toEqual({ width: 144, height: 192 });
+    expect(CARD_FAN_SCALE).toBe(0.1875);
 
-    expect(cardRevealHeight(CARD_REST_REVEAL_RATIO)).toBe(29);
-    expect(cardRevealHeight(CARD_HOVER_REVEAL_RATIO)).toBe(58);
+    expect(cardRevealHeight(CARD_REST_REVEAL_RATIO)).toBe(38);
+    expect(cardRevealHeight(CARD_HOVER_REVEAL_RATIO)).toBe(77);
     expect(cardRevealHeight(2)).toBe(CARD_FAN_HEIGHT);
     expect(cardRevealHeight(-1)).toBe(0);
     expect(cardRevealHeight(Number.NaN)).toBe(0);
@@ -122,34 +149,48 @@ describe('card hand reveal and focus modal', () => {
   it('centres the hand and lifts only the y offset', () => {
     const slots = layoutCardHand(5, { spacing: 76 });
     expect(slots).toHaveLength(5);
-    expect(slots.map((slot) => slot.x)).toEqual([104, 180, 256, 332, 408]);
-    expect(new Set(slots.map((slot) => slot.restY))).toEqual(new Set([371]));
-    expect(new Set(slots.map((slot) => slot.hoverY))).toEqual(new Set([342]));
+    expect(slots.map((slot) => slot.x)).toEqual([96, 172, 248, 324, 400]);
+    expect(new Set(slots.map((slot) => slot.restY))).toEqual(new Set([362]));
+    expect(new Set(slots.map((slot) => slot.hoverY))).toEqual(new Set([323]));
     expect(slots[2]?.rotation).toBe(0);
     expect(slots[0]?.rotation).toBe(-0.04);
     expect(layoutCardHand(0)).toEqual([]);
     expect(layoutCardHand(-3)).toEqual([]);
   });
 
-  it('composites the modal at the native card size and centres it on the stage', () => {
+  it('fits a full five-card hand inside the stage at the authored pitch', () => {
+    const slots = layoutCardHand(5);
+    const first = slots[0];
+    const last = slots.at(-1);
+    if (first === undefined || last === undefined) throw new Error('Expected five slots.');
+    expect(first.x).toBeGreaterThanOrEqual(0);
+    expect(last.x + CARD_FAN_WIDTH).toBeLessThanOrEqual(INTERNAL_WIDTH);
+    // Even lifted, the hand stays clear of the tag row it drops cards onto.
+    expect(first.hoverY).toBeGreaterThan(TAG_ROW_Y + TAG_ROW_HEIGHT);
+  });
+
+  it('composites the modal at the native card size inside the 640x725 focus box', () => {
     const layout = computeCardModalLayout(640, 400);
     expect({ width: layout.nativeWidth, height: layout.nativeHeight }).toEqual({
-      width: 640,
-      height: 725,
+      width: 768,
+      height: 1024,
     });
-    expect(layout.scale).toBe(0.5);
-    expect(layout.width).toBe(320);
+    expect(layout.width).toBe(271.875);
     expect(layout.height).toBe(362.5);
-    expect(layout.x).toBe(160);
+    expect(layout.x).toBe(184);
     expect(layout.y).toBe(19);
     expect((layout.y * 2) % 1).toBe(0);
     expect(layout.x).toBeGreaterThanOrEqual(0);
     expect(layout.y).toBeGreaterThanOrEqual(0);
+    expect(layout.width / layout.height).toBeCloseTo(768 / 1024, 6);
 
+    // At the 2x target the card reaches the focus box's full 725 height and
+    // keeps its ratio, so 640x725 bounds the frame rather than stretching it.
     const hd = computeCardModalLayout(1280, 800);
-    expect(hd.scale).toBe(1);
-    expect(hd.width).toBe(640);
-    expect(hd.height).toBe(725);
+    expect(hd.height).toBe(CARD_MODAL_BOX.height);
+    expect(hd.width).toBe(543.75);
+    expect(hd.width).toBeLessThanOrEqual(CARD_MODAL_BOX.width);
+    expect(hd.width / hd.height).toBeCloseTo(768 / 1024, 6);
   });
 });
 

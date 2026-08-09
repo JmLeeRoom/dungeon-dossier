@@ -123,6 +123,12 @@ template.innerHTML = `
       display: block;
     }
 
+    /* A filled transparent PNG must composite over the slots below it. The
+       checkerboard is an empty-slot affordance, not part of the artwork. */
+    :host([data-filled]) {
+      background: transparent;
+    }
+
     :host([data-filled]) .empty {
       display: none;
     }

@@ -3,6 +3,7 @@ import {
   ValidatedRuntimeJsonRepository,
   type ValidatedRepositoryOptions,
 } from './RuntimeJsonRepository';
+import { runtimeContentUrl } from './runtimeContentUrl';
 
 export class CardRepository {
   readonly #repository: ValidatedRuntimeJsonRepository<CardsDefinition>;
@@ -12,6 +13,6 @@ export class CardRepository {
   }
 
   load(): Promise<CardsDefinition | undefined> {
-    return this.#repository.load('/content/common/cards.json');
+    return this.#repository.load(runtimeContentUrl('common/cards.json'));
   }
 }
