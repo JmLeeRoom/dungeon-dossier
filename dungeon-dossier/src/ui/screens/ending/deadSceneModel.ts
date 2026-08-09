@@ -24,6 +24,12 @@ export interface DeadSceneScreenModel {
   readonly backgroundAssetKey: string;
   readonly illustrationAssetKey: string;
   readonly treatment: DeadSceneTreatment;
+  /**
+   * One-shot stinger for this failure. The reason table has always named one;
+   * carrying it here is what lets the mount actually play it, the same way a
+   * cutscene beat carries its own cue.
+   */
+  readonly audioCue: string;
   readonly stats: readonly DeadSceneStat[];
   readonly actions: readonly DeadSceneAction[];
 }

@@ -30,6 +30,16 @@ export interface RunStripScreenOptions {
  */
 export const BOARD_BACKGROUND_ASSET_KEY = 'bg/event/crazyboard';
 export const BOARD_VEILED_MARKER_ASSET_KEY = 'ui/board/event';
+/**
+ * A pinned note for a KNOWN investigation stage.
+ *
+ * Deliberately NOT the veiled marker: that image means "this slot is hidden",
+ * and drawing it on a revealed card would erase the only difference between the
+ * two. A note reads as a stage that has been written up, which is what a KNOWN
+ * event is. Like the marker it is a renderer constant, so no per-node key
+ * exists for the model to leak.
+ */
+export const BOARD_KNOWN_EVENT_ASSET_KEY = 'bg/event/post';
 export const BOARD_PIN_ASSET_KEY = 'ui/pin/00';
 export const BOARD_DETECTIVE_PHOTO_ASSET_KEY = 'ui/photo/teahoon';
 export const BOARD_PARTNER_PHOTO_ASSET_KEY = 'ui/photo/mulkung';
@@ -196,6 +206,20 @@ function createKnownNode(
         height: 60,
       }),
     );
+  } else if (node.kind === 'EVENT') {
+    // Investigation stages have no cast, so nothing ever supplies a photo for
+    // them and the card was left as bare text. The note fills the same slot.
+    const noteUrl = requiredUrl(assets, BOARD_KNOWN_EVENT_ASSET_KEY, node.nodeId, 'node-note');
+    if (noteUrl !== undefined) {
+      container.addChild(
+        decorate(noteUrl, ASSET_DIMENSIONS.event_overlay_181x156, {
+          x: CARD_WIDTH / 2 - 34,
+          y: 28,
+          width: 68,
+          height: 64,
+        }),
+      );
+    }
   }
   const pinUrl = requiredUrl(assets, BOARD_PIN_ASSET_KEY, node.nodeId, 'node-pin');
   if (pinUrl !== undefined) {

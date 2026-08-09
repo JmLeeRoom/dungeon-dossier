@@ -180,7 +180,9 @@ export function createAutoplayHud(): AutoplayHud {
         ? `⛔ 시연 중단 — ${view.failure}`
         : view.status === 'PASS'
           ? '✅ 수사 완료 — 자백 확보 성공'
-          : `🎬 15-NODE CINEMATIC DEMO  |  NODE ${nodeNumber
+          // The run length is data, not a caption: the strip resolves to nine
+          // nodes today and the banner used to claim fifteen.
+          : `🎬 ${view.nodeCount.toString()}-NODE CINEMATIC DEMO  |  NODE ${nodeNumber
               .toString()
               .padStart(2, '0')} / ${view.nodeCount.toString()}${
               view.nodeLabel === undefined ? '' : `: ${view.nodeLabel}`

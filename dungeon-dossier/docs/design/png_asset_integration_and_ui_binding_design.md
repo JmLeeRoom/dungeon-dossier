@@ -919,6 +919,8 @@ approved-production 예외는 경로 glob이 아니라 checksum과 catalog entry
 
 ### 9.7 남은 승인 전용 roadmap
 
+> Workbench 밖의 오디오·optional direction·legacy fallback·미연결 파일까지 포함한 최신 잔여 목록은 [`remaining_asset_gap_audit.md`](./remaining_asset_gap_audit.md)를 기준으로 한다.
+
 1. Narrative/Game Design이 scene0~2 authored beat, bensi/kimyongsa/partner identity, large stamp semantic, final ending art를 승인한다.
 2. 승인표만 `uiAssetBindings.ts`/presentation catalog에 추가하고 existing required preload와 mapping tests를 확장한다.
 3. Art/UI가 mixed legacy style의 출시 허용 여부를 판단하고, 불허 시 누락 캐릭터 PNG를 같은 naming/importer 계약으로 추가한다.

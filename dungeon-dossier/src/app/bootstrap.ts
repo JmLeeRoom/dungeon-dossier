@@ -27,7 +27,7 @@ import {
   type EventScreenCallbacks,
 } from '../ui/screens/event';
 import { createRewardScreen } from '../ui/screens/reward';
-import { createRunStripScreen } from '../ui/screens/strip';
+import { BOARD_KNOWN_EVENT_ASSET_KEY, createRunStripScreen } from '../ui/screens/strip';
 import {
   BalanceRepository,
   CardRepository,
@@ -188,6 +188,10 @@ function runStripPresentationAssetKeys(model: RunStripScreenModel): readonly str
     PARTNER_PHOTO_ASSET_KEY,
     ...(model.nodes.some((node) => node.visibility === 'VEILED')
       ? [BOARD_ASSET_KEYS.veiledMarker]
+      : []),
+    // Only when a revealed stage will actually draw the note.
+    ...(model.nodes.some((node) => node.visibility === 'KNOWN' && node.kind === 'EVENT')
+      ? [BOARD_KNOWN_EVENT_ASSET_KEY]
       : []),
     ...model.nodes.flatMap((node) =>
       node.visibility === 'KNOWN' ? [node.artAssetKey] : [],
@@ -818,6 +822,9 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
     try {
       const overlay = createCutsceneOverlay(toCutsceneBeatViews(cutscene), {
         assets,
+        // Beats have always declared an `audioCue`; without the port the
+        // overlay had nothing to play it through.
+        audio,
         skippable: cutscene.skippable,
         onChoice(beatId, choiceId): void {
           selections.push({ beatId, choiceId });
@@ -1122,6 +1129,10 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
       }
       routeAfterBoundary();
     };
+    // The failure stinger is the only audio this screen has. It is fired here
+    // rather than inside the screen so the renderer stays free of transports,
+    // and it is safe when the file is absent: play() returns false in silence.
+    audio.play(model.audioCue);
     const controller = createDeadSceneScreen(model, { assets }, {
       onAction: takeDeadSceneAction,
     });
@@ -1871,7 +1882,7 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
       const modeParam = urlParams.get('mode');
       const policyParam = urlParams.get('policy');
       const autoplayModes: readonly AutoplayOptions['mode'][] =
-        ['watch', 'turbo', 'record', 'video'];
+        ['watch', 'turbo', 'record', 'video', 'submission'];
       const autoplayPolicies: readonly AutoplayOptions['policy'][] =
         ['best', 'partial', 'coerced', 'greedy', 'fuzz'];
       // A typo in a URL parameter must degrade to defaults, never crash boot.
@@ -1886,7 +1897,10 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
       startAutoplay(port, {
         mode,
         policy,
-        seed: runSeedOverride ?? DEFAULT_RUN_SEED,
+        // The seed the strip was actually resolved with, so the report is
+        // judged against the route it walked. A resumed run keeps its saved
+        // seed, which `runSeedOverride ?? DEFAULT_RUN_SEED` would have lost.
+        seed: routeSeed,
       });
     }
   }

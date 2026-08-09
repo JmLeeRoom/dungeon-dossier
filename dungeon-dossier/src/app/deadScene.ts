@@ -99,6 +99,7 @@ export function toDeadSceneModel(context: DeadSceneContext): DeadSceneScreenMode
     backgroundAssetKey: EVENT_BACKGROUND_ASSET_KEYS.dead,
     illustrationAssetKey: preset.illustrationAssetKey,
     treatment: preset.treatment,
+    audioCue: preset.audioCue,
     stats: [
       {
         label: t('dead.stat.node', '도달 노드'),

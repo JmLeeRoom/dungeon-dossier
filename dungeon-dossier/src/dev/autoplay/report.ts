@@ -28,6 +28,28 @@ export const VIDEO_DURATION_ACCEPTANCE = Object.freeze({
   measurement: 'L2_WALL_CLOCK' as const,
 });
 
+/**
+ * The short submission cut, which is a different product than the 150s demo.
+ *
+ * The ceiling is the one number that is not negotiable: a clip of 61s is not a
+ * short-form submission at all. The target therefore sits three seconds under
+ * 60 so the tolerated window is 54..60 and its upper bound IS the boundary,
+ * rather than centring on 59 and accepting 62.
+ */
+export const SUBMISSION_TARGET_DURATION_SEC = 57;
+export const SUBMISSION_DURATION_TOLERANCE_SEC = 3;
+export const SUBMISSION_MAXIMUM_DURATION_SEC =
+  SUBMISSION_TARGET_DURATION_SEC + SUBMISSION_DURATION_TOLERANCE_SEC;
+
+export const SUBMISSION_DURATION_ACCEPTANCE = Object.freeze({
+  targetDurationMs: SUBMISSION_TARGET_DURATION_SEC * 1_000,
+  minimumDurationMs:
+    (SUBMISSION_TARGET_DURATION_SEC - SUBMISSION_DURATION_TOLERANCE_SEC) * 1_000,
+  maximumDurationMs: SUBMISSION_MAXIMUM_DURATION_SEC * 1_000,
+  measurement: 'L2_WALL_CLOCK' as const,
+});
+
+
 export interface AutoplayDurationAcceptance {
   readonly targetDurationMs: number;
   readonly minimumDurationMs: number;
@@ -35,6 +57,15 @@ export interface AutoplayDurationAcceptance {
   /** Distinguishes real driver timing from a simulated/fake-clock duration. */
   readonly measurement: 'L2_WALL_CLOCK';
 }
+
+/** Modes that pace to a length and must declare the contract they paced to. */
+export const CAPTURE_DURATION_ACCEPTANCE: Readonly<
+  Record<string, AutoplayDurationAcceptance>
+> = {
+  video: VIDEO_DURATION_ACCEPTANCE,
+  submission: SUBMISSION_DURATION_ACCEPTANCE,
+};
+
 
 const TECHNICAL_ID_FIELD = /(?:^|_)id$/u;
 const TECHNICAL_IDS_FIELD = /(?:^|_)ids$/u;
@@ -81,9 +112,13 @@ const AUTOPLAY_TECHNICAL_CONTENT_ID_SET = new Set(AUTOPLAY_TECHNICAL_CONTENT_IDS
 
 const canonicalStrip = RunStripSchema.parse(runStripJson);
 /**
- * Autoplay asserts against the canonical route: every slot resolved to its
- * first candidate. Seeded runs pick other candidates, so a report is validated
- * against the route it actually walked, not against this baseline.
+ * The unseeded baseline: every slot resolved to its first candidate. It fixes
+ * the run *length* and the episode shape, which no seed can change.
+ *
+ * It is deliberately NOT the order a seeded run walks. `SEEDED_ONE` slots pick
+ * a different candidate per seed, so validating a real run against this route
+ * reported a node-order FAIL for a run that was behaving correctly. Order is
+ * checked against `autoplayExpectedNodes(report.seed)` instead.
  */
 const canonicalRoute = createNodeStrip(canonicalStrip);
 const expectedNodeCount = canonicalStrip.episodes.length * EPISODE_NODE_COUNT;
@@ -108,6 +143,39 @@ export const AUTOPLAY_EXPECTED_NODES = Object.freeze(
 );
 
 export type AutoplayNodeKind = (typeof AUTOPLAY_EXPECTED_NODES)[number]['kind'];
+
+export interface AutoplayExpectedNode {
+  readonly index: number;
+  readonly nodeId: string;
+  readonly kind: AutoplayNodeKind;
+  readonly ref: string;
+}
+
+const expectedNodesBySeed = new Map<number, readonly AutoplayExpectedNode[]>();
+
+/**
+ * The route a run with this seed actually resolves, in play order.
+ *
+ * Seed 20260803 (the product default) diverges from the unseeded baseline at
+ * two of the nine slots, so a report has to be judged against its own seed.
+ * An absent or malformed seed falls back to the baseline rather than throwing:
+ * a bad seed is already reported by its own gate.
+ */
+export function autoplayExpectedNodes(seed?: number): readonly AutoplayExpectedNode[] {
+  if (seed === undefined || !isAutoplaySeed(seed)) return AUTOPLAY_EXPECTED_NODES;
+  const cached = expectedNodesBySeed.get(seed);
+  if (cached !== undefined) return cached;
+  const resolved = Object.freeze(
+    createNodeStrip(canonicalStrip, { seed }).map((node, index) => Object.freeze({
+      index,
+      nodeId: node.nodeId,
+      kind: node.kind,
+      ref: node.ref,
+    })),
+  );
+  expectedNodesBySeed.set(seed, resolved);
+  return resolved;
+}
 
 /** One canonical strip node as observed through the real bootstrap. */
 export interface AutoplayNodeReport {
@@ -191,7 +259,9 @@ export function findAutoplayInvariantFailures(
   report: AutoplayReportEvidence,
 ): readonly string[] {
   const failures: string[] = [];
-  const expectedIds = AUTOPLAY_EXPECTED_NODES.map((node) => node.nodeId);
+  // Judged against the route this seed resolves, not against the unseeded one.
+  const expectedNodes = autoplayExpectedNodes(report.seed);
+  const expectedIds = expectedNodes.map((node) => node.nodeId);
   const actualIds = report.nodes.map((node) => node.nodeId);
 
   if (report.schemaVersion !== AUTOPLAY_REPORT_SCHEMA_VERSION) {
@@ -205,42 +275,47 @@ export function findAutoplayInvariantFailures(
   if (!Number.isFinite(report.durationMs) || report.durationMs < 0) {
     failures.push(`report duration must be finite and non-negative: ${report.durationMs.toString()}`);
   }
-  if (report.mode === 'video') {
+  const declaredAcceptance = CAPTURE_DURATION_ACCEPTANCE[report.mode];
+  if (declaredAcceptance !== undefined) {
     const acceptance = report.durationAcceptance;
     if (acceptance === undefined) {
-      failures.push('video report is missing its wall-clock duration acceptance');
+      failures.push(`${report.mode} report is missing its wall-clock duration acceptance`);
     } else {
       if (
-        acceptance.targetDurationMs !== VIDEO_DURATION_ACCEPTANCE.targetDurationMs ||
-        acceptance.minimumDurationMs !== VIDEO_DURATION_ACCEPTANCE.minimumDurationMs ||
-        acceptance.maximumDurationMs !== VIDEO_DURATION_ACCEPTANCE.maximumDurationMs ||
-        acceptance.measurement !== VIDEO_DURATION_ACCEPTANCE.measurement
+        acceptance.targetDurationMs !== declaredAcceptance.targetDurationMs ||
+        acceptance.minimumDurationMs !== declaredAcceptance.minimumDurationMs ||
+        acceptance.maximumDurationMs !== declaredAcceptance.maximumDurationMs ||
+        acceptance.measurement !== declaredAcceptance.measurement
       ) {
-        failures.push('video report duration acceptance does not match the declared product gate');
+        failures.push(
+          `${report.mode} report duration acceptance does not match the declared product gate`,
+        );
       }
       if (
         report.durationMs < acceptance.minimumDurationMs ||
         report.durationMs > acceptance.maximumDurationMs
       ) {
         failures.push(
-          `video duration ${report.durationMs.toString()}ms is outside ` +
+          `${report.mode} duration ${report.durationMs.toString()}ms is outside ` +
           `${acceptance.minimumDurationMs.toString()}..${acceptance.maximumDurationMs.toString()}ms`,
         );
       }
     }
   } else if (report.durationAcceptance !== undefined) {
-    failures.push(`non-video mode ${report.mode} declared a video duration acceptance`);
+    failures.push(`non-capture mode ${report.mode} declared a duration acceptance`);
   }
 
-  if (report.nodes.length !== AUTOPLAY_EXPECTED_NODES.length) {
+  if (report.nodes.length !== expectedNodes.length) {
     failures.push(
-      `expected ${AUTOPLAY_EXPECTED_NODES.length.toString()} node reports, got ${report.nodes.length.toString()}`,
+      `expected ${expectedNodes.length.toString()} node reports, got ${report.nodes.length.toString()}`,
     );
   }
   if (!sameValues(actualIds, expectedIds)) {
-    failures.push(`node order mismatch: ${actualIds.join(' -> ')}`);
+    failures.push(
+      `node order mismatch for seed ${report.seed.toString()}: ${actualIds.join(' -> ')}`,
+    );
   }
-  AUTOPLAY_EXPECTED_NODES.forEach((expected, index) => {
+  expectedNodes.forEach((expected, index) => {
     const actual = report.nodes[index];
     if (actual === undefined) return;
     if (
@@ -259,9 +334,9 @@ export function findAutoplayInvariantFailures(
       failures.push(`${expected.nodeId} warning: ${warning}`);
     }
   });
-  if (report.finalState.nodeIndex !== AUTOPLAY_EXPECTED_NODES.length) {
+  if (report.finalState.nodeIndex !== expectedNodes.length) {
     failures.push(
-      `terminal nodeIndex must be ${AUTOPLAY_EXPECTED_NODES.length.toString()}, got ${report.finalState.nodeIndex.toString()}`,
+      `terminal nodeIndex must be ${expectedNodes.length.toString()}, got ${report.finalState.nodeIndex.toString()}`,
     );
   }
   if (!report.finalState.terminal) failures.push('final run state is not terminal');
@@ -270,7 +345,7 @@ export function findAutoplayInvariantFailures(
   }
   if (!sameValues(report.finalState.completedNodeIds, expectedIds)) {
     failures.push(
-      `completedNodeIds do not match the canonical ${AUTOPLAY_EXPECTED_NODES.length.toString()}-node order`,
+      `completedNodeIds do not match the ${expectedNodes.length.toString()}-node order for seed ${report.seed.toString()}`,
     );
   }
   if (report.finalState.pendingRewardIds.length > 0) {
@@ -287,7 +362,7 @@ export function findAutoplayInvariantFailures(
   }
 
   const encounterNodes = report.nodes.filter((node) => node.kind !== 'EVENT');
-  const expectedEncounterIds = AUTOPLAY_EXPECTED_NODES
+  const expectedEncounterIds = expectedNodes
     .filter((node) => node.kind !== 'EVENT')
     .map((node) => node.nodeId);
   if (encounterNodes.length !== expectedEncounterIds.length) {

@@ -1,0 +1,894 @@
+{
+ "boundCount": 56,
+ "rows": [
+  {
+   "key": "bg/event/crazyboard",
+   "provenance": "nhn-2026",
+   "bundles": "board",
+   "bound": true,
+   "size": "1280x800"
+  },
+  {
+   "key": "bg/event/dead",
+   "provenance": "nhn-2026",
+   "bundles": "result",
+   "bound": true,
+   "size": "1280x800"
+  },
+  {
+   "key": "bg/event/phone",
+   "provenance": "nhn-2026",
+   "bundles": "event",
+   "bound": true,
+   "size": "1280x800"
+  },
+  {
+   "key": "bg/event/post",
+   "provenance": "nhn-2026",
+   "bundles": "event",
+   "bound": true,
+   "size": "181x156"
+  },
+  {
+   "key": "bg/event/rest",
+   "provenance": "nhn-2026",
+   "bundles": "event",
+   "bound": true,
+   "size": "1280x800"
+  },
+  {
+   "key": "bg/event/safe",
+   "provenance": "nhn-2026",
+   "bundles": "event",
+   "bound": true,
+   "size": "1280x800"
+  },
+  {
+   "key": "bg/event/scene0",
+   "provenance": "nhn-2026",
+   "bundles": "event",
+   "bound": true,
+   "size": "1280x800"
+  },
+  {
+   "key": "bg/event/scene1",
+   "provenance": "nhn-2026",
+   "bundles": "event",
+   "bound": true,
+   "size": "1280x800"
+  },
+  {
+   "key": "bg/event/scene2",
+   "provenance": "nhn-2026",
+   "bundles": "event",
+   "bound": true,
+   "size": "1280x800"
+  },
+  {
+   "key": "bg/event/stamp",
+   "provenance": "nhn-2026",
+   "bundles": "event",
+   "bound": true,
+   "size": "181x156"
+  },
+  {
+   "key": "bg/event/town",
+   "provenance": "nhn-2026",
+   "bundles": "event",
+   "bound": true,
+   "size": "1280x800"
+  },
+  {
+   "key": "bg/interrogationroom/base",
+   "provenance": "nhn-2026",
+   "bundles": "interrogation",
+   "bound": true,
+   "size": "1280x800"
+  },
+  {
+   "key": "bg/interrogationroom/desk",
+   "provenance": "nhn-2026",
+   "bundles": "interrogation",
+   "bound": true,
+   "size": "1280x321"
+  },
+  {
+   "key": "card/기본/템플릿",
+   "provenance": "legacy-placeholder",
+   "bundles": "interrogation",
+   "bound": false,
+   "size": "640x725"
+  },
+  {
+   "key": "card/모순/일러",
+   "provenance": "legacy-placeholder",
+   "bundles": "interrogation",
+   "bound": false,
+   "size": "256x256"
+  },
+  {
+   "key": "card/압박/일러",
+   "provenance": "legacy-placeholder",
+   "bundles": "interrogation",
+   "bound": false,
+   "size": "256x256"
+  },
+  {
+   "key": "card/질문/일러",
+   "provenance": "legacy-placeholder",
+   "bundles": "interrogation",
+   "bound": false,
+   "size": "256x256"
+  },
+  {
+   "key": "dead/과로/기본",
+   "provenance": "legacy-placeholder",
+   "bundles": "result",
+   "bound": false,
+   "size": "1280x440"
+  },
+  {
+   "key": "dead/미제/기본",
+   "provenance": "legacy-placeholder",
+   "bundles": "result",
+   "bound": false,
+   "size": "1280x440"
+  },
+  {
+   "key": "dead/시한/기본",
+   "provenance": "legacy-placeholder",
+   "bundles": "result",
+   "bound": false,
+   "size": "1280x440"
+  },
+  {
+   "key": "dead/징계/기본",
+   "provenance": "legacy-placeholder",
+   "bundles": "result",
+   "bound": false,
+   "size": "1280x440"
+  },
+  {
+   "key": "ev/사건/증거1",
+   "provenance": "legacy-placeholder",
+   "bundles": "interrogation",
+   "bound": false,
+   "size": "128x128"
+  },
+  {
+   "key": "ev/사건/증거2",
+   "provenance": "legacy-placeholder",
+   "bundles": "interrogation",
+   "bound": false,
+   "size": "128x128"
+  },
+  {
+   "key": "ev/사건/증거3",
+   "provenance": "legacy-placeholder",
+   "bundles": "interrogation",
+   "bound": false,
+   "size": "128x128"
+  },
+  {
+   "key": "idle/bensi/base",
+   "provenance": "nhn-2026",
+   "bundles": "interrogation",
+   "bound": false,
+   "size": "512x512"
+  },
+  {
+   "key": "idle/bensi/lose",
+   "provenance": "nhn-2026",
+   "bundles": "interrogation",
+   "bound": false,
+   "size": "512x512"
+  },
+  {
+   "key": "idle/bensi/upset",
+   "provenance": "nhn-2026",
+   "bundles": "interrogation",
+   "bound": false,
+   "size": "512x512"
+  },
+  {
+   "key": "idle/coffee/base",
+   "provenance": "nhn-2026",
+   "bundles": "interrogation",
+   "bound": true,
+   "size": "512x512"
+  },
+  {
+   "key": "idle/coffee/used",
+   "provenance": "nhn-2026",
+   "bundles": "interrogation",
+   "bound": true,
+   "size": "512x512"
+  },
+  {
+   "key": "idle/goblin/base",
+   "provenance": "nhn-2026",
+   "bundles": "interrogation",
+   "bound": true,
+   "size": "512x512"
+  },
+  {
+   "key": "idle/goblin/lose",
+   "provenance": "nhn-2026",
+   "bundles": "interrogation",
+   "bound": true,
+   "size": "512x512"
+  },
+  {
+   "key": "idle/goblin/upset",
+   "provenance": "nhn-2026",
+   "bundles": "interrogation",
+   "bound": true,
+   "size": "512x512"
+  },
+  {
+   "key": "idle/kimyongsa/base",
+   "provenance": "nhn-2026",
+   "bundles": "interrogation",
+   "bound": false,
+   "size": "512x512"
+  },
+  {
+   "key": "idle/kimyongsa/lose",
+   "provenance": "nhn-2026",
+   "bundles": "interrogation",
+   "bound": false,
+   "size": "512x512"
+  },
+  {
+   "key": "idle/kimyongsa/upset",
+   "provenance": "nhn-2026",
+   "bundles": "interrogation",
+   "bound": false,
+   "size": "512x512"
+  },
+  {
+   "key": "idle/minota/base",
+   "provenance": "nhn-2026",
+   "bundles": "interrogation",
+   "bound": true,
+   "size": "512x512"
+  },
+  {
+   "key": "idle/minota/lose",
+   "provenance": "nhn-2026",
+   "bundles": "interrogation",
+   "bound": true,
+   "size": "512x512"
+  },
+  {
+   "key": "idle/minota/upset",
+   "provenance": "nhn-2026",
+   "bundles": "interrogation",
+   "bound": true,
+   "size": "512x512"
+  },
+  {
+   "key": "idle/mulkung/base",
+   "provenance": "nhn-2026",
+   "bundles": "interrogation",
+   "bound": true,
+   "size": "512x512"
+  },
+  {
+   "key": "idle/mulkung/lose",
+   "provenance": "nhn-2026",
+   "bundles": "interrogation",
+   "bound": true,
+   "size": "512x512"
+  },
+  {
+   "key": "idle/mulkung/upset",
+   "provenance": "nhn-2026",
+   "bundles": "interrogation",
+   "bound": true,
+   "size": "512x512"
+  },
+  {
+   "key": "idle/succuba/base",
+   "provenance": "nhn-2026",
+   "bundles": "interrogation",
+   "bound": true,
+   "size": "512x512"
+  },
+  {
+   "key": "idle/succuba/lose",
+   "provenance": "nhn-2026",
+   "bundles": "interrogation",
+   "bound": true,
+   "size": "512x512"
+  },
+  {
+   "key": "idle/succuba/upset",
+   "provenance": "nhn-2026",
+   "bundles": "interrogation",
+   "bound": true,
+   "size": "512x512"
+  },
+  {
+   "key": "placeholder/missing/fallback",
+   "provenance": "legacy-placeholder",
+   "bundles": "core",
+   "bound": false,
+   "size": "64x64"
+  },
+  {
+   "key": "portrait/고블린/base",
+   "provenance": "legacy-placeholder",
+   "bundles": "interrogation",
+   "bound": false,
+   "size": "512x512"
+  },
+  {
+   "key": "portrait/고블린/lose",
+   "provenance": "legacy-placeholder",
+   "bundles": "interrogation",
+   "bound": false,
+   "size": "512x512"
+  },
+  {
+   "key": "portrait/고블린/upset",
+   "provenance": "legacy-placeholder",
+   "bundles": "interrogation",
+   "bound": false,
+   "size": "512x512"
+  },
+  {
+   "key": "portrait/김_인턴/base",
+   "provenance": "legacy-placeholder",
+   "bundles": "interrogation",
+   "bound": false,
+   "size": "512x512"
+  },
+  {
+   "key": "portrait/김_인턴/lose",
+   "provenance": "legacy-placeholder",
+   "bundles": "interrogation",
+   "bound": false,
+   "size": "512x512"
+  },
+  {
+   "key": "portrait/김_인턴/upset",
+   "provenance": "legacy-placeholder",
+   "bundles": "interrogation",
+   "bound": false,
+   "size": "512x512"
+  },
+  {
+   "key": "portrait/김_인턴/used",
+   "provenance": "legacy-placeholder",
+   "bundles": "interrogation",
+   "bound": false,
+   "size": "512x512"
+  },
+  {
+   "key": "portrait/김태훈/base",
+   "provenance": "legacy-placeholder",
+   "bundles": "interrogation",
+   "bound": false,
+   "size": "512x512"
+  },
+  {
+   "key": "portrait/김태훈/lose",
+   "provenance": "legacy-placeholder",
+   "bundles": "interrogation",
+   "bound": false,
+   "size": "512x512"
+  },
+  {
+   "key": "portrait/김태훈/upset",
+   "provenance": "legacy-placeholder",
+   "bundles": "interrogation",
+   "bound": false,
+   "size": "512x512"
+  },
+  {
+   "key": "portrait/드워프/base",
+   "provenance": "legacy-placeholder",
+   "bundles": "interrogation",
+   "bound": false,
+   "size": "512x512"
+  },
+  {
+   "key": "portrait/드워프/lose",
+   "provenance": "legacy-placeholder",
+   "bundles": "interrogation",
+   "bound": false,
+   "size": "512x512"
+  },
+  {
+   "key": "portrait/드워프/upset",
+   "provenance": "legacy-placeholder",
+   "bundles": "interrogation",
+   "bound": false,
+   "size": "512x512"
+  },
+  {
+   "key": "portrait/물컹이/base",
+   "provenance": "legacy-placeholder",
+   "bundles": "interrogation",
+   "bound": false,
+   "size": "512x512"
+  },
+  {
+   "key": "portrait/물컹이/lose",
+   "provenance": "legacy-placeholder",
+   "bundles": "interrogation",
+   "bound": false,
+   "size": "512x512"
+  },
+  {
+   "key": "portrait/물컹이/upset",
+   "provenance": "legacy-placeholder",
+   "bundles": "interrogation",
+   "bound": false,
+   "size": "512x512"
+  },
+  {
+   "key": "portrait/미노타우로스/base",
+   "provenance": "legacy-placeholder",
+   "bundles": "interrogation",
+   "bound": false,
+   "size": "512x512"
+  },
+  {
+   "key": "portrait/미노타우로스/lose",
+   "provenance": "legacy-placeholder",
+   "bundles": "interrogation",
+   "bound": false,
+   "size": "512x512"
+  },
+  {
+   "key": "portrait/미노타우로스/upset",
+   "provenance": "legacy-placeholder",
+   "bundles": "interrogation",
+   "bound": false,
+   "size": "512x512"
+  },
+  {
+   "key": "portrait/사이클롭스/base",
+   "provenance": "legacy-placeholder",
+   "bundles": "interrogation",
+   "bound": false,
+   "size": "512x512"
+  },
+  {
+   "key": "portrait/사이클롭스/lose",
+   "provenance": "legacy-placeholder",
+   "bundles": "interrogation",
+   "bound": false,
+   "size": "512x512"
+  },
+  {
+   "key": "portrait/사이클롭스/upset",
+   "provenance": "legacy-placeholder",
+   "bundles": "interrogation",
+   "bound": false,
+   "size": "512x512"
+  },
+  {
+   "key": "portrait/서큐버스/base",
+   "provenance": "legacy-placeholder",
+   "bundles": "interrogation",
+   "bound": false,
+   "size": "512x512"
+  },
+  {
+   "key": "portrait/서큐버스/lose",
+   "provenance": "legacy-placeholder",
+   "bundles": "interrogation",
+   "bound": false,
+   "size": "512x512"
+  },
+  {
+   "key": "portrait/서큐버스/upset",
+   "provenance": "legacy-placeholder",
+   "bundles": "interrogation",
+   "bound": false,
+   "size": "512x512"
+  },
+  {
+   "key": "portrait/오크/base",
+   "provenance": "legacy-placeholder",
+   "bundles": "interrogation",
+   "bound": false,
+   "size": "512x512"
+  },
+  {
+   "key": "portrait/오크/lose",
+   "provenance": "legacy-placeholder",
+   "bundles": "interrogation",
+   "bound": false,
+   "size": "512x512"
+  },
+  {
+   "key": "portrait/오크/upset",
+   "provenance": "legacy-placeholder",
+   "bundles": "interrogation",
+   "bound": false,
+   "size": "512x512"
+  },
+  {
+   "key": "portrait/켄타우로스/base",
+   "provenance": "legacy-placeholder",
+   "bundles": "interrogation",
+   "bound": false,
+   "size": "512x512"
+  },
+  {
+   "key": "portrait/켄타우로스/lose",
+   "provenance": "legacy-placeholder",
+   "bundles": "interrogation",
+   "bound": false,
+   "size": "512x512"
+  },
+  {
+   "key": "portrait/켄타우로스/upset",
+   "provenance": "legacy-placeholder",
+   "bundles": "interrogation",
+   "bound": false,
+   "size": "512x512"
+  },
+  {
+   "key": "portrait/타락한_용사/base",
+   "provenance": "legacy-placeholder",
+   "bundles": "interrogation",
+   "bound": false,
+   "size": "512x512"
+  },
+  {
+   "key": "portrait/타락한_용사/lose",
+   "provenance": "legacy-placeholder",
+   "bundles": "interrogation",
+   "bound": false,
+   "size": "512x512"
+  },
+  {
+   "key": "portrait/타락한_용사/upset",
+   "provenance": "legacy-placeholder",
+   "bundles": "interrogation",
+   "bound": false,
+   "size": "512x512"
+  },
+  {
+   "key": "portrait/하피/base",
+   "provenance": "legacy-placeholder",
+   "bundles": "interrogation",
+   "bound": false,
+   "size": "512x512"
+  },
+  {
+   "key": "portrait/하피/lose",
+   "provenance": "legacy-placeholder",
+   "bundles": "interrogation",
+   "bound": false,
+   "size": "512x512"
+  },
+  {
+   "key": "portrait/하피/upset",
+   "provenance": "legacy-placeholder",
+   "bundles": "interrogation",
+   "bound": false,
+   "size": "512x512"
+  },
+  {
+   "key": "ui/board/event",
+   "provenance": "nhn-2026",
+   "bundles": "board",
+   "bound": true,
+   "size": "1024x1024"
+  },
+  {
+   "key": "ui/card_stamp/logic",
+   "provenance": "nhn-2026",
+   "bundles": "interrogation",
+   "bound": true,
+   "size": "344x176"
+  },
+  {
+   "key": "ui/card_stamp/pushy",
+   "provenance": "nhn-2026",
+   "bundles": "interrogation",
+   "bound": true,
+   "size": "344x176"
+  },
+  {
+   "key": "ui/card/base",
+   "provenance": "nhn-2026",
+   "bundles": "interrogation",
+   "bound": true,
+   "size": "768x1024"
+  },
+  {
+   "key": "ui/card/evidence00",
+   "provenance": "nhn-2026",
+   "bundles": "interrogation",
+   "bound": true,
+   "size": "256x256"
+  },
+  {
+   "key": "ui/card/evidence01",
+   "provenance": "nhn-2026",
+   "bundles": "interrogation",
+   "bound": true,
+   "size": "256x256"
+  },
+  {
+   "key": "ui/card/evidence02",
+   "provenance": "nhn-2026",
+   "bundles": "interrogation",
+   "bound": true,
+   "size": "256x256"
+  },
+  {
+   "key": "ui/card/evidence03",
+   "provenance": "nhn-2026",
+   "bundles": "interrogation",
+   "bound": true,
+   "size": "256x256"
+  },
+  {
+   "key": "ui/card/evidence04",
+   "provenance": "nhn-2026",
+   "bundles": "interrogation",
+   "bound": true,
+   "size": "256x256"
+  },
+  {
+   "key": "ui/card/evidence05",
+   "provenance": "nhn-2026",
+   "bundles": "interrogation",
+   "bound": true,
+   "size": "256x256"
+  },
+  {
+   "key": "ui/card/illust00",
+   "provenance": "nhn-2026",
+   "bundles": "interrogation",
+   "bound": true,
+   "size": "256x256"
+  },
+  {
+   "key": "ui/card/illust01",
+   "provenance": "nhn-2026",
+   "bundles": "interrogation",
+   "bound": true,
+   "size": "256x256"
+  },
+  {
+   "key": "ui/card/illust02",
+   "provenance": "nhn-2026",
+   "bundles": "interrogation",
+   "bound": true,
+   "size": "256x256"
+  },
+  {
+   "key": "ui/card/illust03",
+   "provenance": "nhn-2026",
+   "bundles": "interrogation",
+   "bound": true,
+   "size": "256x256"
+  },
+  {
+   "key": "ui/card/illust04",
+   "provenance": "nhn-2026",
+   "bundles": "interrogation",
+   "bound": true,
+   "size": "256x256"
+  },
+  {
+   "key": "ui/card/illust05",
+   "provenance": "nhn-2026",
+   "bundles": "interrogation",
+   "bound": true,
+   "size": "256x256"
+  },
+  {
+   "key": "ui/card/post",
+   "provenance": "nhn-2026",
+   "bundles": "interrogation",
+   "bound": true,
+   "size": "675x312"
+  },
+  {
+   "key": "ui/card/pushy",
+   "provenance": "nhn-2026",
+   "bundles": "interrogation",
+   "bound": true,
+   "size": "344x176"
+  },
+  {
+   "key": "ui/debuff/kiss",
+   "provenance": "nhn-2026",
+   "bundles": "interrogation",
+   "bound": true,
+   "size": "580x580"
+  },
+  {
+   "key": "ui/game/clear",
+   "provenance": "nhn-2026",
+   "bundles": "result",
+   "bound": true,
+   "size": "1024x506"
+  },
+  {
+   "key": "ui/game/fail",
+   "provenance": "nhn-2026",
+   "bundles": "result",
+   "bound": true,
+   "size": "1024x506"
+  },
+  {
+   "key": "ui/icon/composure",
+   "provenance": "nhn-2026",
+   "bundles": "interrogation",
+   "bound": true,
+   "size": "32x32"
+  },
+  {
+   "key": "ui/icon/pushy",
+   "provenance": "nhn-2026",
+   "bundles": "interrogation",
+   "bound": true,
+   "size": "32x32"
+  },
+  {
+   "key": "ui/photo/bensi",
+   "provenance": "nhn-2026",
+   "bundles": "board",
+   "bound": false,
+   "size": "256x256"
+  },
+  {
+   "key": "ui/photo/goblin",
+   "provenance": "nhn-2026",
+   "bundles": "board",
+   "bound": true,
+   "size": "256x256"
+  },
+  {
+   "key": "ui/photo/kimyongsa",
+   "provenance": "nhn-2026",
+   "bundles": "board",
+   "bound": false,
+   "size": "256x256"
+  },
+  {
+   "key": "ui/photo/minota",
+   "provenance": "nhn-2026",
+   "bundles": "board",
+   "bound": true,
+   "size": "256x256"
+  },
+  {
+   "key": "ui/photo/mulkung",
+   "provenance": "nhn-2026",
+   "bundles": "board",
+   "bound": true,
+   "size": "256x256"
+  },
+  {
+   "key": "ui/photo/succuba",
+   "provenance": "nhn-2026",
+   "bundles": "board",
+   "bound": true,
+   "size": "256x256"
+  },
+  {
+   "key": "ui/photo/teahoon",
+   "provenance": "nhn-2026",
+   "bundles": "board",
+   "bound": true,
+   "size": "256x256"
+  },
+  {
+   "key": "ui/pin/00",
+   "provenance": "nhn-2026",
+   "bundles": "board",
+   "bound": true,
+   "size": "128x128"
+  },
+  {
+   "key": "ui/stamp/logic",
+   "provenance": "nhn-2026",
+   "bundles": "result",
+   "bound": false,
+   "size": "620x620"
+  },
+  {
+   "key": "ui/stamp/pushy",
+   "provenance": "nhn-2026",
+   "bundles": "result",
+   "bound": false,
+   "size": "620x620"
+  },
+  {
+   "key": "ui/system/00",
+   "provenance": "nhn-2026",
+   "bundles": "interrogation",
+   "bound": false,
+   "size": "415x310"
+  },
+  {
+   "key": "ui/tag/base",
+   "provenance": "nhn-2026",
+   "bundles": "interrogation",
+   "bound": false,
+   "size": "830x330"
+  },
+  {
+   "key": "ui/tag/broken",
+   "provenance": "nhn-2026",
+   "bundles": "interrogation",
+   "bound": false,
+   "size": "830x330"
+  },
+  {
+   "key": "ui/tag/deactivate",
+   "provenance": "nhn-2026",
+   "bundles": "interrogation",
+   "bound": false,
+   "size": "830x330"
+  },
+  {
+   "key": "ui/tag/hidden",
+   "provenance": "nhn-2026",
+   "bundles": "interrogation",
+   "bound": false,
+   "size": "830x330"
+  },
+  {
+   "key": "ui/tag/shield",
+   "provenance": "nhn-2026",
+   "bundles": "interrogation",
+   "bound": false,
+   "size": "830x330"
+  },
+  {
+   "key": "배경/심문실/마젠타",
+   "provenance": "legacy-placeholder",
+   "bundles": "interrogation",
+   "bound": false,
+   "size": "1280x800"
+  },
+  {
+   "key": "배경/심문실/세피아",
+   "provenance": "legacy-placeholder",
+   "bundles": "interrogation",
+   "bound": false,
+   "size": "1280x800"
+  },
+  {
+   "key": "배경/심문실/시안",
+   "provenance": "legacy-placeholder",
+   "bundles": "interrogation",
+   "bound": false,
+   "size": "1280x800"
+  },
+  {
+   "key": "아이콘/강압/기본",
+   "provenance": "legacy-placeholder",
+   "bundles": "interrogation",
+   "bound": false,
+   "size": "32x32"
+  },
+  {
+   "key": "아이콘/평정심/기본",
+   "provenance": "legacy-placeholder",
+   "bundles": "interrogation",
+   "bound": false,
+   "size": "32x32"
+  },
+  {
+   "key": "전경/책상/기본",
+   "provenance": "legacy-placeholder",
+   "bundles": "interrogation",
+   "bound": false,
+   "size": "1280x321"
+  }
+ ]
+}

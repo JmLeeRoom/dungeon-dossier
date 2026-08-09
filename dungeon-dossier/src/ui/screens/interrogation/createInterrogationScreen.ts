@@ -34,6 +34,7 @@ import {
   CARD_ATTACHMENT_ASSET_KEYS,
   CARD_BASE_ASSET_KEY,
   CARD_LOCK_OVERLAY_ASSET_KEY,
+  HUD_ICON_ASSET_KEYS,
 } from '../../../app/uiAssetBindings';
 import { createJudgmentBanner, type JudgmentBannerController } from './judgmentBanner';
 import { createPulseRings, createPunishJuice, PUNISH_TIMELINE } from './punishJuice';
@@ -89,6 +90,15 @@ export const DESK_ACTION_INSET = 57;
 export const DESK_SECURE_INSET = 83;
 export const DESK_DOSSIER_INSET = 105;
 const CARD_HAND_SPACING = 76;
+/**
+ * Command-point pips. The composure icon is already an approved 32x32 asset and
+ * already preloaded for this screen, so the strip reuses it rather than adding
+ * a key that no art delivery covers.
+ */
+const CP_PIP_ASSET_KEY = HUD_ICON_ASSET_KEYS.composure;
+const CP_PIP_SIZE = 9;
+const CP_PIP_GAP = 2;
+const CP_PIP_ORIGIN_X = 26;
 /**
  * Fallback illustrations for the three cards with no approved art yet. They are
  * chosen by intent because that is all the generated set ever distinguished;
@@ -346,22 +356,48 @@ function addHud(
 /**
  * Moved above the desk so the card hand owns the bottom edge of the screen.
  */
-function addStatusStrip(view: Container, model: InterrogationScreenModel): void {
+function addStatusStrip(
+  view: Container,
+  model: InterrogationScreenModel,
+  assets: InterrogationAssetLookup | undefined,
+): void {
   const strip = new Container();
   strip.position.set(0, 26);
   const plate = new Graphics().rect(0, 0, STAGE_WIDTH, 16).fill({ color: UI_PALETTE.deepInk, alpha: 0.85 });
-  const cp = createPixelText(`CP ${'☕'.repeat(Math.max(0, Math.round(model.dto.resources.commandPoints)))}`, {
-    fontSize: 9,
-    fill: UI_PALETTE.parchment,
-  });
+  const points = Math.max(0, Math.round(model.dto.resources.commandPoints));
+  const cp = createPixelText('CP', { fontSize: 9, fill: UI_PALETTE.parchment });
   cp.position.set(8, 3);
+
+  // CP used to be a row of native ☕ glyphs, which renders differently on every
+  // OS and font fallback — including as a blank box in a capture. The pips are
+  // the approved composure icon, so the strip looks the same everywhere.
+  const pipUrl = assets?.resolveOptionalUrl?.(CP_PIP_ASSET_KEY);
+  const pips = new Container();
+  pips.position.set(CP_PIP_ORIGIN_X, 3);
+  for (let index = 0; index < points; index += 1) {
+    const x = index * (CP_PIP_SIZE + CP_PIP_GAP);
+    if (pipUrl === undefined) {
+      pips.addChild(
+        new Graphics()
+          .circle(x + CP_PIP_SIZE / 2, CP_PIP_SIZE / 2, CP_PIP_SIZE / 2)
+          .fill(UI_PALETTE.parchment),
+      );
+      continue;
+    }
+    const pip = Sprite.from(pipUrl);
+    pip.position.set(x, 0);
+    pip.width = CP_PIP_SIZE;
+    pip.height = CP_PIP_SIZE;
+    pip.eventMode = 'none';
+    pips.addChild(pip);
+  }
   const stress = createPixelText(`STRESS ${Math.max(0, Math.round(model.stress))}`, {
     fontSize: 9,
     fill: model.stress <= 20 ? UI_PALETTE.red : UI_PALETTE.parchment,
   });
   stress.anchor.set(1, 0);
   stress.position.set(STAGE_WIDTH - 8, 3);
-  strip.addChild(plate, cp, stress);
+  strip.addChild(plate, cp, pips, stress);
   view.addChild(strip);
 }
 
@@ -437,7 +473,7 @@ export function createInterrogationScreen(
   view.addChild(content);
   addBackground(content, services.assets, model.backgroundAssetKey);
   const hudAnchors = addHud(content, model, services.assets);
-  addStatusStrip(content, model);
+  addStatusStrip(content, model, services.assets);
 
   const suspectStatePart = model.suspectStatePart;
   // The whole suspect is rebuilt on every submission, so the widget resolves
@@ -658,6 +694,14 @@ export function createInterrogationScreen(
     selectedEvidenceIds,
     {
       onOpenDossier: openDossier,
+      // The same id-keyed table the card layers use, so the exhibit a player
+      // picks in the pouch is the photograph that lands on the card.
+      ...(model.evidenceAssetKeys === undefined
+        ? {}
+        : { evidenceAssetKeys: model.evidenceAssetKeys }),
+      ...(services.assets === undefined
+        ? {}
+        : { resolveUrl: (key: string) => services.assets?.resolveOptionalUrl?.(key) }),
     },
   );
   evidenceTray.view.position.set(6, DESK_TOP + DESK_TRAY_INSET);

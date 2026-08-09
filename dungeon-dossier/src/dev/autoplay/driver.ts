@@ -34,7 +34,8 @@ import {
   findRawI18nKeys,
   publishReport,
   AUTOPLAY_NODE_COUNT,
-  VIDEO_DURATION_ACCEPTANCE,
+  CAPTURE_DURATION_ACCEPTANCE,
+  SUBMISSION_TARGET_DURATION_SEC,
   VIDEO_TARGET_DURATION_SEC,
   type AutoplayNodeReport,
   type AutoplayReport,
@@ -90,6 +91,20 @@ export const MODE_CONFIGS: Readonly<Record<AutoplayOptions['mode'], ModeConfig>>
     skipTypewriter: false,
     targetDurationSec: VIDEO_TARGET_DURATION_SEC,
     typewriterIntervalMs: 20,
+  },
+  // The short submission cut. It walks the same nine nodes as `video` in about
+  // a third of the time, so every dial moves together: the cadence is a beat
+  // rather than a pause, directions play at 3x, and dialogue types fast enough
+  // that a statement still reads as typed. The node gate spaces the nodes
+  // evenly across the target; the report decides whether it landed.
+  submission: {
+    timeScale: 3,
+    actionDelayMs: 320,
+    sceneStallMs: 30_000,
+    runTimeoutMs: 180_000,
+    skipTypewriter: false,
+    targetDurationSec: SUBMISSION_TARGET_DURATION_SEC,
+    typewriterIntervalMs: 8,
   },
 };
 
@@ -348,15 +363,18 @@ export function startAutoplay(port: AutoplayPort, options: AutoplayOptions): voi
     finalizeNode();
     const snapshot = port.runSnapshot();
     const durationMs = Math.round(Date.now() - startedAt);
+    // Present only for the modes that pace to a length; the report gate rejects
+    // a non-capture mode that declares one.
+    const captureAcceptance = CAPTURE_DURATION_ACCEPTANCE[options.mode];
     const evidence: AutoplayReportEvidence = {
       schemaVersion: AUTOPLAY_REPORT_SCHEMA_VERSION,
       seed: options.seed,
       mode: options.mode,
       policy: options.policy,
       durationMs,
-      ...(options.mode === 'video'
-        ? { durationAcceptance: { ...VIDEO_DURATION_ACCEPTANCE } }
-        : {}),
+      ...(captureAcceptance === undefined
+        ? {}
+        : { durationAcceptance: { ...captureAcceptance } }),
       nodes: [...nodes],
       ...(endingId === undefined ? {} : { ending: { endingId } }),
       ...(snapshot.terminal ? { terminalMarker: 'RUN_COMPLETED' as const } : {}),

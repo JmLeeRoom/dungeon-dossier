@@ -72,7 +72,17 @@ function resolveAssetUrl(
   }) ?? assets.resolveOptionalUrl?.(key) ?? assets.resolveUrl(key);
 }
 
-/** An unresolved legacy/test key falls back to drawn stand-in art. */
+/**
+ * An unresolved legacy/test key falls back to drawn stand-in art.
+ *
+ * The stand-in is drawn *only* when nothing resolves. Character portraits are
+ * transparent PNGs, so a placeholder left underneath one shows its panel, head
+ * circle and shoulders through every transparent pixel of the real art — the
+ * silhouette reads as a second figure behind the character.
+ *
+ * The placeholder is built eagerly by the caller because it needs the bounds,
+ * so the resolved path destroys it rather than leaking an unparented Graphics.
+ */
 function addArt(
   parent: Container,
   assets: DirectionAssetLookup | undefined,
@@ -84,9 +94,12 @@ function addArt(
   contentId: string,
   slotId: string,
 ): void {
-  parent.addChild(placeholder);
   const url = resolveAssetUrl(assets, key, contentId, slotId);
-  if (url === undefined) return;
+  if (url === undefined) {
+    parent.addChild(placeholder);
+    return;
+  }
+  placeholder.destroy();
   const rect = fitImage(source, bounds, { mode, allowUpscale: true });
   const sprite = Sprite.from(url);
   sprite.position.set(rect.x, rect.y);

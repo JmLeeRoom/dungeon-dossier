@@ -231,7 +231,7 @@ export interface AutoplayPort {
 }
 
 export interface AutoplayOptions {
-  readonly mode: 'watch' | 'turbo' | 'record' | 'video';
+  readonly mode: 'watch' | 'turbo' | 'record' | 'video' | 'submission';
   readonly policy: 'best' | 'partial' | 'coerced' | 'greedy' | 'fuzz';
   readonly seed: number;
 }
