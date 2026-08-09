@@ -396,4 +396,54 @@ describe('card, evidence, and submit selection models', () => {
       ),
     ).toBe(false);
   });
+
+  it('enforces the combat target matrix, exact evidence count, and current CP', () => {
+    const combatCard = (
+      cardId: string,
+      targetRule: NonNullable<InterrogationCardView['combat']>['targetRule'],
+      evidenceMode: NonNullable<InterrogationCardView['combat']>['evidenceMode'],
+      affordable = true,
+    ): InterrogationCardView => ({
+      cardId,
+      title: cardId,
+      description: '',
+      intent: 'CONTRADICT',
+      cpCost: 1,
+      requiresEvidence: evidenceMode === 'EXACTLY_ONE',
+      affordable,
+      combat: { roleLabel: '역할', targetRule, evidenceMode },
+    });
+    const leading = combatCard('leading', 'GAP_OR_SHIELD_ATTEMPT', 'OPTIONAL_FOR_SHIELD');
+    const toss = combatCard('toss', 'GAP_OR_BROKEN', 'NONE');
+    const finisher = combatCard('finisher', 'BROKEN', 'EXACTLY_ONE');
+    const proof = combatCard('proof', 'ANY_CLAIM', 'EXACTLY_ONE');
+    const broke = combatCard('broke', 'ANY_CLAIM', 'NONE', false);
+    const cards = [leading, toss, finisher, proof, broke];
+
+    expect(interrogationCardAllowsFacet(leading, 'WHO', 'GAP')).toBe(true);
+    expect(interrogationCardAllowsFacet(leading, 'WHO', 'SHIELDED')).toBe(true);
+    expect(interrogationCardAllowsFacet(leading, 'WHO', 'BROKEN')).toBe(false);
+    expect(interrogationCardAllowsFacet(toss, 'WHO', 'SHIELDED')).toBe(false);
+    expect(interrogationCardAllowsFacet(toss, 'WHO', 'BROKEN')).toBe(true);
+    expect(interrogationCardAllowsFacet(finisher, 'WHO', 'GAP')).toBe(false);
+    expect(interrogationCardAllowsFacet(finisher, 'WHO', 'BROKEN')).toBe(true);
+
+    const submit = (cardId: string, evidenceIds: readonly string[], exposure: 'GAP' | 'SHIELDED' | 'BROKEN') =>
+      canSubmitInterrogationSelection(
+        cards,
+        { cardId, facet: 'WHO', evidenceIds },
+        { WHO: exposure },
+      );
+    expect(submit('leading', [], 'GAP')).toBe(true);
+    expect(submit('leading', ['ev'], 'GAP')).toBe(false);
+    expect(submit('leading', [], 'SHIELDED')).toBe(false);
+    expect(submit('leading', ['ev'], 'SHIELDED')).toBe(true);
+    expect(submit('leading', ['ev1', 'ev2'], 'SHIELDED')).toBe(false);
+    expect(submit('toss', [], 'BROKEN')).toBe(true);
+    expect(submit('toss', ['ev'], 'BROKEN')).toBe(false);
+    expect(submit('finisher', ['ev'], 'BROKEN')).toBe(true);
+    expect(submit('finisher', [], 'BROKEN')).toBe(false);
+    expect(submit('proof', ['ev'], 'SHIELDED')).toBe(true);
+    expect(submit('broke', [], 'GAP')).toBe(false);
+  });
 });

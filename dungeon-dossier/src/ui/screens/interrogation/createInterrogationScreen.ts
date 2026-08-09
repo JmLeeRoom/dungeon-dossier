@@ -13,7 +13,7 @@ import {
   createCardDetailModal,
   createCardFan,
   createEvidenceTray,
-  createGauge,
+  createGaugeController,
   createPartnerPortrait,
   createShield,
   createSuspectPortrait,
@@ -28,13 +28,15 @@ import {
   type CardFanController,
   type CardLayerId,
   type EvidenceTrayController,
+  type GaugeController,
   type TagChipController,
 } from '../../widgets';
 import {
   CARD_ATTACHMENT_ASSET_KEYS,
   CARD_BASE_ASSET_KEY,
   CARD_LOCK_OVERLAY_ASSET_KEY,
-  HUD_ICON_ASSET_KEYS,
+  CP_PIP_ASSET_KEYS,
+  HP_ICON_ASSET_KEY,
 } from '../../../app/uiAssetBindings';
 import { createJudgmentBanner, type JudgmentBannerController } from './judgmentBanner';
 import { createPulseRings, createPunishJuice, PUNISH_TIMELINE } from './punishJuice';
@@ -89,16 +91,13 @@ export const DESK_PARTNER_INSET = 57;
 export const DESK_ACTION_INSET = 57;
 export const DESK_SECURE_INSET = 83;
 export const DESK_DOSSIER_INSET = 105;
-const CARD_HAND_SPACING = 76;
-/**
- * Command-point pips. The composure icon is already an approved 32x32 asset and
- * already preloaded for this screen, so the strip reuses it rather than adding
- * a key that no art delivery covers.
- */
-const CP_PIP_ASSET_KEY = HUD_ICON_ASSET_KEYS.composure;
-const CP_PIP_SIZE = 9;
+const CARD_HAND_SPACING = 112;
+/** Command-point coins, drawn at full capacity so a spent point reads as empty. */
+const CP_PIP_SIZE = 11;
 const CP_PIP_GAP = 2;
 const CP_PIP_ORIGIN_X = 26;
+/** The heart sits left of the reading so `HP 87/100` scans as one unit. */
+const HP_ICON_SIZE = 11;
 /**
  * Fallback illustrations for the three cards with no approved art yet. They are
  * chosen by intent because that is all the generated set ever distinguished;
@@ -122,6 +121,15 @@ export interface InterrogationScreenServices {
   readonly inputTarget?: EventTarget;
 }
 
+/**
+ * How the two suspect-facing resources moved across a re-mount. The screen is
+ * rebuilt on every submission, so only the app layer sees both sides.
+ */
+export interface InterrogationResourceChange {
+  readonly composureDelta: number;
+  readonly coercionDelta: number;
+}
+
 export interface SuspectStateTransition {
   readonly from: SuspectStatePart;
   readonly to: SuspectStatePart;
@@ -139,6 +147,12 @@ export interface InterrogationScreenController {
   clearJudgmentFeedback(): void;
   /** Impact juice for a coercion spike. A non-positive delta is ignored. */
   playCoercionRise(coercionDelta: number): void;
+  /**
+   * Shakes the bar that just moved against the player: composure falling or
+   * coercion rising. A heal, an unchanged value and the first mount are all
+   * silent, so the shake always means "that cost you something".
+   */
+  playResourceImpact(change: InterrogationResourceChange): void;
   /** Shakes the portrait for a state change the suspect just entered. */
   playSuspectTransition(transition: SuspectStateTransition): void;
   update(elapsedMs: number): void;
@@ -269,6 +283,9 @@ interface HudAnchors {
   /** Centre of the 16x16 coercion icon, in stage coordinates. */
   readonly coercionAnchor: Readonly<{ x: number; y: number }>;
   readonly coercionIcon?: Container;
+  /** The two bars, so the screen can register a hit on the one that moved. */
+  readonly composureGauge: GaugeController;
+  readonly coercionGauge: GaugeController;
 }
 
 const LOSE_SCENE_SHAKE: ShakeProfile = {
@@ -293,7 +310,7 @@ function addHud(
     fill: UI_PALETTE.paper,
   });
   suspect.position.set(12, 8);
-  const composure = createGauge(model.dto.resources.composure, model.composureMax, {
+  const composure = createGaugeController(model.dto.resources.composure, model.composureMax, {
     width: 164,
     height: 12,
     label: '평정심',
@@ -302,16 +319,16 @@ function addHud(
     ...(model.sweetSpotMax === undefined ? {} : { sweetSpotMax: model.sweetSpotMax }),
     fill: UI_PALETTE.cyan,
   });
-  composure.position.set(159, 7);
-  const coercion = createGauge(model.dto.resources.coercion, model.coercionMax, {
+  composure.view.position.set(159, 7);
+  const coercion = createGaugeController(model.dto.resources.coercion, model.coercionMax, {
     width: 152,
     height: 12,
     label: '강압',
     fill: UI_PALETTE.red,
     cellCount: 10,
   });
-  coercion.position.set(346, 7);
-  hud.addChild(plate, suspectPlate, suspect, composure, coercion);
+  coercion.view.position.set(346, 7);
+  hud.addChild(plate, suspectPlate, suspect, composure.view, coercion.view);
 
   // The 32x32 source icons render as 16x16 anchors for each gauge.
   let coercionIcon: Sprite | undefined;
@@ -350,6 +367,8 @@ function addHud(
       y: COERCION_ICON_PLACEMENT.y + COERCION_ICON_PLACEMENT.height / 2,
     },
     ...(coercionIcon === undefined ? {} : { coercionIcon }),
+    composureGauge: composure,
+    coercionGauge: coercion,
   };
 }
 
@@ -365,39 +384,59 @@ function addStatusStrip(
   strip.position.set(0, 26);
   const plate = new Graphics().rect(0, 0, STAGE_WIDTH, 16).fill({ color: UI_PALETTE.deepInk, alpha: 0.85 });
   const points = Math.max(0, Math.round(model.dto.resources.commandPoints));
+  const capacity = Math.max(points, Math.round(model.commandPointsMax ?? points));
   const cp = createPixelText('CP', { fontSize: 9, fill: UI_PALETTE.parchment });
-  cp.position.set(8, 3);
+  cp.position.set(8, 2);
 
   // CP used to be a row of native ☕ glyphs, which renders differently on every
-  // OS and font fallback — including as a blank box in a capture. The pips are
-  // the approved composure icon, so the strip looks the same everywhere.
-  const pipUrl = assets?.resolveOptionalUrl?.(CP_PIP_ASSET_KEY);
+  // OS and font fallback — including as a blank box in a capture. It is now the
+  // approved coin, drawn at full capacity: a spent point dims rather than
+  // disappearing, so the cost of the next card stays legible.
+  const activeUrl = assets?.resolveOptionalUrl?.(CP_PIP_ASSET_KEYS.active);
+  const spentUrl = assets?.resolveOptionalUrl?.(CP_PIP_ASSET_KEYS.deactive);
   const pips = new Container();
-  pips.position.set(CP_PIP_ORIGIN_X, 3);
-  for (let index = 0; index < points; index += 1) {
+  pips.position.set(CP_PIP_ORIGIN_X, 2);
+  for (let index = 0; index < capacity; index += 1) {
     const x = index * (CP_PIP_SIZE + CP_PIP_GAP);
-    if (pipUrl === undefined) {
+    const available = index < points;
+    const url = available ? activeUrl : spentUrl;
+    if (url === undefined) {
       pips.addChild(
         new Graphics()
-          .circle(x + CP_PIP_SIZE / 2, CP_PIP_SIZE / 2, CP_PIP_SIZE / 2)
-          .fill(UI_PALETTE.parchment),
+          .circle(x + CP_PIP_SIZE / 2, CP_PIP_SIZE / 2, CP_PIP_SIZE / 2 - 1)
+          .fill(available ? UI_PALETTE.parchment : UI_PALETTE.panelLight),
       );
       continue;
     }
-    const pip = Sprite.from(pipUrl);
+    const pip = Sprite.from(url);
     pip.position.set(x, 0);
     pip.width = CP_PIP_SIZE;
     pip.height = CP_PIP_SIZE;
     pip.eventMode = 'none';
     pips.addChild(pip);
   }
-  const stress = createPixelText(`STRESS ${Math.max(0, Math.round(model.stress))}`, {
+  // HP is the detective's own life, so it reads as a heart and a fraction
+  // rather than the old bare `STRESS n`, which named an internal field.
+  const hp = Math.max(0, Math.round(model.stress));
+  const hpMax = Math.max(hp, Math.round(model.hpMax ?? hp));
+  const hpLabel = createPixelText(`HP ${hp}/${hpMax}`, {
     fontSize: 9,
-    fill: model.stress <= 20 ? UI_PALETTE.red : UI_PALETTE.parchment,
+    fill: hp <= hpMax * 0.2 ? UI_PALETTE.red : UI_PALETTE.parchment,
   });
-  stress.anchor.set(1, 0);
-  stress.position.set(STAGE_WIDTH - 8, 3);
-  strip.addChild(plate, cp, pips, stress);
+  hpLabel.anchor.set(1, 0);
+  hpLabel.position.set(STAGE_WIDTH - 8, 3);
+
+  const hpIconUrl = assets?.resolveOptionalUrl?.(HP_ICON_ASSET_KEY);
+  const hpIcon = hpIconUrl === undefined ? undefined : Sprite.from(hpIconUrl);
+  if (hpIcon !== undefined) {
+    hpIcon.width = HP_ICON_SIZE;
+    hpIcon.height = HP_ICON_SIZE;
+    hpIcon.eventMode = 'none';
+    hpIcon.position.set(STAGE_WIDTH - 8 - hpLabel.width - HP_ICON_SIZE - 3, 2);
+  }
+
+  strip.addChild(plate, cp, pips, hpLabel);
+  if (hpIcon !== undefined) strip.addChild(hpIcon);
   view.addChild(strip);
 }
 
@@ -421,6 +460,10 @@ export function interrogationCardLayerAssetKey(
   evidenceAssetKeys: Readonly<Record<string, string>> = {},
 ): string | undefined {
   if (layer === 'base') return CARD_BASE_ASSET_KEY;
+  if (layer === 'cost') {
+    return card.costIconAssetKey ??
+      (card.affordable === false ? CP_PIP_ASSET_KEYS.deactive : CP_PIP_ASSET_KEYS.active);
+  }
   if (layer === 'illust') {
     return card.artAssetKey ?? LEGACY_CARD_ILLUSTRATION_ASSET_KEYS[card.intent];
   }
@@ -561,6 +604,10 @@ export function createInterrogationScreen(
   let cardModal: CardDetailModalController | undefined;
   let highlightedFacet: PublicFacet | undefined;
   let destroyed = false;
+  // P0-3 secure-decision checkpoint: while the engine waits for the player's
+  // Secure/Continue choice, the inline rail owns every input path. Cards,
+  // tags, evidence, submit, partner, and dossier are all locked below.
+  const decisionActive = model.pendingDecision !== undefined;
   const visibleCards = model.cards.slice(0, 5);
   const renderedAttachmentSignatures = new Map<string, string>();
 
@@ -591,7 +638,11 @@ export function createInterrogationScreen(
     const selectedCard = visibleCards.find((card) => card.cardId === selectedCardId);
     if (
       selectedFacet !== undefined &&
-      !interrogationCardAllowsFacet(selectedCard, selectedFacet)
+      !interrogationCardAllowsFacet(
+        selectedCard,
+        selectedFacet,
+        model.claimExposureByFacet?.[selectedFacet],
+      )
     ) {
       selectedFacet = undefined;
     }
@@ -608,29 +659,49 @@ export function createInterrogationScreen(
       controller.setState(
         applyTagChipDeactivation(
           publicState,
-          interrogationCardAllowsFacet(selectedCard, facet),
+          interrogationCardAllowsFacet(
+            selectedCard,
+            facet,
+            model.claimExposureByFacet?.[facet],
+          ) && selectedCard?.affordable !== false,
         ),
       );
       controller.setSelected(facet === selectedFacet || facet === highlightedFacet);
     });
     evidenceTray.setEvidence(model.dto.evidence, selectedEvidenceIds);
-    submitButton.setEnabled(canSubmitInterrogationSelection(model.cards, selectionSnapshot()));
+    submitButton.setEnabled(
+      !decisionActive &&
+        canSubmitInterrogationSelection(
+          model.cards,
+          selectionSnapshot(),
+          model.claimExposureByFacet,
+        ),
+    );
     if (notify) callbacks.onSelectionChange?.(selectionSnapshot());
   };
 
   function selectCard(cardId: string): void {
+    if (decisionActive) return;
     selectedCardId = cardId;
     refreshSelection();
   }
 
   function selectFacet(facet: PublicFacet): void {
+    if (decisionActive) return;
     const selectedCard = visibleCards.find((card) => card.cardId === selectedCardId);
-    if (!interrogationCardAllowsFacet(selectedCard, facet)) return;
+    if (
+      !interrogationCardAllowsFacet(
+        selectedCard,
+        facet,
+        model.claimExposureByFacet?.[facet],
+      )
+    ) return;
     selectedFacet = facet;
     refreshSelection();
   }
 
   const openDossier = (): void => {
+    if (decisionActive) return;
     if (dossierView !== undefined) return;
     const close = (): void => {
       if (dossierView === undefined) return;
@@ -661,6 +732,7 @@ export function createInterrogationScreen(
   };
 
   const openCardModal = (cardId: string): void => {
+    if (decisionActive) return;
     closeCardModal();
     const card = model.cards.find((candidate) => candidate.cardId === cardId);
     if (card === undefined) return;
@@ -671,6 +743,9 @@ export function createInterrogationScreen(
         intent: card.intent,
         cpCost: card.cpCost,
         description: card.description,
+        ...(card.combat === undefined ? {} : { roleLabel: card.combat.roleLabel }),
+        ...(card.warningLabels === undefined ? {} : { warningLabels: card.warningLabels }),
+        ...(card.affordable === undefined ? {} : { affordable: card.affordable }),
         ...(card.locked === undefined ? {} : { locked: card.locked }),
         ...(card.lockTurnsRemaining === undefined
           ? {}
@@ -736,8 +811,12 @@ export function createInterrogationScreen(
       refreshSelection(false);
     },
     onDropOnTarget(card, targetId): void {
+      if (decisionActive) return;
       const facet = FACETS.find((candidate) => candidate === targetId);
-      if (facet === undefined || !interrogationCardAllowsFacet(card, facet)) return;
+      if (
+        facet === undefined ||
+        !interrogationCardAllowsFacet(card, facet, model.claimExposureByFacet?.[facet])
+      ) return;
       selectedCardId = card.cardId;
       selectedFacet = facet;
       highlightedFacet = undefined;
@@ -761,7 +840,9 @@ export function createInterrogationScreen(
     cooldown: model.partnerCooldown,
     width: PARTNER_PLACEMENT.width,
     height: PARTNER_PLACEMENT.height,
-    ...(model.partnerSkillAvailable === true && callbacks.onUsePartner !== undefined
+    ...(model.partnerSkillAvailable === true &&
+    callbacks.onUsePartner !== undefined &&
+    !decisionActive
       ? { onUse: callbacks.onUsePartner }
       : {}),
     ...(partnerBaseUrl === undefined ? {} : { baseUrl: partnerBaseUrl }),
@@ -772,18 +853,24 @@ export function createInterrogationScreen(
 
   const submitButton = createActionButton('제출 / RETURN', 82, 22, () => {
     const selection = selectionSnapshot();
-    if (canSubmitInterrogationSelection(model.cards, selection)) callbacks.onSubmit?.(selection);
+    if (canSubmitInterrogationSelection(model.cards, selection, model.claimExposureByFacet)) {
+      callbacks.onSubmit?.(selection);
+    }
   });
   submitButton.view.position.set(452, DESK_TOP + DESK_ACTION_INSET);
   content.addChild(submitButton.view);
 
-  const secureButton = createActionButton('진술 확보', 78, 18, () => callbacks.onSecureStatement?.());
+  const secureButton = createActionButton('진술 확보', 78, 18, () => {
+    if (!decisionActive) callbacks.onSecureStatement?.();
+  });
   secureButton.view.position.set(452, DESK_TOP + DESK_SECURE_INSET);
-  secureButton.setEnabled(model.canSecureStatement === true);
+  // The v2 decision rail is the single owner of Secure while it is open.
+  secureButton.setEnabled(!decisionActive && model.canSecureStatement === true);
   content.addChild(secureButton.view);
 
   const dossierButton = createActionButton('조서 열기', 72, 18, openDossier);
   dossierButton.view.position.set(452, DESK_TOP + DESK_DOSSIER_INSET);
+  dossierButton.setEnabled(!decisionActive);
   content.addChild(dossierButton.view);
 
   // The fan is the topmost desk interaction layer. A lifted right-hand card
@@ -823,12 +910,106 @@ export function createInterrogationScreen(
       // secondary bindings fall through would mutate the obscured scene (and
       // could even advance the encounter under a still-visible card modal).
       if (dossierView !== undefined || cardModal !== undefined) return;
+      // The decision rail is the sole keyboard owner while it is open.
+      if (decisionActive) return;
       if (command.type === 'ADVANCE') {
         callbacks.onAdvance?.();
         return;
       }
       cardFan.selectByIndex(command.cardNumber - 1);
     });
+  }
+
+  // P0-3 inline secure-decision rail: rendered where the (empty) hand sits,
+  // driven by pointer or by its own Left/Right + Enter/Space keyboard owner.
+  // Escape is deliberately a no-op in this slice; the dismissible DOM dialog
+  // arrives in P2.
+  let unbindDecisionKeys = (): void => undefined;
+  const decision = model.pendingDecision;
+  if (decision !== undefined) {
+    // Placed on the (empty) hand area at the stage floor, below the
+    // typewriter, so the reaction line stays readable (design §3.5.3).
+    const railWidth = 256;
+    const railHeight = 56;
+    const rail = new Container();
+    rail.position.set((STAGE_WIDTH - railWidth) / 2, STAGE_HEIGHT - railHeight - 4);
+    const plate = new Graphics()
+      .rect(0, 0, railWidth, railHeight)
+      .fill(UI_PALETTE.panel)
+      .stroke({ color: UI_PALETTE.parchmentDark, width: 1 });
+    rail.addChild(plate);
+    const railTitle = createPixelText(decision.title, {
+      fontSize: 8,
+      fill: UI_PALETTE.paper,
+    });
+    railTitle.anchor.set(0.5, 0);
+    railTitle.position.set(railWidth / 2, 6);
+    rail.addChild(railTitle);
+
+    let decisionResolved = false;
+    const resolveDecision = (choice: 'SECURE' | 'CONTINUE'): void => {
+      if (decisionResolved || destroyed) return;
+      decisionResolved = true;
+      callbacks.onResolveDecision?.(decision.decisionId, choice);
+    };
+    const buttonWidth = 112;
+    const buttonHeight = 22;
+    const buttonY = 26;
+    const secureRailButton = createActionButton(
+      decision.secureLabel,
+      buttonWidth,
+      buttonHeight,
+      () => resolveDecision('SECURE'),
+    );
+    secureRailButton.view.position.set(8, buttonY);
+    const continueRailButton = createActionButton(
+      decision.continueLabel,
+      buttonWidth,
+      buttonHeight,
+      () => resolveDecision('CONTINUE'),
+    );
+    continueRailButton.view.position.set(railWidth - buttonWidth - 8, buttonY);
+    const focusMarker = new Graphics();
+    let decisionFocus: 'SECURE' | 'CONTINUE' = 'SECURE';
+    const drawDecisionFocus = (): void => {
+      const focusX = decisionFocus === 'SECURE' ? 8 : railWidth - buttonWidth - 8;
+      focusMarker
+        .clear()
+        .rect(focusX - 2, buttonY - 2, buttonWidth + 4, buttonHeight + 4)
+        .stroke({ color: UI_PALETTE.paper, width: 1 });
+    };
+    drawDecisionFocus();
+    rail.addChild(secureRailButton.view, continueRailButton.view, focusMarker);
+    content.addChild(rail);
+
+    if (inputTarget !== undefined) {
+      const decisionKeyListener: EventListener = (event) => {
+        if (destroyed || decisionResolved) return;
+        if (!('code' in event) || typeof event.code !== 'string') return;
+        // A held key from before the rail appeared must not auto-resolve the
+        // decision: OS auto-repeat events are dropped like the secondary
+        // keyboard bindings drop them.
+        if ('repeat' in event && event.repeat === true) return;
+        const code = event.code;
+        if (code === 'ArrowLeft' || code === 'ArrowRight') {
+          decisionFocus = decisionFocus === 'SECURE' ? 'CONTINUE' : 'SECURE';
+          drawDecisionFocus();
+          event.preventDefault();
+          return;
+        }
+        if (code === 'Enter' || code === 'NumpadEnter' || code === 'Space') {
+          event.preventDefault();
+          resolveDecision(decisionFocus);
+          return;
+        }
+        // Escape must not map to Secure or Continue (design §3.5.3).
+        if (code === 'Escape') event.preventDefault();
+      };
+      inputTarget.addEventListener('keydown', decisionKeyListener);
+      unbindDecisionKeys = () => {
+        inputTarget.removeEventListener('keydown', decisionKeyListener);
+      };
+    }
   }
   // Construction is not a user selection. In particular, bootstrap couples
   // this callback to paper SFX, so notifying here creates a phantom click on
@@ -859,6 +1040,10 @@ export function createInterrogationScreen(
     playCoercionRise(delta): void {
       punish.play(delta, hudAnchors.coercionAnchor);
     },
+    playResourceImpact(change): void {
+      if (change.composureDelta < 0) hudAnchors.composureGauge.playImpact();
+      if (change.coercionDelta > 0) hudAnchors.coercionGauge.playImpact();
+    },
     playSuspectTransition(transition): void {
       if (transition.from === transition.to) return;
       portrait.playTransitionShake(transition.to);
@@ -870,6 +1055,8 @@ export function createInterrogationScreen(
     update(elapsedMs): void {
       typewriter.update(elapsedMs);
       punish.update(elapsedMs);
+      hudAnchors.composureGauge.update(elapsedMs);
+      hudAnchors.coercionGauge.update(elapsedMs);
       portrait.update(elapsedMs);
       loseShake.update(elapsedMs);
       if (loseRingsElapsedMs < PUNISH_TIMELINE.ringDurationMs) {
@@ -882,6 +1069,7 @@ export function createInterrogationScreen(
       if (destroyed) return;
       destroyed = true;
       unbindKeyboard();
+      unbindDecisionKeys();
       closeCardModal();
       cardFan.destroy();
       loseShake.release();

@@ -99,7 +99,9 @@ describe('per-encounter fallback dialogue corpus', () => {
 
     for (const definition of cases) {
       for (const encounter of definition.encounters) {
-        const claimIds = encounter.rounds.flatMap((round) => round.statement_claims);
+        const claimIds = [...new Set(
+          encounter.rounds.flatMap((round) => round.statement_claims),
+        )];
         const claims = claimIds.map((claimId) => {
           const claim = definition.claims.find((candidate) => candidate.claim_id === claimId);
           if (claim === undefined) throw new Error(`Missing claim ${claimId}.`);

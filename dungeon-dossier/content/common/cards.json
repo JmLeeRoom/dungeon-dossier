@@ -3,6 +3,107 @@
   "schema_version": "1.0",
   "cards": [
     {
+      "card_id": "card_leading_question",
+      "name_key": "card.leading_question.name",
+      "description_key": "card.leading_question.description",
+      "category": "BASE",
+      "intent": "CONTRADICT",
+      "cost": { "cp": 1 },
+      "target": { "kind": "CLAIM", "min_evidence": 0, "max_evidence": 1 },
+      "modifiers": [],
+      "starting_copies": 1,
+      "combat_profile": {
+        "role": "BASIC_JAB",
+        "composure_delta": -10,
+        "coercion_delta": 2,
+        "target_rule": "GAP_OR_SHIELD_ATTEMPT",
+        "evidence_mode": "OPTIONAL_FOR_SHIELD",
+        "shield_mode": "BREAK_ON_DIRECT",
+        "shield_damage": 1
+      }
+    },
+    {
+      "card_id": "card_toss_dossier",
+      "name_key": "card.toss_dossier.name",
+      "description_key": "card.toss_dossier.description",
+      "category": "BASE",
+      "intent": "PRESSURE",
+      "cost": { "cp": 1 },
+      "target": { "kind": "CLAIM", "min_evidence": 0, "max_evidence": 0 },
+      "modifiers": [],
+      "starting_copies": 1,
+      "combat_profile": {
+        "role": "MENTAL_CONTROL",
+        "composure_delta": -10,
+        "coercion_delta": 0,
+        "target_rule": "GAP_OR_BROKEN",
+        "evidence_mode": "NONE",
+        "shield_mode": "BLOCKED",
+        "shield_damage": 0
+      }
+    },
+    {
+      "card_id": "card_point_contradiction",
+      "name_key": "card.point_contradiction.name",
+      "description_key": "card.point_contradiction.description",
+      "category": "BASE",
+      "intent": "CONTRADICT",
+      "cost": { "cp": 2 },
+      "target": { "kind": "CLAIM", "min_evidence": 1, "max_evidence": 1 },
+      "modifiers": [],
+      "starting_copies": 1,
+      "combat_profile": {
+        "role": "FINISHER",
+        "composure_delta": -25,
+        "coercion_delta": 5,
+        "target_rule": "BROKEN",
+        "evidence_mode": "EXACTLY_ONE",
+        "shield_mode": "REQUIRE_BROKEN",
+        "shield_damage": 0
+      }
+    },
+    {
+      "card_id": "card_decisive_proof",
+      "name_key": "card.decisive_proof.name",
+      "description_key": "card.decisive_proof.description",
+      "category": "BASE",
+      "intent": "CONTRADICT",
+      "cost": { "cp": 2 },
+      "target": { "kind": "CLAIM", "min_evidence": 1, "max_evidence": 1 },
+      "modifiers": [],
+      "starting_copies": 1,
+      "combat_profile": {
+        "role": "FINISHER",
+        "composure_delta": -20,
+        "coercion_delta": 0,
+        "target_rule": "ANY_CLAIM",
+        "evidence_mode": "EXACTLY_ONE",
+        "shield_mode": "IGNORE",
+        "shield_damage": 0
+      }
+    },
+    {
+      "card_id": "card_bat_threat",
+      "name_key": "card.bat_threat.name",
+      "description_key": "card.bat_threat.description",
+      "category": "BASE",
+      "intent": "PRESSURE",
+      "cost": { "cp": 2 },
+      "target": { "kind": "CLAIM", "min_evidence": 0, "max_evidence": 0 },
+      "modifiers": [],
+      "starting_copies": 1,
+      "tags": ["HOT_TEMPER_RISK"],
+      "combat_profile": {
+        "role": "PHYSICAL_COERCION",
+        "composure_delta": -30,
+        "coercion_delta": 15,
+        "target_rule": "ANY_CLAIM",
+        "evidence_mode": "NONE",
+        "shield_mode": "IGNORE",
+        "shield_damage": 0
+      }
+    },
+    {
       "card_id": "card_query_who",
       "name_key": "card.query.who.name",
       "description_key": "card.query.who.description",
@@ -11,7 +112,8 @@
       "cost": { "cp": 1 },
       "target": { "kind": "ROUTE", "facets": ["WHO"] },
       "modifiers": [],
-      "starting_copies": 1
+      "starting_copies": 1,
+      "legacy": true
     },
     {
       "card_id": "card_query_when",
@@ -22,7 +124,8 @@
       "cost": { "cp": 1 },
       "target": { "kind": "ROUTE", "facets": ["WHEN"] },
       "modifiers": [],
-      "starting_copies": 1
+      "starting_copies": 1,
+      "legacy": true
     },
     {
       "card_id": "card_clarify_basic",
@@ -33,7 +136,8 @@
       "cost": { "cp": 1 },
       "target": { "kind": "CLAIM" },
       "modifiers": [],
-      "starting_copies": 1
+      "starting_copies": 1,
+      "legacy": true
     },
     {
       "card_id": "card_clarify_deep",
@@ -47,7 +151,8 @@
         { "type": "MODIFY_SHIELDS", "target": "runtime-selected-claim", "delta": -1 }
       ],
       "card_modifier": { "postit": "HOW" },
-      "starting_copies": 0
+      "starting_copies": 0,
+      "legacy": true
     },
     {
       "card_id": "card_confirm_basic",
@@ -58,7 +163,8 @@
       "cost": { "cp": 1 },
       "target": { "kind": "CLAIM", "min_evidence": 1 },
       "modifiers": [],
-      "starting_copies": 1
+      "starting_copies": 1,
+      "legacy": true
     },
     {
       "card_id": "card_confirm_careful",
@@ -72,7 +178,8 @@
         { "type": "ADJUST_RESOURCE", "resource": "coercion", "delta": -1 }
       ],
       "card_modifier": { "stamp": "BLUE" },
-      "starting_copies": 0
+      "starting_copies": 0,
+      "legacy": true
     },
     {
       "card_id": "card_contradict_basic",
@@ -83,7 +190,8 @@
       "cost": { "cp": 2 },
       "target": { "kind": "CLAIM", "min_evidence": 1 },
       "modifiers": [],
-      "starting_copies": 1
+      "starting_copies": 1,
+      "legacy": true
     },
     {
       "card_id": "card_contradict_precise",
@@ -97,7 +205,8 @@
         { "type": "ADJUST_RESOURCE", "resource": "composure", "delta": -4 }
       ],
       "card_modifier": { "stamp": "RED" },
-      "starting_copies": 0
+      "starting_copies": 0,
+      "legacy": true
     },
     {
       "card_id": "card_recover_breathe",
@@ -110,7 +219,8 @@
       "modifiers": [
         { "type": "ADJUST_RESOURCE", "resource": "coercion", "delta": -4 }
       ],
-      "starting_copies": 1
+      "starting_copies": 1,
+      "legacy": true
     },
     {
       "card_id": "card_recover_pace",
@@ -124,7 +234,8 @@
         { "type": "ADJUST_RESOURCE", "resource": "coercion", "delta": -2 },
         { "type": "DRAW_CARD" }
       ],
-      "starting_copies": 0
+      "starting_copies": 0,
+      "legacy": true
     },
     {
       "card_id": "card_pressure",
@@ -138,7 +249,8 @@
         { "type": "ADJUST_RESOURCE", "resource": "composure", "delta": -8 },
         { "type": "ADJUST_RESOURCE", "resource": "coercion", "delta": 5 }
       ],
-      "starting_copies": 0
+      "starting_copies": 0,
+      "legacy": true
     },
     {
       "card_id": "card_forensic",
@@ -151,7 +263,8 @@
       "modifiers": [
         { "type": "UPGRADE_EVIDENCE", "targets": ["runtime-selected-evidence"] }
       ],
-      "starting_copies": 0
+      "starting_copies": 0,
+      "legacy": true
     },
     {
       "card_id": "card_special_notice",
@@ -165,7 +278,8 @@
         { "type": "ADJUST_RESOURCE", "resource": "coercion", "delta": -3 }
       ],
       "special_effect_id": "effect_procedure_notice",
-      "starting_copies": 0
+      "starting_copies": 0,
+      "legacy": true
     },
     {
       "card_id": "card_commit_clip",
@@ -177,15 +291,15 @@
       "target": { "kind": "CLAIM" },
       "modifiers": [],
       "card_modifier": { "clip": true },
-      "starting_copies": 0
+      "starting_copies": 0,
+      "legacy": true
     }
   ],
   "initial_deck": [
-    "card_query_who",
-    "card_query_when",
-    "card_clarify_basic",
-    "card_confirm_basic",
-    "card_contradict_basic",
-    "card_recover_breathe"
+    "card_leading_question",
+    "card_toss_dossier",
+    "card_point_contradiction",
+    "card_decisive_proof",
+    "card_bat_threat"
   ]
 }

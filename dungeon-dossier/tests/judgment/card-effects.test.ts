@@ -271,7 +271,11 @@ describe('shipped card catalogue authoring', () => {
     // pure CP sinks unless the card authors its own modifiers.
     const effectlessIntents = new Set(['PRESSURE', 'RECOVER', 'FORENSIC', 'SPECIAL']);
     const inert = cards.cards
-      .filter((card) => effectlessIntents.has(card.intent) && card.modifiers.length === 0)
+      .filter((card) =>
+        effectlessIntents.has(card.intent) &&
+        card.modifiers.length === 0 &&
+        card.combat_profile === undefined,
+      )
       .map((card) => card.card_id);
     expect(inert).toEqual([]);
   });

@@ -54,6 +54,11 @@ const EVIDENCE_RECT = containImage(EVIDENCE, { x: 284, y: 16, width: 200, height
 
 export const CARD_LAYER_RECTS: Readonly<Record<CardLayerId, CardLayerRect>> = {
   base: { x: 0, y: 0, width: CARD_SIZE.width, height: CARD_SIZE.height },
+  // The approved coin occupies the value slot immediately under the baked-in
+  // COST heading. Copy never borrows the lower EFFECT sheet for its price.
+  cost: { x: 64, y: 100, width: 96, height: 96 },
+  name: { x: 96, y: 538, width: 568, height: 76 },
+  ability: { x: 96, y: 650, width: 576, height: 224 },
   // Centred on the photograph mount at the largest aspect-true size it holds.
   illust: { x: ILLUST_RECT.x, y: ILLUST_RECT.y, width: ILLUST_RECT.width, height: ILLUST_RECT.height },
   // The attribute seal is pressed across the lower-right of the photograph, at
@@ -106,19 +111,25 @@ export function layoutCardEvidence(count: number): readonly CardEvidencePlacemen
   }));
 }
 
-export type CardCopyZoneId = 'cpBadge' | 'ordinal' | 'title' | 'intent' | 'description';
+export type CardCopyZoneId =
+  | 'cpBadge'
+  | 'ordinal'
+  | 'title'
+  | 'intent'
+  | 'description'
+  | 'warning';
 
 /**
- * The reading zones, all on the lower sheet: cost badge top-left, hand ordinal
- * top-right, title between them, intent under the title, and a permanent
- * description block filling the rest.
+ * Reading zones follow the authored form: cost belongs to the upper COST
+ * column; name and ability copy stay above the lower sheet's signature line.
  */
 export const CARD_COPY_RECTS: Readonly<Record<CardCopyZoneId, CardLayerRect>> = {
-  cpBadge: { x: 96, y: 548, width: 106, height: 68 },
-  ordinal: { x: CARD_SIZE.width - 96 - 58, y: 548, width: 58, height: 54 },
-  title: { x: 216, y: 548, width: 336, height: 116 },
-  intent: { x: 96, y: 676, width: 320, height: 54 },
-  description: { x: 96, y: 740, width: 576, height: 200 },
+  cpBadge: CARD_LAYER_RECTS.cost,
+  ordinal: { x: CARD_SIZE.width - 96 - 50, y: 548, width: 50, height: 48 },
+  title: { x: 104, y: 542, width: 448, height: 66 },
+  intent: { x: 104, y: 654, width: 560, height: 40 },
+  description: { x: 104, y: 702, width: 560, height: 136 },
+  warning: { x: 104, y: 842, width: 560, height: 32 },
 };
 
 /**
@@ -130,12 +141,13 @@ export const CARD_COPY_FONT_SIZES = {
   cpBadge: 48,
   ordinal: 48,
   intent: 32,
-  description: 48,
+  description: 42,
+  warning: 26,
 } as const;
 
 export const CARD_COPY_LINE_HEIGHTS = {
   title: 54,
-  description: 56,
+  description: 48,
 } as const;
 
 /**
@@ -165,12 +177,14 @@ export const CARD_FAN_HEIGHT = CARD_SIZE.height * CARD_FAN_SCALE;
 
 export const CARD_REST_REVEAL_RATIO = 0.2;
 export const CARD_HOVER_REVEAL_RATIO = 0.4;
+export const CARD_SELECTED_REVEAL_RATIO = 1;
 
 export interface CardHandSlot {
   readonly index: number;
   readonly x: number;
   readonly restY: number;
   readonly hoverY: number;
+  readonly selectedY: number;
   readonly rotation: number;
 }
 
@@ -205,6 +219,7 @@ export function layoutCardHand(
   const spacing = options.spacing ?? Math.round(cardWidth * 0.84);
   const restY = panelBottom - cardRevealHeight(CARD_REST_REVEAL_RATIO, cardHeight);
   const hoverY = panelBottom - cardRevealHeight(CARD_HOVER_REVEAL_RATIO, cardHeight);
+  const selectedY = panelBottom - cardRevealHeight(CARD_SELECTED_REVEAL_RATIO, cardHeight);
   const span = count === 0 ? 0 : (count - 1) * spacing + cardWidth;
   const startX = Math.round((stageWidth - span) / 2);
   const centre = (count - 1) / 2;
@@ -214,6 +229,7 @@ export function layoutCardHand(
     x: startX + index * spacing,
     restY,
     hoverY,
+    selectedY,
     rotation: Number(((index - centre) * 0.02).toFixed(4)),
   }));
 }
@@ -287,9 +303,8 @@ export function cardLayerZIndex(layer: CardLayerId): number {
   return CARD_LAYER_Z_INDEX[layer];
 }
 
-/** Copy and the lock overlay sit above every raster layer, in that order. */
-export const CARD_COPY_Z_INDEX = 5;
-export const CARD_LOCK_Z_INDEX = 6;
+/** The lock is the first state overlay above the authored eight-layer face. */
+export const CARD_LOCK_Z_INDEX = 8;
 
 export interface CardDropTargetBounds {
   readonly x: number;

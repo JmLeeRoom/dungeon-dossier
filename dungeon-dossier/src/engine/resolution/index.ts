@@ -1,5 +1,6 @@
 export * from './ActionValidator';
 export * from './ArgumentResolver';
+export * from './ConfrontationResolver';
 export * from './DomainAdapters';
 export * from './EvidenceRelationEvaluator';
 export * from './IndependenceEvaluator';

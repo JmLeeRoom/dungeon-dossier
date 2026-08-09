@@ -1,4 +1,5 @@
 import { Container, Graphics } from 'pixi.js';
+import { createSceneShake, dampedShakeOffset, type ShakeProfile } from '../core/shake';
 import { createPixelText } from '../core/pixelText';
 import { UI_PALETTE } from './theme';
 
@@ -56,6 +57,67 @@ export interface GaugeOptions {
   readonly sweetSpotMax?: number;
   readonly label?: string;
   readonly cellCount?: number;
+}
+
+/**
+ * A gauge that can react to the change it just displayed.
+ *
+ * `playImpact()` is called by the screen only when the value moved in the
+ * direction that hurts — composure falling, coercion rising — so a heal and a
+ * first mount stay still. The shake is local to the bar: the full-screen punish
+ * juice is a separate, louder beat and the two must not double up.
+ */
+export interface GaugeController {
+  readonly view: Container;
+  /** True while an impact shake is still running. */
+  readonly shaking: boolean;
+  playImpact(): void;
+  update(deltaMS: number): void;
+  destroy(): void;
+}
+
+export const GAUGE_IMPACT_PROFILE: ShakeProfile = {
+  durationMs: 200,
+  amplitude: 6,
+  oscillations: 4,
+};
+
+export function gaugeImpactOffset(elapsedMs: number): number {
+  return dampedShakeOffset(elapsedMs, GAUGE_IMPACT_PROFILE);
+}
+
+/**
+ * Wraps a drawn gauge so the bar itself can register a hit. The returned
+ * container is the one the screen positions; the shake moves it and always
+ * returns it to wherever that was.
+ */
+export function createGaugeController(
+  value: number,
+  max: number,
+  options: GaugeOptions = {},
+): GaugeController {
+  const view = createGauge(value, max, options);
+  let shake = createSceneShake(view, GAUGE_IMPACT_PROFILE);
+  return {
+    view,
+    get shaking(): boolean {
+      return shake.active;
+    },
+    playImpact(): void {
+      // Restarting from the current rest position keeps rapid consecutive hits
+      // from walking the bar off its anchor.
+      shake.release();
+      shake = createSceneShake(view, GAUGE_IMPACT_PROFILE);
+      shake.play();
+    },
+    update(deltaMS): void {
+      shake.update(deltaMS);
+    },
+    destroy(): void {
+      shake.release();
+      view.destroy({ children: true });
+    },
+  };
 }
 
 export function createGauge(value: number, max: number, options: GaugeOptions = {}): Container {

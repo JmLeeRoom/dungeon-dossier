@@ -17,9 +17,12 @@ export const ENCOUNTER_STATES = [
   'APPLY_EFFECTS',
   'RENDER_REACTION',
   'RUN_MODIFIERS',
+  'SETTLE_TURN',
   'CHECK_FLOW_TRANSITION',
   'CHECK_OBJECTIVES',
   'CHECK_OUTCOME',
+  'AWAIT_SECURE_DECISION',
+  'PRESENT_PENDING_FLOW',
   'ENCOUNTER_COMPLETE',
   'FAILED',
 ] as const;
@@ -43,10 +46,21 @@ export const ENCOUNTER_EVENTS = [
   'EFFECTS_APPLIED',
   'REACTION_RENDERED',
   'MODIFIERS_APPLIED',
+  'TURN_SETTLED',
   'STAY_IN_FLOW',
   'ENTER_NEXT_FLOW',
+  'FLOW_LOGIC_COMMITTED',
+  'NO_FLOW',
   'OBJECTIVES_CHECKED',
   'CONTINUE',
+  'OFFER_SECURE',
+  'CONTINUE_NO_FLOW',
+  'CONTINUE_WITH_FLOW',
+  'SECURE_STATEMENT',
+  'DECLINE_NO_FLOW',
+  'DECLINE_WITH_FLOW',
+  'DECLINE_AND_COMPLETE',
+  'FLOW_PRESENTATION_STARTED',
   'COMPLETE_ENCOUNTER',
   'FAIL_ENCOUNTER',
 ] as const;
@@ -70,8 +84,10 @@ const LINEAR_TRANSITIONS: Readonly<
   RESOLVE: ['RESOLUTION_READY', 'APPLY_EFFECTS'],
   APPLY_EFFECTS: ['EFFECTS_APPLIED', 'RENDER_REACTION'],
   RENDER_REACTION: ['REACTION_RENDERED', 'RUN_MODIFIERS'],
-  RUN_MODIFIERS: ['MODIFIERS_APPLIED', 'CHECK_FLOW_TRANSITION'],
+  RUN_MODIFIERS: ['MODIFIERS_APPLIED', 'SETTLE_TURN'],
+  SETTLE_TURN: ['TURN_SETTLED', 'CHECK_FLOW_TRANSITION'],
   CHECK_OBJECTIVES: ['OBJECTIVES_CHECKED', 'CHECK_OUTCOME'],
+  PRESENT_PENDING_FLOW: ['FLOW_PRESENTATION_STARTED', 'RENDER_STATEMENT'],
 };
 
 /** Pure reducer: invalid transitions are explicit failures, never fallbacks. */
@@ -87,12 +103,36 @@ export function transitionEncounter(
   if (linear?.[0] === event) return linear[1];
 
   if (state === 'CHECK_FLOW_TRANSITION') {
+    // STAY_IN_FLOW / ENTER_NEXT_FLOW are the legacy pre-v2 flow events. The
+    // P0-3B atomic Submit replaces them with a pure plan + logical commit
+    // (FLOW_LOGIC_COMMITTED / NO_FLOW) and deletes the legacy pair.
     if (event === 'ENTER_NEXT_FLOW') return 'ENTER_FLOW_NODE';
     if (event === 'STAY_IN_FLOW') return 'CHECK_OBJECTIVES';
+    if (event === 'FLOW_LOGIC_COMMITTED') return 'CHECK_OBJECTIVES';
+    if (event === 'NO_FLOW') return 'CHECK_OBJECTIVES';
   }
 
   if (state === 'CHECK_OUTCOME') {
+    // CONTINUE is the legacy endTurn() event; P0-3B removes it together with
+    // the public endTurn() action in favor of the explicit CONTINUE_* pair.
     if (event === 'CONTINUE') return 'TURN_START';
+    if (event === 'OFFER_SECURE') return 'AWAIT_SECURE_DECISION';
+    if (event === 'CONTINUE_NO_FLOW') return 'TURN_START';
+    if (event === 'CONTINUE_WITH_FLOW') return 'PRESENT_PENDING_FLOW';
+    if (event === 'COMPLETE_ENCOUNTER') return 'ENCOUNTER_COMPLETE';
+    if (event === 'FAIL_ENCOUNTER') return 'FAILED';
+  }
+
+  if (state === 'AWAIT_SECURE_DECISION') {
+    if (event === 'SECURE_STATEMENT') return 'ENCOUNTER_COMPLETE';
+    if (event === 'DECLINE_NO_FLOW') return 'TURN_START';
+    if (event === 'DECLINE_WITH_FLOW') return 'PRESENT_PENDING_FLOW';
+    if (event === 'DECLINE_AND_COMPLETE') return 'ENCOUNTER_COMPLETE';
+  }
+
+  if (state === 'TURN_START') {
+    // ON_TURN_START_PRE_DRAW can create a terminal threshold fact, so the
+    // machine must be able to finish an encounter from TURN_START directly.
     if (event === 'COMPLETE_ENCOUNTER') return 'ENCOUNTER_COMPLETE';
     if (event === 'FAIL_ENCOUNTER') return 'FAILED';
   }
@@ -172,7 +212,11 @@ export type DesignTurnStep = (typeof DESIGN_TURN_STEPS)[number];
 export const TURN_STATE_MAPPING: Readonly<
   Record<DesignTurnStep, readonly EncounterState[]>
 > = Object.freeze({
-  STATEMENT: Object.freeze(['ENTER_FLOW_NODE', 'RENDER_STATEMENT'] as const),
+  STATEMENT: Object.freeze([
+    'ENTER_FLOW_NODE',
+    'RENDER_STATEMENT',
+    'PRESENT_PENDING_FLOW',
+  ] as const),
   TAG_REFRESH: Object.freeze(['EMIT_PUBLIC_DTO'] as const),
   SHIELD: Object.freeze(['TURN_START'] as const),
   DOSSIER_REVIEW: Object.freeze(['FREE_REVIEW'] as const),
@@ -180,9 +224,11 @@ export const TURN_STATE_MAPPING: Readonly<
   JUDGMENT: Object.freeze(['RESOLVE', 'APPLY_EFFECTS'] as const),
   ENEMY_RESPONSE: Object.freeze(['RENDER_REACTION', 'RUN_MODIFIERS'] as const),
   END_CHECK: Object.freeze([
+    'SETTLE_TURN',
     'CHECK_FLOW_TRANSITION',
     'CHECK_OBJECTIVES',
     'CHECK_OUTCOME',
+    'AWAIT_SECURE_DECISION',
   ] as const),
 });
 

@@ -6,7 +6,7 @@ export function createTitleScreen(dto: PublicDTO): Container {
   const backdrop = new Graphics().rect(0, 0, 640, 400).fill(0x11131d);
   const frame = new Graphics().rect(24, 24, 592, 352).stroke({ color: 0x77d8d0, width: 2 });
   const title = new Text({
-    text: '던전 수사 조서',
+    text: '던전 탐정 김태훈',
     style: {
       fill: 0xf4e7c5,
       fontFamily: 'monospace',

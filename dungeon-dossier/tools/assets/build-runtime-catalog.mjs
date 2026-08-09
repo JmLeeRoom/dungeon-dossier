@@ -44,8 +44,14 @@ const BUNDLE_RULES = [
   { prefix: "bg/event/crazyboard", bundles: ["board"] },
   { prefix: "bg/event/dead", bundles: ["result"] },
   { prefix: "bg/event/", bundles: ["event"] },
+  { prefix: "bg/story/", bundles: ["event"] },
   { prefix: "idle/coffee/", bundles: ["interrogation"] },
   { prefix: "idle/", bundles: ["interrogation"] },
+  // Title menu plates load before anything else has a route.
+  { prefix: "ui/start/", bundles: ["core"] },
+  { prefix: "ui/load/", bundles: ["core"] },
+  { prefix: "ui/options/", bundles: ["core"] },
+  { prefix: "ui/quit/", bundles: ["core"] },
   { prefix: "ui/board/", bundles: ["board"] },
   { prefix: "ui/photo/", bundles: ["board"] },
   { prefix: "ui/pin/", bundles: ["board"] },
@@ -54,6 +60,7 @@ const BUNDLE_RULES = [
   { prefix: "ui/card_stamp/", bundles: ["interrogation"] },
   { prefix: "ui/card/", bundles: ["interrogation"] },
   { prefix: "ui/tag/", bundles: ["interrogation"] },
+  { prefix: "ui/icon_cp/", bundles: ["interrogation"] },
   { prefix: "ui/icon/", bundles: ["interrogation"] },
   { prefix: "ui/debuff/", bundles: ["interrogation"] },
   { prefix: "ui/system/", bundles: ["interrogation"] },
@@ -159,7 +166,10 @@ export async function buildRuntimeCatalog(options = {}) {
       status: nhn !== undefined || key === "placeholder/missing/fallback" ? "active" : "legacy-fallback",
       palettePolicy: nhn === undefined ? "strict16" : "approved-production",
       sha256: metadata.sha256,
-      ...(nhn === undefined ? {} : { sourceWorkbookRow: nhn.workbookRow, sourcePath: nhn.sourcePath }),
+      // Provenance is the source path; the workbook row is only present for
+      // files the naming sheet covered at the time it was written.
+      ...(nhn === undefined ? {} : { sourcePath: nhn.sourcePath }),
+      ...(nhn?.workbookRow === undefined ? {} : { sourceWorkbookRow: nhn.workbookRow }),
     });
   }
 
@@ -196,9 +206,11 @@ function serializeCatalog(catalog) {
       `palettePolicy: ${JSON.stringify(entry.palettePolicy)}`,
       `sha256: ${JSON.stringify(entry.sha256)}`,
     ];
+    if (entry.sourcePath !== undefined) {
+      fields.push(`sourcePath: ${JSON.stringify(entry.sourcePath)}`);
+    }
     if (entry.sourceWorkbookRow !== undefined) {
       fields.push(`sourceWorkbookRow: ${entry.sourceWorkbookRow}`);
-      fields.push(`sourcePath: ${JSON.stringify(entry.sourcePath)}`);
     }
     return `  {\n${fields.map((field) => `    ${field},`).join("\n")}\n  },`;
   });

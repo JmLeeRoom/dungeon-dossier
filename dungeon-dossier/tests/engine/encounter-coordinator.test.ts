@@ -76,6 +76,18 @@ const CASE = CaseSchema.parse({
         contradicting_events: [],
       },
     },
+    ...(['WHEN', 'WHERE', 'WHAT', 'HOW', 'WHY'] as const).map((facet) => ({
+      claim_id: `clm_coordinator_${facet.toLowerCase()}`,
+      speaker: 'ent_coordinator_suspect',
+      facet,
+      canonical_meaning: `Coordinator ${facet} statement.`,
+      predicate: `COORDINATOR_${facet}`,
+      initial: { commitment: 'ASSERTED' as const, presentation: 'NORMAL' as const },
+      truth: {
+        relation: 'UNVERIFIABLE' as const,
+        contradicting_events: [],
+      },
+    })),
   ],
   inquiry_routes: [],
   evidence: [
@@ -169,13 +181,23 @@ const CASE = CaseSchema.parse({
         cp_per_turn: 3,
         cp_max: 3,
         coercion_limit: 100,
-        shields_per_round: 0,
+        shields_per_round: 2,
       },
       rounds: [
         {
           round_id: 'round_coordinator_one',
-          statement_claims: ['clm_coordinator_main'],
-          shields: [],
+          statement_claims: [
+            'clm_coordinator_main',
+            'clm_coordinator_when',
+            'clm_coordinator_where',
+            'clm_coordinator_what',
+            'clm_coordinator_how',
+            'clm_coordinator_why',
+          ],
+          shields: [
+            { claim_id: 'clm_coordinator_main', durability: 1 },
+            { claim_id: 'clm_coordinator_why', durability: 1 },
+          ],
         },
       ],
       flow_nodes: [
@@ -384,16 +406,19 @@ describe('EncounterCoordinator', () => {
       ...CASE,
       encounters: CASE.encounters.map((encounter) => ({
         ...encounter,
-        resources: { ...encounter.resources, shields_per_round: 1 },
+        resources: { ...encounter.resources, shields_per_round: 2 },
         rounds: encounter.rounds.map((round) => ({
           ...round,
-          shields: [{ claim_id: 'clm_coordinator_main', durability: 3 }],
+          shields: [
+            { claim_id: 'clm_coordinator_main', durability: 1 },
+            { claim_id: 'clm_coordinator_why', durability: 1 },
+          ],
         })),
       })),
     });
 
     expect(begin(shieldedCase).snapshot.claims.clm_coordinator_main?.resistance)
-      .toBe(3);
+      .toBe(1);
   });
 
   it('G-C1: completes a headless encounter through explicit BEST confirmation', () => {
@@ -601,6 +626,11 @@ describe('EncounterCoordinator', () => {
     const initialDto = publicDto(coordinator);
     expect(initialDto.statement.map((claim) => claim.claimId)).toEqual([
       'clm_coordinator_main',
+      'clm_coordinator_when',
+      'clm_coordinator_where',
+      'clm_coordinator_what',
+      'clm_coordinator_how',
+      'clm_coordinator_why',
     ]);
     expect(initialDto.evidence.map((evidence) => evidence.evidenceId)).toEqual([
       'ev_coordinator_entry_log',

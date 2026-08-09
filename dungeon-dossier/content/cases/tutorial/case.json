@@ -142,7 +142,7 @@
       "predicate": "NO_MOTIVE",
       "initial": { "commitment": "ASSERTED", "presentation": "NORMAL" },
       "resistance": 2,
-      "truth": { "relation": "UNVERIFIABLE", "contradicting_events": [] }
+      "truth": { "relation": "CONSISTENT_WITH_WORLD", "contradicting_events": [] }
     },
     {
       "claim_id": "clm_tutorial_slime_where",
@@ -233,7 +233,7 @@
       "initial": { "commitment": "ASSERTED", "presentation": "NORMAL" },
       "resistance": 2,
       "is_required": false,
-      "truth": { "relation": "PARTIALLY_TRUE", "contradicting_events": [] }
+      "truth": { "relation": "CONSISTENT_WITH_WORLD", "contradicting_events": [] }
     },
     {
       "claim_id": "clm_tutorial_harpy_why",
@@ -500,7 +500,8 @@
           "scopes": ["LOCATION", "PRESENCE"],
           "detail": {},
           "confidence": 1,
-          "contradicts_claim_ids": ["clm_tutorial_where"]
+          "contradicts_claim_ids": ["clm_tutorial_where"],
+          "supports_claim_ids": ["clm_tutorial_harpy_what"]
         }
       ],
       "not_proven_keys": ["evidence.tutorial.corridor_photo.not_motive"]
@@ -556,7 +557,8 @@
           "scopes": ["ACTION", "OWNERSHIP"],
           "detail": {},
           "confidence": 0.9,
-          "contradicts_claim_ids": ["clm_tutorial_what"]
+          "contradicts_claim_ids": ["clm_tutorial_what"],
+          "supports_claim_ids": ["clm_tutorial_why"]
         }
       ],
       "not_proven_keys": ["evidence.tutorial.locker_inventory.not_intent"]
@@ -683,6 +685,30 @@
         "require_integrity": true
       },
       "guaranteed_evidence_sets": [["ev_tutorial_handle_forensics"]]
+    },
+    {
+      "rule_id": "rule_tutorial_harpy_what_support",
+      "target_claim_id": "clm_tutorial_harpy_what",
+      "direction": "SUPPORT",
+      "requirements": {
+        "required_scopes": ["LOCATION", "PRESENCE"],
+        "minimum_confidence": 0.8,
+        "minimum_independent_sources": 1,
+        "require_integrity": true
+      },
+      "guaranteed_evidence_sets": [["ev_tutorial_corridor_photo"]]
+    },
+    {
+      "rule_id": "rule_tutorial_why_support",
+      "target_claim_id": "clm_tutorial_why",
+      "direction": "SUPPORT",
+      "requirements": {
+        "required_scopes": ["ACTION", "OWNERSHIP"],
+        "minimum_confidence": 0.8,
+        "minimum_independent_sources": 1,
+        "require_integrity": true
+      },
+      "guaranteed_evidence_sets": [["ev_tutorial_locker_inventory"]]
     }
   ],
   "encounters": [
@@ -694,7 +720,7 @@
         "cp_per_turn": 3,
         "cp_max": 3,
         "coercion_limit": 100,
-        "shields_per_round": 1
+        "shields_per_round": 2
       },
       "rounds": [
         {
@@ -707,7 +733,10 @@
             "clm_tutorial_slime_how",
             "clm_tutorial_slime_why"
           ],
-          "shields": [{ "claim_id": "clm_tutorial_who", "durability": 2 }]
+          "shields": [
+            { "claim_id": "clm_tutorial_who", "durability": 1 },
+            { "claim_id": "clm_tutorial_when", "durability": 1 }
+          ]
         }
       ],
       "flow_nodes": [
@@ -804,7 +833,7 @@
         "cp_per_turn": 3,
         "cp_max": 3,
         "coercion_limit": 100,
-        "shields_per_round": 1
+        "shields_per_round": 2
       },
       "rounds": [
         {
@@ -817,7 +846,10 @@
             "clm_tutorial_how",
             "clm_tutorial_harpy_why"
           ],
-          "shields": [{ "claim_id": "clm_tutorial_where", "durability": 1 }]
+          "shields": [
+            { "claim_id": "clm_tutorial_where", "durability": 1 },
+            { "claim_id": "clm_tutorial_harpy_what", "durability": 1 }
+          ]
         }
       ],
       "flow_nodes": [
@@ -844,7 +876,7 @@
       "modifiers": [
         {
           "modifier_id": "mod_tutorial_harpy_recall_qte",
-          "trigger": "ON_TURN_START",
+          "trigger": "ON_TURN_START_PRE_DRAW",
           "condition": null,
           "effect": {
             "type": "TRIGGER_QTE",
@@ -903,7 +935,7 @@
         "cp_per_turn": 3,
         "cp_max": 3,
         "coercion_limit": 100,
-        "shields_per_round": 1
+        "shields_per_round": 2
       },
       "rounds": [
         {
@@ -912,17 +944,29 @@
             "clm_tutorial_minotaur_who",
             "clm_tutorial_minotaur_when",
             "clm_tutorial_minotaur_where",
-            "clm_tutorial_what"
+            "clm_tutorial_what",
+            "clm_tutorial_minotaur_how",
+            "clm_tutorial_why"
           ],
-          "shields": [{ "claim_id": "clm_tutorial_what", "durability": 1 }]
+          "shields": [
+            { "claim_id": "clm_tutorial_what", "durability": 1 },
+            { "claim_id": "clm_tutorial_why", "durability": 1 }
+          ]
         },
         {
           "round_id": "round_tutorial_minotaur_02",
           "statement_claims": [
+            "clm_tutorial_minotaur_who",
+            "clm_tutorial_minotaur_when",
+            "clm_tutorial_minotaur_where",
+            "clm_tutorial_what",
             "clm_tutorial_minotaur_how",
             "clm_tutorial_why"
           ],
-          "shields": [{ "claim_id": "clm_tutorial_minotaur_how", "durability": 1 }]
+          "shields": [
+            { "claim_id": "clm_tutorial_minotaur_who", "durability": 1 },
+            { "claim_id": "clm_tutorial_why", "durability": 1 }
+          ]
         }
       ],
       "flow_nodes": [

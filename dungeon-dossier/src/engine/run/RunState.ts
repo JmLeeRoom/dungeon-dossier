@@ -321,6 +321,11 @@ export interface RunEventCompletion {
   readonly placementResult?: PlacementEventResult;
   /** Structural transitions this completion produced. */
   readonly progression: readonly RunProgressionEvent[];
+  /**
+   * Present when the event itself ended the run. The caller routes to the
+   * defeat screen instead of the next node.
+   */
+  readonly failureReason?: 'STRESS_DEPLETED';
 }
 
 function assertUint32(name: string, value: number): void {
@@ -579,6 +584,16 @@ export function completeEncounterNode(
     appliedFlags: flagResult.applied,
     progression: episodeProgress.progression,
   };
+}
+
+/**
+ * HP is the run's own life, not an interrogation resource, so it has to be
+ * judged wherever it can reach zero — an event cost drains it just as a lost
+ * interrogation does. Returning the reason rather than a boolean keeps the
+ * defeat screen data-driven.
+ */
+export function evaluateRunFailure(state: RunState): 'STRESS_DEPLETED' | undefined {
+  return state.stress <= 0 ? 'STRESS_DEPLETED' : undefined;
 }
 
 function applyRunCost(state: RunState, cost: Cost | undefined): RunState {
@@ -1011,6 +1026,9 @@ export function completeEventNode(
     node,
     nodeIndex,
   );
+  // An event that spent the last of the detective's HP ends the run here. The
+  // strip having more nodes left is irrelevant: there is nobody to walk them.
+  const failure = evaluateRunFailure(appliedEvent.state);
   return {
     state: {
       ...appliedEvent.state,
@@ -1020,8 +1038,9 @@ export function completeEventNode(
       activeEpisodeId: episodeProgress.activeEpisodeId,
       unlockedEpisodeIds: episodeProgress.unlockedEpisodeIds,
       completedEpisodeIds: episodeProgress.completedEpisodeIds,
-      terminal: isRunStripComplete(input.strip, nodeIndex),
+      terminal: failure !== undefined || isRunStripComplete(input.strip, nodeIndex),
     },
+    ...(failure === undefined ? {} : { failureReason: failure }),
     appliedFlags: flagResult.applied,
     progression: episodeProgress.progression,
     ...(appliedEvent.placementResult === undefined

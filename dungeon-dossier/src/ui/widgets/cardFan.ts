@@ -119,16 +119,24 @@ export function createCardFan(
   let dragging = false;
   let dragOrigin: CardPoint = { x: 0, y: 0 };
   let highlightedTargetId: string | undefined;
+  let pressWasSelected = false;
   let destroyed = false;
   let focusTimer: ReturnType<typeof globalThis.setTimeout> | undefined;
 
   const applyLayout = (): void => {
     entries.forEach((entry, index) => {
-      const lifted = index === hoveredIndex || index === dragIndex;
-      entry.view.position.set(entry.slot.x, lifted ? entry.slot.hoverY : entry.slot.restY);
+      const selected = entry.card.cardId === selectedId;
+      const transientLift = index === hoveredIndex || index === dragIndex;
+      const lifted = selected || transientLift;
+      const y = selected
+        ? entry.slot.selectedY
+        : transientLift
+          ? entry.slot.hoverY
+          : entry.slot.restY;
+      entry.view.position.set(entry.slot.x, y);
       entry.view.rotation = lifted ? 0 : entry.slot.rotation;
-      entry.view.zIndex = lifted ? 100 : index;
-      drawOutline(entry.outline, lifted, entry.card.cardId === selectedId);
+      entry.view.zIndex = selected ? 101 : transientLift ? 100 : index;
+      drawOutline(entry.outline, transientLift, selected);
     });
   };
 
@@ -141,6 +149,7 @@ export function createCardFan(
   const resetDrag = (): void => {
     dragIndex = undefined;
     dragging = false;
+    pressWasSelected = false;
     hoveredIndex = undefined;
     link.clear();
     setHighlight(undefined);
@@ -152,10 +161,11 @@ export function createCardFan(
     if (activeIndex === undefined) return;
     const activeEntry = entries[activeIndex];
     const wasDragging = dragging;
+    const shouldFocus = pressWasSelected;
     const point = view.toLocal(event.global);
     resetDrag();
     if (activeEntry === undefined) return;
-    if (!wasDragging) {
+    if (!wasDragging && shouldFocus) {
       // Adding the modal during pointerup lets the remainder of that same
       // federated click reach its dismissing backdrop. Wait until the release
       // dispatch has completely unwound.
@@ -185,6 +195,9 @@ export function createCardFan(
         cpCost: card.cpCost,
         description: card.description,
         ordinal: index + 1,
+        ...(card.combat === undefined ? {} : { roleLabel: card.combat.roleLabel }),
+        ...(card.warningLabels === undefined ? {} : { warningLabels: card.warningLabels }),
+        ...(card.affordable === undefined ? {} : { affordable: card.affordable }),
         ...(card.locked === undefined ? {} : { locked: card.locked }),
         ...(card.lockTurnsRemaining === undefined
           ? {}
@@ -202,6 +215,7 @@ export function createCardFan(
       },
     );
     artwork.view.scale.set(CARD_FAN_SCALE);
+    artwork.view.alpha = card.affordable === false ? 0.58 : 1;
     return artwork.view;
   };
 
@@ -229,6 +243,8 @@ export function createCardFan(
       applyLayout();
     });
     cardView.on('pointerdown', (event: FederatedPointerEvent) => {
+      pressWasSelected = selectedId === card.cardId;
+      selectedId = card.cardId;
       dragIndex = index;
       dragging = false;
       dragOrigin = { x: event.global.x, y: event.global.y };

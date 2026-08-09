@@ -1,5 +1,5 @@
 import type { ZodType } from 'zod';
-import { CaseSchema, DialogueSchema } from '../../content-io/schemas';
+import { CaseObjectSchema, DialogueSchema } from '../../content-io/schemas';
 import {
   SchemaValidator,
   validateTier1Case,
@@ -34,7 +34,7 @@ export interface LiveValidationOptions {
 
 type JsonObject = Record<string, unknown>;
 
-const CaseWithoutDialogueSchema = CaseSchema.omit({ dialogue: true });
+const CaseWithoutDialogueSchema = CaseObjectSchema.omit({ dialogue: true });
 
 function asObject(value: unknown): JsonObject | undefined {
   return value !== null && typeof value === 'object' && !Array.isArray(value)

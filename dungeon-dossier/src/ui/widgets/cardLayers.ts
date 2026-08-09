@@ -1,20 +1,32 @@
 /**
- * Presentation-owned description of the five composited card layers. Engine
+ * Presentation-owned description of the eight composited card layers. Engine
  * card modifiers are projected into this deliberately small shape before the
  * renderer sees them; the UI never imports engine attachment helpers.
  */
-export const CARD_LAYER_IDS = ['base', 'illust', 'stamp', 'post', 'evidence'] as const;
+export const CARD_LAYER_IDS = [
+  'base',
+  'cost',
+  'name',
+  'ability',
+  'illust',
+  'stamp',
+  'post',
+  'evidence',
+] as const;
 export type CardLayerId = (typeof CARD_LAYER_IDS)[number];
 
 export const CARD_LAYER_Z_INDEX: Readonly<Record<CardLayerId, number>> = {
   base: 0,
-  illust: 1,
-  stamp: 2,
-  post: 3,
-  evidence: 4,
+  cost: 1,
+  name: 2,
+  ability: 3,
+  illust: 4,
+  stamp: 5,
+  post: 6,
+  evidence: 7,
 };
 
-export const CARD_PERMANENT_LAYER_IDS = ['base', 'illust'] as const;
+export const CARD_PERMANENT_LAYER_IDS = ['base', 'cost', 'name', 'ability', 'illust'] as const;
 export const CARD_ATTACHABLE_LAYER_IDS = ['stamp', 'post', 'evidence'] as const;
 export const DEFAULT_MAX_CARD_EVIDENCE = 3;
 
@@ -97,6 +109,9 @@ export function buildCardLayerStack(
 ): readonly CardLayerSlot[] {
   const slots: CardLayerSlot[] = [
     { layer: 'base', zIndex: CARD_LAYER_Z_INDEX.base, attachmentId: undefined },
+    { layer: 'cost', zIndex: CARD_LAYER_Z_INDEX.cost, attachmentId: undefined },
+    { layer: 'name', zIndex: CARD_LAYER_Z_INDEX.name, attachmentId: undefined },
+    { layer: 'ability', zIndex: CARD_LAYER_Z_INDEX.ability, attachmentId: undefined },
     { layer: 'illust', zIndex: CARD_LAYER_Z_INDEX.illust, attachmentId: undefined },
   ];
   if (attachments.stampId !== undefined) {

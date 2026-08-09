@@ -14,12 +14,13 @@ export interface IntegerViewport {
 }
 
 export function calculateIntegerViewport(containerWidth: number, containerHeight: number): IntegerViewport {
-  const availableScale = Math.floor(
-    Math.min(containerWidth / INTERNAL_WIDTH, containerHeight / INTERNAL_HEIGHT),
+  const availableScale = Math.min(
+    containerWidth / INTERNAL_WIDTH,
+    containerHeight / INTERNAL_HEIGHT,
   );
-  const renderScale = availableScale >= DEFAULT_TARGET_SCALE
-    ? DEFAULT_TARGET_SCALE
-    : Math.max(1, availableScale);
+  // Keep the authored 2x ceiling, but scale continuously below 800px tall.
+  // A 720p viewport therefore displays at 1.8x instead of collapsing to 1x.
+  const renderScale = Math.min(DEFAULT_TARGET_SCALE, Math.max(1, availableScale));
   const width = INTERNAL_WIDTH * renderScale;
   const height = INTERNAL_HEIGHT * renderScale;
 

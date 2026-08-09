@@ -25,6 +25,9 @@ import type {
 import {
   EncounterCoordinator,
   type EncounterCoordinatorDeps,
+  type EncounterIdentityDeps,
+  type EncounterPresentationFrame,
+  type EncounterTurnLoopMode,
 } from '../engine/encounter';
 import { RESOLUTION_CODES } from '../engine/resolution';
 import { createRngState } from '../engine/rng';
@@ -36,12 +39,24 @@ import {
   CARD_ILLUSTRATION_ASSET_KEYS,
   CARD_LOCK_OVERLAY_ASSET_KEY,
   CARD_LOCKED_ILLUSTRATION_ASSET_KEY,
+  CP_PIP_ASSET_KEYS,
   EVIDENCE_ASSET_KEYS,
   PARTNER_ASSET_SET,
   PARTNER_USED_ASSET_KEY,
   interrogationBackgroundAssetKey,
   suspectAssetSet,
 } from './uiAssetBindings';
+
+const CARD_ROLE_LABELS = {
+  BASIC_JAB: '기본 잽',
+  MENTAL_CONTROL: '멘탈 조절',
+  FINISHER: '주력기',
+  PHYSICAL_COERCION: '물리/강압',
+} as const;
+
+const CARD_WARNING_LABELS: Readonly<Record<string, string>> = {
+  HOT_TEMPER_RISK: '주의: 다혈질·진실 공격 위험',
+};
 
 interface CaseLoader {
   load(caseDirectory: string): Promise<CaseDefinition | undefined>;
@@ -80,6 +95,10 @@ export interface CreateEncounterSessionOptions {
   readonly enhancementDefinitions?: readonly EnhancementDefinition[];
   /** Extra encounter-start effects, e.g. owned relics with ENCOUNTER_START activation. */
   readonly extraInitialEffects?: readonly Effect[];
+  /** P0-3/P0-4 gate: 'V2_ATOMIC' turns on the atomic Submit loop. */
+  readonly turnLoop?: EncounterTurnLoopMode;
+  readonly identity?: EncounterIdentityDeps;
+  readonly contentRevision?: string;
 }
 
 export interface EncounterSession {
@@ -92,7 +111,8 @@ export interface EncounterSession {
   readonly speakerProfile: SpeakerProfile;
   applyBalance(balance: BalanceDefinition): void;
   usePartnerSkill(skillId?: string): PartnerCooldownView;
-  currentModel(): InterrogationScreenModel;
+  currentModel(frame?: EncounterPresentationFrame): InterrogationScreenModel;
+  modelForFrame(frame: EncounterPresentationFrame): InterrogationScreenModel;
   targetClaimIdForFacet(facet: Facet): string | undefined;
 }
 
@@ -269,13 +289,38 @@ export async function createEncounterSession(
     })),
   ];
 
+  const runSeed = options.runSeed ?? 2_026_080_3;
   const deps: EncounterCoordinatorDeps = {
     caseDefinition: loadedCase,
     encounterId,
     cards: loadedCards.cards,
     balance: loadedBalance,
-    rng: createRngState(options.runSeed ?? 2_026_080_3, 'DECK_SHUFFLE'),
+    rng: createRngState(runSeed, 'DECK_SHUFFLE'),
+    ...(options.turnLoop !== 'V2_ATOMIC'
+      ? {}
+      : {
+          cardDrawRng: createRngState(runSeed, 'CARD_DRAW'),
+          drawSlots: (loadedCards.initial_deck ?? loadedCards.cards.flatMap(
+            (card) => Array.from(
+              { length: card.starting_copies },
+              () => card.card_id,
+            ),
+          )).filter(
+            (blueprintId, index, blueprintIds) =>
+              blueprintIds.indexOf(blueprintId) === index,
+          ).slice(0, 5).map(
+            (blueprintId, index) => ({
+              slotId: `basic-${index + 1}`,
+              blueprintId,
+            }),
+          ),
+        }),
     resolutionEffectSources,
+    ...(options.turnLoop === undefined ? {} : { turnLoop: options.turnLoop }),
+    ...(options.identity === undefined ? {} : { identity: options.identity }),
+    ...(options.contentRevision === undefined
+      ? {}
+      : { contentRevision: options.contentRevision }),
     acquiredEvidenceIds: [
       ...(runState?.acquiredEvidenceIds ?? []),
       ...(options.acquiredEvidenceIds ?? []),
@@ -341,14 +386,20 @@ export async function createEncounterSession(
       return coordinator.usePartnerSkill(skillId ?? options.partnerSkillId);
     },
     targetClaimIdForFacet(facet) {
+      const activeClaimId = coordinator.snapshot.claimIdByFacet?.[facet];
+      if (activeClaimId !== undefined) return activeClaimId;
       return loadedCase.claims.find(
         (claim) => encounterClaimIds.has(claim.claim_id) && claim.facet === facet,
       )?.claim_id;
     },
-    currentModel() {
-      const snapshot = coordinator.snapshot;
+    modelForFrame(frame) {
+      return this.currentModel(frame);
+    },
+    currentModel(frame) {
+      const snapshot = frame?.snapshot ?? coordinator.snapshot;
+      const knowledge = frame?.knowledge ?? coordinator.knowledge;
       const sourceDto = toPublicDTO({
-        knowledge: coordinator.knowledge,
+        knowledge,
         resources: {
           composure: snapshot.resources.composure,
           coercion: snapshot.resources.coercion,
@@ -362,9 +413,14 @@ export async function createEncounterSession(
           completed: objective.completed,
         })),
       });
+      const activeEncounterClaimIds = snapshot.claimIdByFacet === undefined
+        ? encounterClaimIds
+        : new Set(Object.values(snapshot.claimIdByFacet));
       const dto: PublicDTO = {
         ...sourceDto,
-        statement: sourceDto.statement.filter((claim) => encounterClaimIds.has(claim.claimId)),
+        statement: sourceDto.statement.filter((claim) =>
+          activeEncounterClaimIds.has(claim.claimId),
+        ),
         evidence: sourceDto.evidence.map((item) => ({
           ...item,
           displayName: t(item.displayName, item.evidenceId),
@@ -373,6 +429,25 @@ export async function createEncounterSession(
       if (hasForbiddenPublicKey(dto)) {
         throw new Error('PublicDTO projection contains a forbidden private field.');
       }
+      const shieldDurabilityByClaimId = snapshot.shieldDurabilityByClaimId ?? {};
+      const claimExposureByFacet = Object.fromEntries(
+        dto.statement
+          .filter((claim) => claim.presentation !== 'HIDDEN')
+          .map((claim) => {
+            const hasShieldState = Object.prototype.hasOwnProperty.call(
+              shieldDurabilityByClaimId,
+              claim.claimId,
+            );
+            return [
+              claim.facet,
+              claim.resistance > 0
+                ? 'SHIELDED'
+                : hasShieldState
+                  ? 'BROKEN'
+                  : 'GAP',
+            ] as const;
+          }),
+      );
       const limits = coordinator.resourceLimits;
       const sweetSpot = coordinator.sweetSpot;
       const stateConditions = encounter.objectives.state_conditions;
@@ -384,7 +459,22 @@ export async function createEncounterSession(
         snapshot.resources.composure <= sweetSpot.composureMax &&
         (stateConditions.coercion_max === undefined ||
           snapshot.resources.coercion <= stateConditions.coercion_max);
-      const cards = snapshot.deck.hand.flatMap((cardId) => {
+      const v2TurnLoop = coordinator.turnLoopMode === 'V2_ATOMIC';
+      // v2 hands are addressed by physical copy; the legacy loop keeps its
+      // definition-id hand until the interrogationV2TurnLoop gate retires it.
+      const handEntries: readonly {
+        readonly cardId: string;
+        readonly instanceId: string | undefined;
+      }[] = v2TurnLoop
+        ? (snapshot.handInstances ?? []).map((instance) => ({
+            cardId: instance.blueprintId,
+            instanceId: instance.instanceId,
+          }))
+        : snapshot.deck.hand.map((cardId) => ({
+            cardId,
+            instanceId: undefined,
+          }));
+      const cards = handEntries.flatMap(({ cardId, instanceId }) => {
         const definition = loadedCards.cards.find((card) => card.card_id === cardId);
         if (definition === undefined) return [];
         // A lock is already engine state: the succubus modifier writes
@@ -392,16 +482,43 @@ export async function createEncounterSession(
         const lockedUntilTurn = snapshot.cards[cardId]?.lockedUntilTurn ?? -1;
         const lockTurnsRemaining = Math.max(0, lockedUntilTurn - snapshot.resources.turn + 1);
         const locked = lockTurnsRemaining > 0;
+        const cpCost = definition.cost.cp ?? 0;
+        const affordable = cpCost <= snapshot.resources.commandPoints;
         const artAssetKey = locked
           ? CARD_LOCKED_ILLUSTRATION_ASSET_KEY
           : CARD_ILLUSTRATION_ASSET_KEYS[cardId];
         return [{
           cardId,
+          ...(instanceId === undefined ? {} : { instanceId }),
           title: t(definition.name_key ?? definition.title_key, definition.card_id),
           description: t(definition.description_key, ''),
           intent: definition.intent,
-          cpCost: definition.cost.cp ?? 0,
+          cpCost,
           requiresEvidence: (definition.target.min_evidence ?? 0) > 0,
+          affordable,
+          minEvidence: definition.target.min_evidence ?? 0,
+          ...(definition.target.max_evidence === undefined
+            ? {}
+            : { maxEvidence: definition.target.max_evidence }),
+          costIconAssetKey: affordable ? CP_PIP_ASSET_KEYS.active : CP_PIP_ASSET_KEYS.deactive,
+          ...(definition.combat_profile === undefined
+            ? {}
+            : {
+                combat: {
+                  roleLabel: CARD_ROLE_LABELS[definition.combat_profile.role],
+                  targetRule: definition.combat_profile.target_rule,
+                  evidenceMode: definition.combat_profile.evidence_mode,
+                },
+              }),
+          ...((definition.tags ?? [])
+            .map((tag) => CARD_WARNING_LABELS[tag])
+            .filter((label): label is string => label !== undefined).length === 0
+            ? {}
+            : {
+                warningLabels: (definition.tags ?? [])
+                  .map((tag) => CARD_WARNING_LABELS[tag])
+                  .filter((label): label is string => label !== undefined),
+              }),
           ...(definition.target.facets === undefined
             ? {}
             : { allowedFacets: [...definition.target.facets] }),
@@ -453,11 +570,14 @@ export async function createEncounterSession(
         },
         stress: snapshot.resources.stress,
         composureMax: limits.composureMax,
+        commandPointsMax: limits.commandPointMax,
+        hpMax: limits.stressMax,
         coercionMax: limits.coercionLimit,
         sweetSpotMin: sweetSpot.composureMin,
         sweetSpotMax: sweetSpot.composureMax,
         sweetSpotUnlocked: inSweetSpot,
         cards,
+        claimExposureByFacet,
         evidenceCosts: Object.fromEntries(dto.evidence.map((item) => [item.evidenceId, 0])),
         ...(suspectArt === undefined ? {} : { suspectAssetSet: suspectArt }),
         ...(backgroundAssetKey === undefined ? {} : { backgroundAssetKey }),
@@ -472,8 +592,27 @@ export async function createEncounterSession(
         partnerCooldown: coordinator.partnerCooldown(partnerSkillId),
         partnerSkillAvailable:
           partnerSkillDuration !== undefined && partnerSkillDuration > 0,
-        canSecureStatement:
-          snapshot.machine.state === 'CHECK_OUTCOME' && requiredComplete && inSweetSpot,
+        // v2: the engine's canonical pending decision is projected verbatim —
+        // the app never recomputes eligibility (design §3.5.6 P0-3C).
+        canSecureStatement: v2TurnLoop
+          ? (snapshot.pendingSecureDecision ?? null) !== null
+          : snapshot.machine.state === 'CHECK_OUTCOME' &&
+            requiredComplete &&
+            inSweetSpot,
+        ...((snapshot.pendingSecureDecision ?? null) === null
+          ? {}
+          : {
+              pendingDecision: {
+                decisionId: snapshot.pendingSecureDecision!.decisionId,
+                title: '결정적 진술을 확보할 수 있습니다',
+                secureLabel: '진술 확보하고 종료',
+                continueLabel:
+                  snapshot.pendingSecureDecision!.onDecline ===
+                  'PARTIAL_RESOLUTION'
+                    ? '확보 포기 · 부분 해결'
+                    : '심문 계속',
+              },
+            }),
       };
     },
   };

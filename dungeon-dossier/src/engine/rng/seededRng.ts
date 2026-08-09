@@ -7,7 +7,11 @@ export interface RandomStep {
   readonly state: RngState;
 }
 
-export type RngPurpose = 'DECK_SHUFFLE' | 'MODIFIER_SELECTION' | 'AI_SEED';
+export type RngPurpose =
+  | 'DECK_SHUFFLE'
+  | 'CARD_DRAW'
+  | 'MODIFIER_SELECTION'
+  | 'AI_SEED';
 
 function hashPurpose(purpose: RngPurpose): number {
   let hash = 0x811c9dc5;
@@ -48,4 +52,3 @@ export function shuffleWithState<T>(
 
   return { values: shuffled, state };
 }
-

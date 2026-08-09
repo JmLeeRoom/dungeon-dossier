@@ -11,12 +11,52 @@ import {
   CostSchema,
   EffectSchema,
   JsonSchemaReferenceSchema,
+  FiniteNumberSchema,
   LocalizationKeySchema,
   NonEmptyStringSchema,
   NonNegativeIntegerSchema,
   VersionSchema,
   uniqueContentIds,
 } from './primitives';
+
+export const CardCombatRoleSchema = z.enum([
+  'BASIC_JAB',
+  'MENTAL_CONTROL',
+  'FINISHER',
+  'PHYSICAL_COERCION',
+]);
+
+export const CardCombatTargetRuleSchema = z.enum([
+  'GAP_OR_SHIELD_ATTEMPT',
+  'GAP_OR_BROKEN',
+  'BROKEN',
+  'ANY_CLAIM',
+]);
+
+export const CardCombatEvidenceModeSchema = z.enum([
+  'NONE',
+  'OPTIONAL_FOR_SHIELD',
+  'EXACTLY_ONE',
+]);
+
+export const CardCombatShieldModeSchema = z.enum([
+  'BREAK_ON_DIRECT',
+  'BLOCKED',
+  'REQUIRE_BROKEN',
+  'IGNORE',
+]);
+
+/** P1 nominal combat payload. Generic balance damage must never be added to it. */
+export const CardCombatProfileSchema = z.strictObject({
+  role: CardCombatRoleSchema,
+  composure_delta: FiniteNumberSchema,
+  coercion_delta: FiniteNumberSchema,
+  target_rule: CardCombatTargetRuleSchema,
+  evidence_mode: CardCombatEvidenceModeSchema,
+  shield_mode: CardCombatShieldModeSchema,
+  shield_damage: z.union([z.literal(0), z.literal(1)]),
+});
+export type CardCombatProfile = z.infer<typeof CardCombatProfileSchema>;
 
 export const CardTargetSchema = z.strictObject({
   kind: z.enum(['CLAIM', 'ROUTE', 'EVIDENCE', 'SELF', 'SPECIAL']),
@@ -60,10 +100,32 @@ export const CardSchema = z
     starting_copies: NonNegativeIntegerSchema,
     acquisition: NonEmptyStringSchema.optional(),
     tags: z.array(NonEmptyStringSchema).optional(),
+    /** Transitional definitions stay loadable but never occupy a P1 basic slot. */
+    legacy: z.boolean().optional(),
+    combat_profile: CardCombatProfileSchema.optional(),
   })
   .refine((card) => card.name_key !== undefined || card.title_key !== undefined, {
     message: 'a card must declare name_key or title_key',
     path: ['name_key'],
+  })
+  .superRefine((card, context) => {
+    if (card.legacy === true && card.combat_profile !== undefined) {
+      context.addIssue({
+        code: 'custom',
+        message: 'a legacy card cannot occupy a P1 combat slot',
+        path: ['combat_profile'],
+      });
+    }
+    const profile = card.combat_profile;
+    if (profile === undefined) return;
+    const expectedShieldDamage = profile.shield_mode === 'BREAK_ON_DIRECT' ? 1 : 0;
+    if (profile.shield_damage !== expectedShieldDamage) {
+      context.addIssue({
+        code: 'custom',
+        message: `${profile.shield_mode} requires shield_damage ${expectedShieldDamage}`,
+        path: ['combat_profile', 'shield_damage'],
+      });
+    }
   });
 export type CardDefinition = z.infer<typeof CardSchema>;
 
@@ -71,7 +133,10 @@ export const CardsSchema = z
   .strictObject({
     $schema: JsonSchemaReferenceSchema.optional(),
     schema_version: VersionSchema,
-    cards: z.array(CardSchema).length(14),
+    // P1 removes the historical fixed-size fourteen-card catalogue. Five is
+    // the minimum viable interrogation bar; expansions and legacy migration
+    // may add more definitions without a schema revision.
+    cards: z.array(CardSchema).min(5),
     initial_deck: uniqueContentIds().optional(),
   })
   .superRefine((catalogue, context) => {

@@ -38,6 +38,8 @@ export const NHN_ASSET_DIMENSION_IDS = [
   'feedback_stamp_620',
   'system_panel_415x310',
   'tag_830x330',
+  'title_button_230x220',
+  'menu_button_150x136',
 ] as const;
 
 export const ASSET_DIMENSION_IDS = [
@@ -86,6 +88,10 @@ export const ASSET_DIMENSIONS: Readonly<Record<AssetDimensionId, AssetDimension>
   feedback_stamp_620: { width: 620, height: 620 },
   system_panel_415x310: { width: 415, height: 310 },
   tag_830x330: { width: 830, height: 330 },
+  // Title menu plates. The start button is authored larger than the other
+  // three because it is the primary action, not because it is a different kind.
+  title_button_230x220: { width: 230, height: 220 },
+  menu_button_150x136: { width: 150, height: 136 },
 };
 
 const ASSET_DIMENSION_ID_SET: ReadonlySet<string> = new Set(ASSET_DIMENSION_IDS);

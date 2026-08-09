@@ -1,5 +1,6 @@
-import { Container, Graphics } from 'pixi.js';
+import { Container, Sprite } from 'pixi.js';
 import { describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
 
 interface RecordedText {
   readonly text: string;
@@ -39,7 +40,7 @@ vi.mock('../../src/ui/core/pixelText', async () => {
   };
 });
 
-import { createCardWidget } from '../../src/ui/widgets/cardWidget';
+import { createCardWidget, fitCardText } from '../../src/ui/widgets/cardWidget';
 import {
   CARD_ART_ZONE,
   CARD_COPY_FONT_SIZES,
@@ -61,6 +62,9 @@ const FACE = {
   cpCost: 2,
   description: '증거로 진술의 모순을 지적한다.',
 } as const;
+
+const WHITE_TEXTURE_URL =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
 
 function isMockText(node: Container): node is MockTextView {
   return typeof (node as unknown as Partial<MockTextView>).text === 'string';
@@ -129,9 +133,10 @@ describe('card face three-zone layout', () => {
       expect(zone.y + zone.height).toBeLessThanOrEqual(CARD_SIZE.height);
     }
 
-    // Cost badge sits left of the title, and the hand ordinal right of it.
-    expect(CARD_COPY_RECTS.cpBadge.x + CARD_COPY_RECTS.cpBadge.width)
-      .toBeLessThanOrEqual(CARD_COPY_RECTS.title.x);
+    // Cost belongs to the upper COST column; the title and ordinal share the
+    // lower sheet's first row.
+    expect(CARD_COPY_RECTS.cpBadge.y + CARD_COPY_RECTS.cpBadge.height)
+      .toBeLessThanOrEqual(CARD_SHEET_ZONE.y);
     expect(CARD_COPY_RECTS.title.x + CARD_COPY_RECTS.title.width)
       .toBeLessThanOrEqual(CARD_COPY_RECTS.ordinal.x);
     // The base art is a folder holding a photograph mount above a typed sheet:
@@ -142,6 +147,8 @@ describe('card face three-zone layout', () => {
       .toBeLessThanOrEqual(CARD_COPY_RECTS.intent.y);
     expect(CARD_COPY_RECTS.intent.y + CARD_COPY_RECTS.intent.height)
       .toBeLessThanOrEqual(CARD_COPY_RECTS.description.y);
+    expect(CARD_COPY_RECTS.description.y + CARD_COPY_RECTS.description.height)
+      .toBeLessThanOrEqual(CARD_COPY_RECTS.warning.y);
     expect(CARD_COPY_RECTS.description.y)
       .toBeGreaterThanOrEqual(CARD_LAYER_RECTS.illust.y + CARD_LAYER_RECTS.illust.height);
   });
@@ -192,21 +199,23 @@ describe('card face three-zone layout', () => {
     expect(preservesAspect(ASSET_DIMENSIONS.card_base_768x1024, CARD_LAYER_RECTS.base)).toBe(true);
   });
 
-  it('renders the cost as a top-left badge with a plate behind it', () => {
-    const artwork = createCardWidget(FACE);
+  it('renders the approved CP image and numeric value in the upper COST slot', () => {
+    const artwork = createCardWidget(FACE, {
+      resolveLayerUrl: (layer) => layer === 'cost' ? WHITE_TEXTURE_URL : undefined,
+    });
     const rect = CARD_COPY_RECTS.cpBadge;
-    const cost = findText(artwork.view, (entry) => entry.text === '2 CP');
+    const cost = findText(artwork.view, (entry) => entry.text === '2');
 
-    expect(cost.x).toBe(rect.x + rect.width / 2);
-    expect(cost.y).toBe(rect.y + rect.height / 2);
+    expect(cost.x).toBe(rect.x + 78);
+    expect(cost.y).toBe(rect.y + 40);
     expect({ x: cost.anchorX, y: cost.anchorY }).toEqual({ x: 0.5, y: 0.5 });
     expect(cost.options.fontSize).toBe(CARD_COPY_FONT_SIZES.cpBadge);
     // Top-left of the typed sheet, never in the old bottom-right corner.
     expect(cost.y).toBeLessThan(CARD_SHEET_ZONE.y + CARD_SHEET_ZONE.height / 2);
     expect(cost.x).toBeLessThan(CARD_SIZE.width / 2);
 
-    const badge = findParentOfText(artwork.view, '2 CP');
-    expect(badge.children.some((child) => child instanceof Graphics)).toBe(true);
+    const badge = findParentOfText(artwork.view, '2');
+    expect(badge.children.some((child) => child instanceof Sprite)).toBe(true);
 
     artwork.view.destroy({ children: true });
   });
@@ -232,8 +241,8 @@ describe('card face three-zone layout', () => {
     const texts = collectTexts(artwork.view).map((entry) => entry.text);
 
     expect(texts).toContain('질문');
-    expect(texts).toContain('1 CP');
-    expect(texts).toContain('QUERY');
+    expect(texts).toContain('1');
+    expect(texts).not.toContain('QUERY');
     expect(texts).toHaveLength(3);
 
     artwork.view.destroy({ children: true });
@@ -255,20 +264,71 @@ describe('card face three-zone layout', () => {
 });
 
 describe('authored copy sizing at hand scale', () => {
-  it('authors 48px copy so the fan renders it at exactly 9px', () => {
+  it('keeps title and role readable while allowing body copy to shrink', () => {
     expect(CARD_FAN_SCALE).toBe(0.1875);
-    expect(cardCopyDisplayFontSize(CARD_COPY_FONT_SIZES.description)).toBe(9);
+    expect(cardCopyDisplayFontSize(CARD_COPY_FONT_SIZES.description)).toBe(7.875);
     expect(cardCopyDisplayFontSize(CARD_COPY_FONT_SIZES.title)).toBe(9);
     expect(cardCopyDisplayFontSize(CARD_COPY_FONT_SIZES.intent)).toBe(6);
     // The card is 768 wide against the old 640, so authored copy grew by the
     // same 1.2 and lands one pixel larger on a proportionally larger card.
-    expect(cardCopyDisplayFontSize(CARD_COPY_FONT_SIZES.description, 1)).toBe(48);
+    expect(cardCopyDisplayFontSize(CARD_COPY_FONT_SIZES.description, 1)).toBe(42);
   });
 
-  it('fits three wrapped description lines in the fixed block', () => {
-    expect(cardDescriptionLineCapacity()).toBe(3);
-    expect(
-      cardDescriptionLineCapacity() * CARD_COPY_LINE_HEIGHTS.description,
-    ).toBeLessThanOrEqual(CARD_COPY_RECTS.description.height);
+  it('shrinks real-length copy until every estimated line fits its masked block', () => {
+    expect(cardDescriptionLineCapacity()).toBe(2);
+    const fit = fitCardText(
+      'SHIELDED는 증거 정확히 1개. 직접 모순: 방어막 1→0 · 평정심 -10 · 강압 +2%p',
+      CARD_COPY_RECTS.description,
+      CARD_COPY_FONT_SIZES.description,
+      24,
+    );
+    expect(fit.fontSize).toBeLessThanOrEqual(CARD_COPY_FONT_SIZES.description);
+    expect(fit.lineCount * fit.lineHeight).toBeLessThanOrEqual(CARD_COPY_RECTS.description.height);
+  });
+
+  it('fits and masks all five production card descriptions, including the bat warning', () => {
+    const table = JSON.parse(
+      readFileSync(new URL('../../content/common/strings.ko.json', import.meta.url), 'utf8'),
+    ) as { strings: Readonly<Record<string, string>> };
+    const keys = [
+      'leading_question',
+      'toss_dossier',
+      'point_contradiction',
+      'decisive_proof',
+      'bat_threat',
+    ] as const;
+
+    for (const key of keys) {
+      const description = table.strings[`card.${key}.description`];
+      if (description === undefined) throw new Error(`Missing production copy for ${key}.`);
+      const fit = fitCardText(
+        description,
+        CARD_COPY_RECTS.description,
+        CARD_COPY_FONT_SIZES.description,
+        24,
+      );
+      expect(fit.lineCount * fit.lineHeight, key)
+        .toBeLessThanOrEqual(CARD_COPY_RECTS.description.height);
+      expect(fit.fontSize, key).toBeGreaterThanOrEqual(24);
+
+      const widget = createCardWidget({
+        title: key,
+        intent: key === 'bat_threat' ? 'PRESSURE' : 'CONTRADICT',
+        cpCost: key === 'leading_question' || key === 'toss_dossier' ? 1 : 2,
+        description,
+        roleLabel: key === 'bat_threat' ? '물리/강압' : '역할',
+        ...(key === 'bat_threat'
+          ? { warningLabels: ['주의: 다혈질·진실 공격 위험'] }
+          : {}),
+      });
+      const ability = widget.permanentLayers.ability;
+      expect(ability, key).toBeDefined();
+      expect(ability?.children.some((child) => child.mask !== null), key).toBe(true);
+      if (key === 'bat_threat') {
+        expect(collectTexts(widget.view).map((entry) => entry.text))
+          .toContain('주의: 다혈질·진실 공격 위험');
+      }
+      widget.view.destroy({ children: true });
+    }
   });
 });

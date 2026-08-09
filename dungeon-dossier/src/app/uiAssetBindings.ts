@@ -125,7 +125,8 @@ export function interrogationBackgroundAssetKey(authoredKey: string | undefined)
 export const CARD_BASE_ASSET_KEY = requireAssetPlacement('card-base').assetKey;
 
 /**
- * Card id to illustration. Six illustrations serve fourteen cards, so the
+ * Card id to illustration. Six illustrations serve the five P1 basics and
+ * fourteen legacy cards, so the
  * mapping is many-to-one and written out in full: `illust00` is the detective
  * leading a question, `01` a sealed file, `02` a contradiction, `03` annotated
  * cross-referenced documents, `04` a raised weapon.
@@ -136,6 +137,11 @@ export const CARD_BASE_ASSET_KEY = requireAssetPlacement('card-base').assetKey;
  * one. Those three keep their generated illustration until art exists.
  */
 export const CARD_ILLUSTRATION_ASSET_KEYS: Readonly<Record<string, string>> = {
+  card_leading_question: 'ui/card/illust00',
+  card_toss_dossier: 'ui/card/illust01',
+  card_point_contradiction: 'ui/card/illust02',
+  card_decisive_proof: 'ui/card/illust03',
+  card_bat_threat: 'ui/card/illust04',
   card_query_who: 'ui/card/illust00',
   card_query_when: 'ui/card/illust00',
   card_clarify_basic: 'ui/card/illust00',
@@ -218,6 +224,27 @@ export const EVIDENCE_ASSET_KEYS: Readonly<Record<string, string>> = {
 /* HUD, tags, board and results                                                */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * The command-point coin, in both states. CP is always drawn at
+ * `commandPointsMax` slots so a spent point reads as an empty coin rather than
+ * simply vanishing.
+ */
+export const CP_PIP_ASSET_KEYS = {
+  active: 'ui/icon_cp/active',
+  deactive: 'ui/icon_cp/deactive',
+} as const;
+
+/** The run's own life, shown as a heart rather than the old `STRESS n` text. */
+export const HP_ICON_ASSET_KEY = 'ui/icon/hp';
+
+/** Title menu plates, in their idle and highlighted states. */
+export const TITLE_MENU_ASSET_KEYS = {
+  start: { active: 'ui/start/active', deactive: 'ui/start/deactive' },
+  load: { active: 'ui/load/active', deactive: 'ui/load/deactive' },
+  options: { active: 'ui/options/active', deactive: 'ui/options/deactive' },
+  quit: { active: 'ui/quit/active', deactive: 'ui/quit/deactive' },
+} as const;
+
 export const HUD_ICON_ASSET_KEYS = {
   composure: requireAssetPlacement('icon-composure').assetKey,
   coercion: requireAssetPlacement('icon-coercion').assetKey,
@@ -226,11 +253,11 @@ export const HUD_ICON_ASSET_KEYS = {
 /** The detective and the intern, as pinned file photographs. */
 export const DETECTIVE_PHOTO_ASSET_KEY = 'ui/photo/teahoon';
 /**
- * The intern is the paper-cup slime, which is the same character the board
- * files under `mulkung`. One photograph therefore serves both the partner card
- * and the slime suspect's board marker.
+ * The intern now has a photograph of his own. It is deliberately not the slime
+ * suspect's: reusing `mulkung` for both made the partner and a suspect share a
+ * face on the same board.
  */
-export const PARTNER_PHOTO_ASSET_KEY = 'ui/photo/mulkung';
+export const PARTNER_PHOTO_ASSET_KEY = 'ui/photo/coffee';
 
 export const BOARD_ASSET_KEYS = {
   background: 'bg/event/crazyboard',
@@ -413,6 +440,9 @@ export function allBoundAssetKeys(): readonly string[] {
       ...Object.values(CARD_ATTACHMENT_ASSET_KEYS),
       ...Object.values(EVIDENCE_ASSET_KEYS),
       ...Object.values(HUD_ICON_ASSET_KEYS),
+      ...Object.values(CP_PIP_ASSET_KEYS),
+      HP_ICON_ASSET_KEY,
+      ...Object.values(TITLE_MENU_ASSET_KEYS).flatMap((states) => Object.values(states)),
       DETECTIVE_PHOTO_ASSET_KEY,
       PARTNER_PHOTO_ASSET_KEY,
       ...Object.values(BOARD_ASSET_KEYS),

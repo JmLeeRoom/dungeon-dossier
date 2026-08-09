@@ -175,6 +175,22 @@ export type AutoplayScene = AutoplayScenePresentation & (
       skipTypewriter(): void;
     }
   | {
+      /**
+       * v2 secure-decision checkpoint. Published only after the judgment
+       * direction barrier ends, in the same tick the rail becomes visible.
+       * Submit/endTurn are deliberately absent: the decision window rejects
+       * every other gameplay action.
+       */
+      readonly kind: 'SECURE_STATEMENT_DECISION';
+      readonly encounterId: string;
+      readonly decisionId: string;
+      /** 'PARTIAL_RESOLUTION' marks the final-turn "확보 포기 · 부분 해결" branch. */
+      readonly onDecline: 'START_NEXT_TURN' | 'PARTIAL_RESOLUTION';
+      secure(): void;
+      continueInterrogation(): void;
+      skipTypewriter(): void;
+    }
+  | {
       readonly kind: 'REWARD';
       readonly grade: string;
       readonly rewardIds: readonly string[];
@@ -231,7 +247,7 @@ export interface AutoplayPort {
 }
 
 export interface AutoplayOptions {
-  readonly mode: 'watch' | 'turbo' | 'record' | 'video' | 'submission';
+  readonly mode: 'watch' | 'turbo' | 'record' | 'video' | 'submission' | 'slow';
   readonly policy: 'best' | 'partial' | 'coerced' | 'greedy' | 'fuzz';
   readonly seed: number;
 }

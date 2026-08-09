@@ -78,7 +78,7 @@ describe('palette policy', () => {
 
   it('covers exactly the 72 approved deliverables', async () => {
     const digests = (await approvedProductionDigests()) as ReadonlyMap<string, string>;
-    expect(digests.size).toBe(72);
+    expect(digests.size).toBe(87);
     for (const [runtimePath, digest] of digests) {
       expect(runtimePath.startsWith('assets/')).toBe(true);
       expect(digest).toMatch(/^[0-9a-f]{64}$/u);
@@ -114,7 +114,7 @@ describe('palette policy', () => {
   it('passes the whole checked-in tree and reports the split', async () => {
     const result = await checkPalettes();
     expect(result.problems).toEqual([]);
-    expect(result.checkedFiles).toBe(127);
-    expect(result.byPolicy).toEqual({ strict16: 55, 'approved-production': 72 });
+    expect(result.checkedFiles).toBe(142);
+    expect(result.byPolicy).toEqual({ strict16: 55, 'approved-production': 87 });
   }, 60_000);
 });

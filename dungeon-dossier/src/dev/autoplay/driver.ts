@@ -59,10 +59,19 @@ interface ModeConfig {
 export const MODE_CONFIGS: Readonly<Record<AutoplayOptions['mode'], ModeConfig>> = {
   watch: {
     timeScale: 1,
-    actionDelayMs: 600,
+    actionDelayMs: 2000,
     sceneStallMs: 90_000,
     runTimeoutMs: 1_200_000,
     skipTypewriter: false,
+    typewriterIntervalMs: 35,
+  },
+  slow: {
+    timeScale: 0.8,
+    actionDelayMs: 3500,
+    sceneStallMs: 120_000,
+    runTimeoutMs: 1_200_000,
+    skipTypewriter: false,
+    typewriterIntervalMs: 50,
   },
   turbo: {
     timeScale: 20,
@@ -144,6 +153,8 @@ export function usesAutoplayActionCadence(scene: {
   // pacing only. Watch/record retain their original readable scene holds.
   if (mode !== 'video') return true;
   if (scene.kind === 'EVENT' || scene.kind === 'REWARD') return true;
+  // The v2 secure decision is a player-visible choice, never a mechanical hop.
+  if (scene.kind === 'SECURE_STATEMENT_DECISION') return true;
   if (scene.kind !== 'INTERROGATION') return false;
   return scene.machineState !== 'CHECK_OUTCOME' || scene.secureStatementEnabled === true;
 }
@@ -662,6 +673,27 @@ export function startAutoplay(port: AutoplayPort, options: AutoplayOptions): voi
             config.targetDurationSec === undefined ? scene : cinematicScene(scene),
           );
           break;
+        case 'SECURE_STATEMENT_DECISION': {
+          // v2 decision policy (design §3.5.3): best/greedy secure the BEST
+          // outcome, partial/coerced keep interrogating to probe the other
+          // endings, fuzz explores both branches on its own seeded stream —
+          // never the engine's CARD_DRAW state.
+          const secure =
+            options.policy === 'best' || options.policy === 'greedy'
+              ? true
+              : options.policy === 'fuzz'
+                ? fuzzRng() < 0.25
+                : false;
+          if (secure) registerSubmission();
+          performWithCinematic(
+            secure ? '진술 확보 — 서명 날인' : '심문 계속 — 확보 보류',
+            () => {
+              if (secure) scene.secure();
+              else scene.continueInterrogation();
+            },
+          );
+          break;
+        }
         case 'REWARD': {
           const rewardId = chooseReward(
             scene.rewardIds,

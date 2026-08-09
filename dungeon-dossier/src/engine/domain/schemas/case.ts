@@ -4,6 +4,7 @@ import {
   ActionIntentSchema,
   CommitmentStateSchema,
   ContentIdSchema,
+  FACETS,
   FacetSchema,
   GradeSchema,
 } from '../vocabulary';
@@ -352,10 +353,57 @@ const CaseCommonShape = {
   dialogue: DialogueSchema,
 };
 
-/** Raw case file schema. Its claims are TruthGraph-owned records. */
-export const CaseSchema = z.strictObject({
+/** Refinement-free shape used by partial editor validation. */
+export const CaseObjectSchema = z.strictObject({
   ...CaseCommonShape,
   claims: z.array(TruthClaimSchema).min(1),
+});
+
+/** Raw case file schema. Its claims are TruthGraph-owned records. */
+export const CaseSchema = CaseObjectSchema.superRefine((definition, context) => {
+    const claimById = new Map(
+      definition.claims.map((claim) => [claim.claim_id, claim]),
+    );
+    definition.encounters.forEach((encounter, encounterIndex) => {
+      encounter.rounds.forEach((round, roundIndex) => {
+        const roundClaims = round.statement_claims.flatMap((claimId) => {
+          const claim = claimById.get(claimId);
+          return claim === undefined ? [] : [claim];
+        });
+        const facets = roundClaims.flatMap((claim) => {
+          const facet = claim.facet;
+          return facet === undefined ? [] : [facet];
+        });
+        for (const facet of FACETS) {
+          if (facets.filter((candidate) => candidate === facet).length !== 1) {
+            context.addIssue({
+              code: 'custom',
+              message: `round ${round.round_id} must contain exactly one ${facet} claim`,
+              path: ['encounters', encounterIndex, 'rounds', roundIndex, 'statement_claims'],
+            });
+          }
+        }
+        if (round.shields.length !== encounter.resources.shields_per_round) {
+          context.addIssue({
+            code: 'custom',
+            message: `round ${round.round_id} shield count must equal shields_per_round`,
+            path: ['encounters', encounterIndex, 'rounds', roundIndex, 'shields'],
+          });
+        }
+        roundClaims.forEach((claim) => {
+          if (
+            claim.initial.presentation === 'COMPOUND' ||
+            claim.facet_group !== undefined
+          ) {
+            context.addIssue({
+              code: 'custom',
+              message: `round ${round.round_id} claims must be atomic target statements`,
+              path: ['encounters', encounterIndex, 'rounds', roundIndex, 'statement_claims'],
+            });
+          }
+        });
+      });
+    });
 });
 export type CaseDefinition = z.infer<typeof CaseSchema>;
 

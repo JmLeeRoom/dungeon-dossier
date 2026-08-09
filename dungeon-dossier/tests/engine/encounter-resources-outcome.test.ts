@@ -482,14 +482,44 @@ describe('OutcomeEvaluator exact ordering', () => {
     });
   });
 
-  it('treats encounter coercion limit equality as safe', () => {
-    const result = evaluateOutcome(
-      outcomeInput({ resources: resources({ coercion: 40 }) }),
+  it('fails the moment coercion reaches the encounter limit', () => {
+    // The limit is the point of failure, not the last safe value. Coercion is
+    // clamped to 100, so an exclusive test made the ordinary limit of 100
+    // unreachable and a maxed-out interrogation could never end.
+    expect(
+      evaluateOutcome(outcomeInput({ resources: resources({ coercion: 40 }) })),
+    ).toMatchObject({
+      terminalOutcome: 'FAILED',
+      reason: 'COERCION_LIMIT_EXCEEDED',
+    });
+
+    const belowLimit = evaluateOutcome(
+      outcomeInput({ resources: resources({ coercion: 39 }) }),
     );
-    expect(result.terminalOutcome).toBeNull();
-    expect(result.bestResolution.secureStatementEnabled).toBe(true);
+    expect(belowLimit.terminalOutcome).toBeNull();
+    expect(belowLimit.bestResolution.secureStatementEnabled).toBe(true);
   });
 
+  it('reaches failure at the ordinary 100 ceiling too', () => {
+    expect(
+      evaluateOutcome(
+        outcomeInput({ coercionLimit: 100, resources: resources({ coercion: 100 }) }),
+      ),
+    ).toMatchObject({
+      terminalOutcome: 'FAILED',
+      reason: 'COERCION_LIMIT_EXCEEDED',
+    });
+    expect(
+      evaluateOutcome(
+        outcomeInput({ coercionLimit: 100, resources: resources({ coercion: 99 }) }),
+      ).terminalOutcome,
+    ).toBeNull();
+  });
+
+  // Legacy submit/endTurn loop only. The v2 settlement directive fixes the
+  // final-turn priority the other way — an eligible sweet spot opens the
+  // secure decision before PARTIAL (see settlement-directive.test.ts) — and
+  // P0-3B deletes this behavior together with evaluateOutcome.
   it('uses PARTIAL at the exact turn limit when BEST is not selected', () => {
     const result = evaluateOutcome(
       outcomeInput({ resources: resources({ turn: 5 }) }),

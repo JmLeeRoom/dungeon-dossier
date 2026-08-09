@@ -29,14 +29,35 @@ export const EncounterResourcesSchema = z.strictObject({
 
 export const ClaimShieldSchema = z.strictObject({
   claim_id: ContentIdSchema,
-  durability: z.number().positive().finite(),
+  durability: z.literal(1),
 });
 
-export const EncounterRoundSchema = z.strictObject({
-  round_id: ContentIdSchema,
-  statement_claims: uniqueContentIds(1),
-  shields: z.array(ClaimShieldSchema),
-});
+export const EncounterRoundSchema = z
+  .strictObject({
+    round_id: ContentIdSchema,
+    statement_claims: uniqueContentIds(6).max(6),
+    shields: z.array(ClaimShieldSchema).min(2).max(3),
+  })
+  .superRefine((round, context) => {
+    const seen = new Set<string>();
+    round.shields.forEach((shield, index) => {
+      if (!round.statement_claims.includes(shield.claim_id)) {
+        context.addIssue({
+          code: 'custom',
+          message: 'a shield must target a claim in the same round',
+          path: ['shields', index, 'claim_id'],
+        });
+      }
+      if (seen.has(shield.claim_id)) {
+        context.addIssue({
+          code: 'custom',
+          message: `duplicate shield claim: ${shield.claim_id}`,
+          path: ['shields', index, 'claim_id'],
+        });
+      }
+      seen.add(shield.claim_id);
+    });
+  });
 
 export const FlowNodeSchema = z.strictObject({
   node_id: ContentIdSchema,
@@ -53,7 +74,9 @@ export const FlowNodeSchema = z.strictObject({
 
 export const ModifierTriggerSchema = z.enum([
   'ON_ENCOUNTER_START',
+  'ON_TURN_START_PRE_DRAW',
   'ON_TURN_START',
+  'ON_HAND_READY',
   'ON_ACTION_SELECTED',
   'ON_ACTION_SUBMITTED',
   'ON_RESOLUTION',

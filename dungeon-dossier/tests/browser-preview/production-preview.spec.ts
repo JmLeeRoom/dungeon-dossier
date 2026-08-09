@@ -86,7 +86,7 @@ test('boots the fresh production bundle cleanly from a project subpath', async (
     waitUntil: 'networkidle',
   });
   expect(workbenchNavigation?.ok(), 'production workbench response').toBe(true);
-  await expect(page).toHaveTitle('던전 수사 조서 · 애셋 워크벤치');
+  await expect(page).toHaveTitle('던전 탐정 김태훈 · 애셋 워크벤치');
   await expect(page.locator('#asset-list .asset-row')).toHaveCount(16);
   await expect(page.locator('#save-to-project')).toBeVisible();
   const shippingManifest = await page.locator('#manifest-json').evaluate((element) =>

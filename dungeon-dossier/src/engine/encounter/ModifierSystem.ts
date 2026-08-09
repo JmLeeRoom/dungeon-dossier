@@ -31,7 +31,9 @@ export function applyModifierEffects<TState, TPayload>(
 
 export const MODIFIER_TRIGGERS = [
   'ON_ENCOUNTER_START',
+  'ON_TURN_START_PRE_DRAW',
   'ON_TURN_START',
+  'ON_HAND_READY',
   'ON_ACTION_SELECTED',
   'ON_ACTION_SUBMITTED',
   'ON_RESOLUTION',
@@ -601,6 +603,38 @@ export function assertModifierDefinition(modifier: EncounterModifier): void {
     throw new Error(
       `Modifier ${modifier.modifier_id} has unsupported target randomness.`,
     );
+  }
+}
+
+/** P0-4 semantic gate for the atomic five-card turn boundary. */
+export function assertV2TurnBoundaryModifiers(
+  modifiers: readonly EncounterModifier[],
+): void {
+  for (const modifier of modifiers) {
+    assertModifierDefinition(modifier);
+    const effectType = modifier.effect.type as EncounterModifierEffectType;
+    const scope = modifier.effect.target_selector?.scope.toUpperCase();
+    if (
+      modifier.trigger === 'ON_TURN_START' ||
+      modifier.trigger === 'ON_TURN_START_PRE_DRAW'
+    ) {
+      if (
+        effectType === 'DRAW_CARD' ||
+        effectType === 'DISCARD_CARD' ||
+        effectType === 'LOCK_CARD' ||
+        scope === 'HAND' ||
+        scope === 'CARD'
+      ) {
+        throw new Error(
+          `Modifier ${modifier.modifier_id} has a hand-dependent pre-draw effect.`,
+        );
+      }
+    }
+    if (modifier.trigger === 'ON_HAND_READY' && effectType !== 'LOCK_CARD') {
+      throw new Error(
+        `Modifier ${modifier.modifier_id} may only LOCK_CARD on ON_HAND_READY.`,
+      );
+    }
   }
 }
 

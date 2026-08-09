@@ -53,7 +53,24 @@ describe('encounter app session', () => {
     for (const card of model.cards) {
       const authored = cardsDefinition.cards.find((entry) => entry.card_id === card.cardId);
       expect(card.allowedFacets).toEqual(authored?.target.facets);
+      expect(card.minEvidence).toBe(authored?.target.min_evidence ?? 0);
+      expect(card.maxEvidence).toBe(authored?.target.max_evidence);
+      expect(card.affordable).toBe((authored?.cost.cp ?? 0) <= model.dto.resources.commandPoints);
+      expect(card.costIconAssetKey).toBe(
+        card.affordable === true ? 'ui/icon_cp/active' : 'ui/icon_cp/deactive',
+      );
+      if (authored?.combat_profile !== undefined) {
+        expect(card.combat).toMatchObject({
+          targetRule: authored.combat_profile.target_rule,
+          evidenceMode: authored.combat_profile.evidence_mode,
+        });
+        expect(card.combat?.roleLabel).not.toMatch(/^[A-Z_]+$/u);
+      }
     }
+    expect(model.claimExposureByFacet).toMatchObject({
+      WHO: 'SHIELDED',
+      WHEN: 'SHIELDED',
+    });
     expect(model.suspectName).toBe('물컹이');
     // The case authors a tinted room that the delivery does not contain, so the
     // app layer rebinds it to the one approved interrogation background.
@@ -173,6 +190,262 @@ describe('encounter app session', () => {
     };
 
     expect(await play()).toBe(await play());
+  });
+
+  it('projects the v2 atomic loop: instance-addressed hand and decision state', async () => {
+    const [caseDefinition, cardsDefinition, balance] = await Promise.all([
+      content('cases/tutorial/case.json').then((value) => CaseSchema.parse(value)),
+      content('common/cards.json').then((value) => CardsSchema.parse(value)),
+      content('common/balance.json').then((value) => BalanceSchema.parse(value)),
+    ]);
+    const session = await createEncounterSession({
+      caseRepository: { load: async () => caseDefinition },
+      cardRepository: { load: async () => cardsDefinition },
+      balanceRepository: { reload: async () => balance },
+      runSeed: 0,
+      turnLoop: 'V2_ATOMIC',
+      identity: {
+        nodeId: 'node_tutorial',
+        encounterAttemptId: 'test:node_tutorial:1',
+        initialDrawSerial: 0,
+      },
+    });
+
+    const model = session.currentModel();
+    const instances = session.coordinator.snapshot.handInstances ?? [];
+    expect(instances).toHaveLength(5);
+    const drawSlots = session.coordinator.snapshot.drawSlots ?? [];
+    expect(drawSlots).toHaveLength(5);
+    expect(new Set(drawSlots.map((slot) => slot.blueprintId))).toHaveProperty(
+      'size',
+      5,
+    );
+    expect(session.coordinator.snapshot.cardDrawCursor).toBe(5);
+    expect(model.dto.statement).toHaveLength(6);
+    expect(model.dto.statement.filter((claim) => claim.resistance > 0)).toEqual([
+      expect.objectContaining({ claimId: 'clm_tutorial_who', resistance: 1 }),
+      expect.objectContaining({ claimId: 'clm_tutorial_when', resistance: 1 }),
+    ]);
+    // Every card view is addressed by its physical copy, in hand order.
+    expect(model.cards.map((card) => card.instanceId)).toEqual(
+      instances.map((instance) => instance.instanceId),
+    );
+    expect(model.cards.map((card) => card.cardId)).toEqual(
+      instances.map((instance) => instance.blueprintId),
+    );
+    expect(model.pendingDecision).toBeUndefined();
+    expect(model.canSecureStatement).toBe(false);
+
+    // One valid Submit through the app boundary consumes exactly one turn.
+    const contradiction = model.cards.find(
+      (card) => card.cardId === 'card_decisive_proof',
+    );
+    if (contradiction?.instanceId === undefined) {
+      throw new Error('Expected the tutorial decisive-proof card in hand.');
+    }
+    const firstHandInstanceIds = new Set(
+      model.cards.map((card) => card.instanceId),
+    );
+    const result = session.coordinator.submitTransaction({
+      cardId: 'card_decisive_proof',
+      instanceId: contradiction.instanceId,
+      targetClaimId: 'clm_tutorial_when',
+      evidenceIds: ['ev_tutorial_gate_log'],
+    });
+    expect(result.kind).toBe('COMMITTED');
+    if (result.kind !== 'COMMITTED') throw new Error('unreachable');
+    expect(result.resolution.code).toBe('R_DIRECT_CONTRADICTION');
+    expect(result.turnsSpent).toBe(1);
+    expect(result.phase).toBe('INPUT');
+    expect(session.modelForFrame(result.impactFrame).cards).toHaveLength(4);
+    expect(session.modelForFrame(result.impactFrame).turn.current).toBe(1);
+    expect(session.modelForFrame(result.settledFrame).cards).toHaveLength(0);
+    expect(session.modelForFrame(result.committedFrame).cards).toHaveLength(5);
+    expect(session.modelForFrame(result.committedFrame).turn.current).toBe(2);
+
+    const after = session.currentModel();
+    expect(after.turn.current).toBe(2);
+    expect(after.pendingDecision).toBeUndefined();
+    // The settlement discarded the whole hand; the next turn's cards are all
+    // freshly minted instances.
+    for (const card of after.cards) {
+      expect(card.instanceId).toBeDefined();
+      expect(firstHandInstanceIds.has(card.instanceId)).toBe(false);
+    }
+    expect(hasForbiddenPublicKey(after.dto)).toBe(false);
+  });
+
+  it('runs the P1 truth trap, shield break, and broken-claim finisher across turns', async () => {
+    const [caseDefinition, cardsDefinition, balance] = await Promise.all([
+      content('cases/tutorial/case.json').then((value) => CaseSchema.parse(value)),
+      content('common/cards.json').then((value) => CardsSchema.parse(value)),
+      content('common/balance.json').then((value) => BalanceSchema.parse(value)),
+    ]);
+    const session = await createEncounterSession({
+      caseRepository: { load: async () => caseDefinition },
+      cardRepository: { load: async () => cardsDefinition },
+      balanceRepository: { reload: async () => balance },
+      runSeed: 0,
+      turnLoop: 'V2_ATOMIC',
+      identity: { nodeId: 'node_truth_trap', encounterAttemptId: 'p1:slime:1' },
+    });
+    const instance = (cardId: string): string => {
+      const value = session.currentModel().cards.find(
+        (card) => card.cardId === cardId,
+      )?.instanceId;
+      if (value === undefined) throw new Error(`Expected ${cardId} in the current hand.`);
+      return value;
+    };
+    expect(session.currentModel().cards.find(
+      (card) => card.cardId === 'card_bat_threat',
+    )?.warningLabels).toEqual(['주의: 다혈질·진실 공격 위험']);
+
+    const truth = session.coordinator.submitTransaction({
+      cardId: 'card_bat_threat',
+      instanceId: instance('card_bat_threat'),
+      targetClaimId: 'clm_tutorial_who',
+      evidenceIds: [],
+    });
+    expect(truth.kind).toBe('COMMITTED');
+    if (truth.kind !== 'COMMITTED') throw new Error('unreachable');
+    expect(truth.resolution).toMatchObject({
+      code: 'R_TRUTH_ATTACKED',
+      effects: { composureDelta: 0, coercionDelta: 30, resistanceDelta: 0 },
+    });
+    expect(session.coordinator.snapshot.shieldDurabilityByClaimId?.clm_tutorial_who)
+      .toBe(1);
+
+    const breakShield = session.coordinator.submitTransaction({
+      cardId: 'card_leading_question',
+      instanceId: instance('card_leading_question'),
+      targetClaimId: 'clm_tutorial_when',
+      evidenceIds: ['ev_tutorial_gate_log'],
+    });
+    expect(breakShield.kind).toBe('COMMITTED');
+    if (breakShield.kind !== 'COMMITTED') throw new Error('unreachable');
+    expect(breakShield.resolution.effects).toMatchObject({
+      composureDelta: -10,
+      coercionDelta: 2,
+      resistanceDelta: -1,
+    });
+    expect(breakShield.resolution.effects.epistemicState).toBeUndefined();
+    expect(session.coordinator.snapshot.shieldDurabilityByClaimId?.clm_tutorial_when)
+      .toBe(0);
+    expect(session.coordinator.snapshot.claims.clm_tutorial_when?.epistemic)
+      .toBe('UNKNOWN');
+
+    const finish = session.coordinator.submitTransaction({
+      cardId: 'card_point_contradiction',
+      instanceId: instance('card_point_contradiction'),
+      targetClaimId: 'clm_tutorial_when',
+      evidenceIds: ['ev_tutorial_gate_log'],
+    });
+    expect(finish.kind).toBe('COMMITTED');
+    if (finish.kind !== 'COMMITTED') throw new Error('unreachable');
+    expect(finish.resolution.effects).toMatchObject({
+      composureDelta: -25,
+      coercionDelta: 5,
+      resistanceDelta: 0,
+      epistemicState: 'REFUTED',
+    });
+    expect(session.coordinator.snapshot.shieldDurabilityByClaimId?.clm_tutorial_when)
+      .toBe(0);
+  });
+
+  it('evaluates supporting evidence before an IGNORE/BREAK shield mode and gates truth damage', async () => {
+    const [caseDefinition, cardsDefinition, balance] = await Promise.all([
+      content('cases/tutorial/case.json').then((value) => CaseSchema.parse(value)),
+      content('common/cards.json').then((value) => CardsSchema.parse(value)),
+      content('common/balance.json').then((value) => BalanceSchema.parse(value)),
+    ]);
+    const guardedCards = CardsSchema.parse({
+      ...cardsDefinition,
+      cards: cardsDefinition.cards.map((card) =>
+        card.card_id === 'card_leading_question'
+          ? {
+              ...card,
+              modifiers: [
+                { type: 'ADJUST_RESOURCE', resource: 'composure', delta: -99 },
+                { type: 'MODIFY_SHIELDS', target: 'runtime-selected-claim', delta: -1 },
+              ],
+            }
+          : card,
+      ),
+    });
+    const session = await createEncounterSession({
+      caseRepository: { load: async () => caseDefinition },
+      cardRepository: { load: async () => guardedCards },
+      balanceRepository: { reload: async () => balance },
+      runSeed: 1,
+      turnLoop: 'V2_ATOMIC',
+      identity: { nodeId: 'node_evidence_truth', encounterAttemptId: 'p1:truth:1' },
+    });
+    const leading = session.currentModel().cards.find(
+      (card) => card.cardId === 'card_leading_question',
+    );
+    if (leading?.instanceId === undefined) throw new Error('Expected leading question.');
+    const result = session.coordinator.submitTransaction({
+      cardId: leading.cardId,
+      instanceId: leading.instanceId,
+      targetClaimId: 'clm_tutorial_who',
+      evidenceIds: ['ev_tutorial_roster'],
+    });
+    expect(result.kind).toBe('COMMITTED');
+    if (result.kind !== 'COMMITTED') throw new Error('unreachable');
+    expect(result.resolution).toMatchObject({
+      code: 'R_TRUTH_ATTACKED',
+      effects: { composureDelta: 0, coercionDelta: 17, resistanceDelta: 0 },
+    });
+    expect(session.coordinator.snapshot.shieldDurabilityByClaimId?.clm_tutorial_who)
+      .toBe(1);
+  });
+
+  it('advances logical and presented active-round cursors only through authored flow', async () => {
+    const [caseDefinition, cardsDefinition, balance] = await Promise.all([
+      content('cases/tutorial/case.json').then((value) => CaseSchema.parse(value)),
+      content('common/cards.json').then((value) => CardsSchema.parse(value)),
+      content('common/balance.json').then((value) => BalanceSchema.parse(value)),
+    ]);
+    const session = await createEncounterSession({
+      caseRepository: { load: async () => caseDefinition },
+      cardRepository: { load: async () => cardsDefinition },
+      balanceRepository: { reload: async () => balance },
+      encounterId: 'enc_tutorial_minotaur',
+      runSeed: 0,
+      turnLoop: 'V2_ATOMIC',
+      identity: { nodeId: 'node_rounds', encounterAttemptId: 'p1:minotaur:1' },
+    });
+    expect(session.coordinator.snapshot).toMatchObject({
+      activeRoundIndex: 0,
+      presentedRoundIndex: 0,
+    });
+    const proof = session.currentModel().cards.find(
+      (card) => card.cardId === 'card_decisive_proof',
+    );
+    if (proof?.instanceId === undefined) throw new Error('Expected decisive proof.');
+
+    const result = session.coordinator.submitTransaction({
+      cardId: proof.cardId,
+      instanceId: proof.instanceId,
+      targetClaimId: 'clm_tutorial_what',
+      evidenceIds: ['ev_tutorial_locker_inventory'],
+    });
+    expect(result.kind).toBe('COMMITTED');
+    if (result.kind !== 'COMMITTED') throw new Error('unreachable');
+    expect(result.resolution.code).toBe('R_DIRECT_CONTRADICTION');
+    expect(result.impactFrame.snapshot).toMatchObject({
+      activeRoundIndex: 0,
+      presentedRoundIndex: 0,
+    });
+    expect(result.settledFrame.snapshot).toMatchObject({
+      activeRoundIndex: 1,
+      presentedRoundIndex: 0,
+    });
+    expect(result.committedFrame.snapshot).toMatchObject({
+      activeRoundIndex: 1,
+      presentedRoundIndex: 1,
+    });
+    expect(session.targetClaimIdForFacet('HOW')).toBe('clm_tutorial_minotaur_how');
   });
 
   it('applies validated balance changes to the active encounter without restarting it', async () => {

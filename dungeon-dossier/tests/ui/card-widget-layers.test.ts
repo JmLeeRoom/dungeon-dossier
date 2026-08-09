@@ -18,7 +18,6 @@ vi.mock('../../src/ui/core/pixelText', async () => {
 import { createCardWidget, type CardFace } from '../../src/ui/widgets/cardWidget';
 import { createCardAttachments } from '../../src/ui/widgets/cardLayers';
 import {
-  CARD_COPY_Z_INDEX,
   CARD_LAYER_RECTS,
   CARD_LOCK_Z_INDEX,
   CARD_SIZE,
@@ -40,21 +39,17 @@ const fullyAttached = createCardAttachments({
   evidenceIds: ['ev1', 'ev2', 'ev3'],
 });
 
-describe('five-layer card composition', () => {
-  it('keeps the copy above every raster layer that can be docked later', () => {
+describe('eight-layer card composition', () => {
+  it('exposes the permanent cost, name, and ability layers independently', () => {
     const card = createCardWidget(FACE, {
       attachments: fullyAttached,
       resolveLayerUrl: () => WHITE_TEXTURE_URL,
     });
 
-    // The copy layer used to be a child of the base sprite, so a seal, a
-    // post-it or an evidence polaroid could cover the title and cost.
-    expect(card.copyLayer.zIndex).toBe(CARD_COPY_Z_INDEX);
-    const rasterZ = card.view.children
-      .filter((child) => child !== card.copyLayer)
-      .map((child) => child.zIndex);
-    expect(rasterZ.length).toBeGreaterThan(0);
-    expect(Math.max(...rasterZ)).toBeLessThan(card.copyLayer.zIndex);
+    expect(Object.keys(card.permanentLayers)).toEqual([
+      'base', 'cost', 'name', 'ability', 'illust',
+    ]);
+    expect(Object.values(card.permanentLayers).map((layer) => layer?.zIndex)).toEqual([0, 1, 2, 3, 4]);
     expect(card.view.sortableChildren).toBe(true);
 
     card.view.destroy({ children: true });
@@ -67,6 +62,9 @@ describe('five-layer card composition', () => {
     });
     expect(card.stack.map((slot) => slot.layer)).toEqual([
       'base',
+      'cost',
+      'name',
+      'ability',
       'illust',
       'stamp',
       'post',
@@ -74,8 +72,8 @@ describe('five-layer card composition', () => {
       'evidence',
       'evidence',
     ]);
-    // base + illust + stamp + post + 3 evidence + copy
-    expect(card.view.children).toHaveLength(8);
+    // five permanent layers + stamp + post + three evidence layers
+    expect(card.view.children).toHaveLength(10);
     card.view.destroy({ children: true });
   });
 
@@ -88,7 +86,7 @@ describe('five-layer card composition', () => {
     // The stack still records what is docked...
     expect(evidenceSlots.length).toBeGreaterThan(3);
     // ...but only three are composited, and all of them stay on the card.
-    const drawn = card.view.children.filter((child) => child.zIndex === 4);
+    const drawn = card.view.children.filter((child) => child.zIndex === 7);
     expect(drawn).toHaveLength(3);
     for (const child of drawn) {
       const half = CARD_LAYER_RECTS.evidence.width / 2;
@@ -133,7 +131,7 @@ describe('five-layer card composition', () => {
     );
     const overlay = locked.view.children.find((child) => child.zIndex === CARD_LOCK_Z_INDEX);
     expect(overlay).toBeInstanceOf(Container);
-    expect(CARD_LOCK_Z_INDEX).toBeGreaterThan(CARD_COPY_Z_INDEX);
+    expect(CARD_LOCK_Z_INDEX).toBeGreaterThan(7);
     // A scrim, the kiss art, and the remaining turn count.
     expect(overlay?.children.filter((child) => child instanceof Sprite)).toHaveLength(1);
     expect(overlay?.children.filter((child) => child instanceof Graphics)).toHaveLength(1);

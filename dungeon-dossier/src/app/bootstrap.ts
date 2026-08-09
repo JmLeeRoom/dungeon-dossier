@@ -59,7 +59,13 @@ import {
   type SuspectStatePart,
 } from '../dto';
 import type { ActionIntent, CutsceneDefinition } from '../engine/domain';
-import type { EncounterOutcome, OutcomeEvaluation } from '../engine/encounter';
+import type {
+  EncounterOutcome,
+  OutcomeEvaluation,
+  OutcomeReason,
+  SubmitRejectionReason,
+} from '../engine/encounter';
+import { interrogationV2TurnLoopEnabled } from './featureFlags';
 import {
   createNodeStrip,
   runEpisodeIds,
@@ -137,6 +143,7 @@ import {
   CARD_ILLUSTRATION_ASSET_KEYS,
   CARD_LOCK_OVERLAY_ASSET_KEY,
   CARD_LOCKED_ILLUSTRATION_ASSET_KEY,
+  CP_PIP_ASSET_KEYS,
   DETECTIVE_PHOTO_ASSET_KEY,
   HUD_ICON_ASSET_KEYS,
   INTERROGATION_BACKGROUND_ASSET_KEY,
@@ -210,6 +217,7 @@ function interrogationPresentationAssetKeys(
     model.backgroundAssetKey ?? INTERROGATION_BACKGROUND_ASSET_KEY,
     INTERROGATION_DESK_ASSET_KEY,
     ...Object.values(HUD_ICON_ASSET_KEYS),
+    ...Object.values(CP_PIP_ASSET_KEYS),
     ...Object.values(TAG_CHIP_ASSET_KEYS),
     CARD_BASE_ASSET_KEY,
     ...Object.values(CARD_ILLUSTRATION_ASSET_KEYS),
@@ -422,6 +430,36 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
     contentVersionsByDirectory,
   });
   let runSession = newRunSession(initialState);
+  // P0-3/P0-4 release gate: off = the shipped legacy submit/endTurn loop,
+  // on (production default; DEV may compare with `?v2turnloop=0`) = the
+  // atomic Submit + secure-decision + five-slot with-replacement loop.
+  const v2TurnLoop = interrogationV2TurnLoopEnabled(undefined, import.meta.env.DEV);
+  const outcomeEvaluationForCommit = (commit: {
+    readonly outcome: EncounterOutcome;
+    readonly reason: OutcomeReason;
+  }): OutcomeEvaluation => ({
+    terminalOutcome: commit.outcome,
+    terminal: true,
+    bestResolution: {
+      conditionsMet: commit.outcome === 'BEST_RESOLUTION',
+      secureStatementEnabled: false,
+    },
+    reason: commit.reason,
+  });
+  const v2RejectionMessage = (reason: SubmitRejectionReason): string => {
+    switch (reason) {
+      case 'CP':
+        return 'CP가 부족합니다. 다른 카드를 선택해 주세요.';
+      case 'EVIDENCE':
+        return '이 카드에 맞는 증거 구성이 아닙니다.';
+      case 'TAG':
+        return '이 진술 태그에는 그 카드를 쓸 수 없습니다.';
+      case 'BUSY':
+        return '지금은 제출할 수 없습니다.';
+      default:
+        return '이 대상에는 카드를 사용할 수 없습니다.';
+    }
+  };
   let encounterSession: EncounterSession | undefined;
   let dialogueService: Phase4DialogueService | undefined;
   let interrogation: InterrogationScreenController | undefined;
@@ -435,6 +473,11 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
   // widget survives long enough to notice a state change. Bootstrap is the only
   // layer that sees both sides of a re-mount.
   let lastSuspectStatePart: SuspectStatePart | undefined;
+  /**
+   * The two suspect-facing resources as of the previous mount, so a re-mount can
+   * tell a hit from a heal. Cleared with the suspect state on a new node.
+   */
+  let lastResources: { composure: number; coercion: number } | undefined;
   let lastSuspectEncounterId: string | undefined;
   let recordDevJudgment: ((input: unknown, result: unknown) => void) | undefined;
   let destroyDevConsole = (): void => undefined;
@@ -872,9 +915,15 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
     });
     let completed = false;
     const closing = cutsceneForTiming(event, 'AFTER');
-    const routeAfterEvent = (): void => {
+    const routeAfterEvent = (failureReason?: FailureReason): void => {
       const advance = (): void => {
         try {
+          // HP is the run's own life. An event that drained the last of it ends
+          // the run where it happened, rather than walking on to the next node.
+          if (failureReason !== undefined) {
+            mountDeadScene(failureReason, 0);
+            return;
+          }
           routeAfterBoundary();
         } catch (error) {
           handleFlowError(error, routeAfterBoundary);
@@ -893,8 +942,9 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
       retry: () => void,
     ): void => {
       completed = true;
+      let completion: ReturnType<typeof finishEvent>;
       try {
-        finishEvent(event, {
+        completion = finishEvent(event, {
           ...input,
           ...(progress.cutsceneOutcome === undefined
             ? {}
@@ -905,7 +955,7 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
         handleFlowError(error, retry);
         return;
       }
-      routeAfterEvent();
+      routeAfterEvent(completion?.failureReason);
     };
     const eventCallbacks: EventScreenCallbacks = {
       onChoice(choiceId: string): void {
@@ -1384,6 +1434,207 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
         }),
       );
     };
+    /**
+     * v2 atomic Submit (P0-3C): one valid play settles the whole turn inside
+     * the engine transaction. There is no "previous endTurn on the next
+     * Submit" branch here — a rejected Submit changed nothing, a committed
+     * one already consumed the turn and either continued, froze at the
+     * secure decision, or terminated.
+     */
+    const submitV2 = (
+      selection: InterrogationSelection,
+      targetClaimId: string,
+    ): void => {
+      const cardId = selection.cardId;
+      if (cardId === undefined) return;
+      const instanceId = screenModel.cards.find(
+        (card) => card.cardId === cardId,
+      )?.instanceId;
+      if (instanceId === undefined) {
+        controller.useFallbackStatement('제출할 카드를 다시 확인해 주세요.');
+        return;
+      }
+      audio.play('card_snap');
+      const modelBefore = active.currentModel();
+      const evidenceBefore = new Map(
+        modelBefore.dto.evidence.map((evidence) => [
+          evidence.evidenceId,
+          evidence.grade,
+        ]),
+      );
+      const submittedStatement = toRenderableClaims(modelBefore.dto).find(
+        (claim) => claim.claimId === targetClaimId,
+      )?.canonicalMeaning;
+      const submittedEvidenceNames = selection.evidenceIds.flatMap((evidenceId) => {
+        const item = modelBefore.dto.evidence.find(
+          (candidate) => candidate.evidenceId === evidenceId,
+        );
+        return item === undefined ? [] : [item.displayName];
+      });
+      const result = active.coordinator.submitTransaction({
+        cardId,
+        instanceId,
+        targetClaimId,
+        evidenceIds: selection.evidenceIds,
+      });
+      if (result.kind === 'REJECTED') {
+        // Nothing was consumed: no CP, no turn, no discard.
+        controller.useFallbackStatement(v2RejectionMessage(result.reason));
+        return;
+      }
+      const resolution = result.resolution;
+      const evidenceAfter = new Map(
+        active.currentModel().dto.evidence.map((evidence) => [
+          evidence.evidenceId,
+          evidence.grade,
+        ]),
+      );
+      const gradeOrder = ['C', 'B', 'A'] as const;
+      const evidenceWasDamaged = [...evidenceBefore].some(([evidenceId, grade]) => {
+        const currentGrade = evidenceAfter.get(evidenceId);
+        return currentGrade === undefined
+          || gradeOrder.indexOf(currentGrade) < gradeOrder.indexOf(grade);
+      });
+      if (evidenceWasDamaged) audio.play('shredder');
+      recordDevJudgment?.(
+        { source: 'ENCOUNTER_SUBMISSION', selection, nodeId: devState.nodeId },
+        {
+          resolutionCode: resolution.code,
+          outcome: result.phase === 'TERMINAL' ? result.outcome : null,
+          phase: result.phase,
+          turnsSpent: result.turnsSpent,
+        },
+      );
+      // The banner's number is the transaction's own action delta — the same
+      // clamped, modifier-adjusted change the gauge shows (§3.4.2).
+      const coercionRise = result.actionResourceDelta.coercion;
+      const presentJudgment = (): void => {
+        const controllerAfterMount = interrogation;
+        if (controllerAfterMount === undefined) return;
+        controllerAfterMount.showJudgmentFeedback(
+          buildJudgmentFeedback({
+            resolution,
+            ...(submittedStatement === undefined
+              ? {}
+              : { statement: submittedStatement }),
+            evidenceNames: submittedEvidenceNames,
+            ...(judgmentUiMap === undefined ? {} : { uiMap: judgmentUiMap }),
+          }),
+        );
+        controllerAfterMount.playCoercionRise(coercionRise);
+      };
+      if (result.phase === 'TERMINAL') {
+        mountInterrogation();
+        presentJudgment();
+        queueEncounterOutcome(outcomeEvaluationForCommit(result), resolution.code);
+        // Bridge the outcome-preload gap: the freshly published terminal
+        // INTERROGATION scene must not be actionable while the ending
+        // direction is still loading.
+        setAutoplayScene(undefined);
+        return;
+      }
+      if (result.phase === 'AWAIT_SECURE_DECISION') {
+        // §3.5.3: the decision is revealed in the same tick the judgment
+        // direction barrier ends — for the rail's keyboard owner, the rail's
+        // buttons, and the autoplay decision scene alike. Until then the
+        // pre-decision screen stays up behind the barrier.
+        presentJudgment();
+        cueResolution(audio, resolution.code);
+        showTimedDirection(
+          createJudgmentDirection(directionForResolution(resolution.code), { assets }),
+          () => {
+            mountInterrogation();
+            presentJudgment();
+          },
+        );
+        return;
+      }
+      // INPUT renders the next hand out of the same projected model.
+      mountInterrogation();
+      presentJudgment();
+      cueResolution(audio, resolution.code);
+      showTimedDirection(
+        createJudgmentDirection(directionForResolution(resolution.code), { assets }),
+      );
+      const reactionController = interrogation;
+      const selectedClaim = toRenderableClaims(active.currentModel().dto).find(
+        (claim) => claim.claimId === targetClaimId,
+      );
+      if (reactionController === undefined || selectedClaim === undefined) {
+        reactionController?.useFallbackStatement('판정 결과를 사건 기록에 반영했습니다.');
+        return;
+      }
+      const model = active.currentModel();
+      const request = {
+        allowedClaims: [selectedClaim],
+        reactionKey: resolution.reactionKey,
+        missingScopes: resolution.feedback?.missingScopes ?? [],
+        seed: stableDialogueSeed([
+          cardId,
+          selection.facet ?? '',
+          ...selection.evidenceIds,
+        ]),
+      } as const;
+      const requestReaction = (): void => {
+        try {
+          void dialogue
+            .renderReaction(request, {
+              aiEnabled: devState.aiEnabled,
+              composureBand: toComposureBand(
+                model.dto.resources.composure,
+                model.composureMax,
+              ),
+            })
+            .then((line) => {
+              if (interrogation === reactionController) {
+                reactionController.useFallbackStatement(line);
+              }
+            })
+            .catch((error: unknown) => {
+              if (interrogation === reactionController) {
+                handleFlowError(error, requestReaction);
+              }
+            });
+        } catch (error) {
+          if (interrogation === reactionController) {
+            handleFlowError(error, requestReaction);
+          }
+        }
+      };
+      requestReaction();
+    };
+    /** v2 secure-decision resolution; stale or duplicate inputs are no-ops. */
+    const resolveDecisionV2 = (
+      decisionId: string,
+      choice: 'SECURE' | 'CONTINUE',
+    ): void => {
+      if (outcomeTransitionPending) return;
+      try {
+        const result = active.coordinator.resolveSecureDecision(decisionId, choice);
+        if (result.kind === 'REJECTED') return;
+        recordDevJudgment?.(
+          {
+            source: 'SECURE_DECISION',
+            encounterId: active.encounterId,
+            decisionId,
+            choice,
+          },
+          { outcome: result.phase === 'TERMINAL' ? result.outcome : null },
+        );
+        if (result.phase === 'TERMINAL') {
+          mountInterrogation();
+          queueEncounterOutcome(outcomeEvaluationForCommit(result));
+          // Bridge the outcome-preload gap so the transient post-decision
+          // INTERROGATION scene is never actionable before the direction.
+          setAutoplayScene(undefined);
+          return;
+        }
+        audio.play('shuffle_bubble');
+        mountInterrogation();
+      } catch (error) {
+        handleFlowError(error, mountInterrogation);
+      }
+    };
     const interrogationCallbacks: InterrogationCallbacks = {
         onSelectionChange(selection): void {
           if (outcomeTransitionPending) return;
@@ -1403,6 +1654,12 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
             return;
           }
           try {
+            if (v2TurnLoop) {
+              submitV2(selection, targetClaimId);
+              return;
+            }
+            // Legacy loop only: the "previous endTurn on the next Submit"
+            // branch below is deleted with the interrogationV2TurnLoop gate.
             if (active.coordinator.snapshot.machine.state === 'CHECK_OUTCOME') {
               if (advanceEncounterTurn()) return;
             }
@@ -1557,6 +1814,11 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
         },
         onSecureStatement(): void {
           if (outcomeTransitionPending) return;
+          if (v2TurnLoop) {
+            const decisionId = screenModel.pendingDecision?.decisionId;
+            if (decisionId !== undefined) resolveDecisionV2(decisionId, 'SECURE');
+            return;
+          }
           try {
             const outcome = active.coordinator.secureStatement();
             recordDevJudgment?.(
@@ -1587,6 +1849,10 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
           : {}),
         onKeystroke(): void {
           audio.play('typewriter');
+        },
+        onResolveDecision(decisionId, choice): void {
+          if (!v2TurnLoop) return;
+          resolveDecisionV2(decisionId, choice);
         },
     };
     const controller = createInterrogationScreen(
@@ -1634,40 +1900,84 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
           effectiveCpCost <= coordinatorSnapshot.resources.commandPoints,
       }] as const;
     }));
-    setAutoplayScene({
-      kind: 'INTERROGATION',
-      encounterId: active.encounterId,
-      machineState: coordinatorSnapshot.machine.state,
-      turn: coordinatorSnapshot.resources.turn,
-      turnLimit: active.caseDefinition.metadata.estimated_turns,
-      secureStatementEnabled: screenModel.canSecureStatement === true,
-      model: screenModel,
-      caseDefinition: active.caseDefinition,
-      cardPlayability,
-      requiredObjectives: coordinatorSnapshot.objectives.required.map((objective) => ({
-        objectiveId: objective.objectiveId,
-        completed: objective.completed,
-      })),
-      displayStrings: collectAutoplaySceneStrings(screenModel),
-      submit: (submission): void => {
-        interrogationCallbacks.onSubmit?.({
-          cardId: submission.cardId,
-          facet: submission.facet,
-          evidenceIds: submission.evidenceIds,
-        });
-      },
-      endTurn: endTurnForAutoplay,
-      secureStatement: (): void => {
-        interrogationCallbacks.onSecureStatement?.();
-      },
-      skipTypewriter: (): void => {
-        controller.finishStatement();
-      },
-    });
+    const pendingDecisionView = screenModel.pendingDecision;
+    if (v2TurnLoop && pendingDecisionView !== undefined) {
+      // The decision window rejects every other gameplay action, so the port
+      // exposes only the typed decision. The scene is published now but the
+      // driver still sees DIRECTION until the judgment barrier ends, which
+      // reveals this scene in the same tick the rail becomes interactive.
+      const decisionId = pendingDecisionView.decisionId;
+      setAutoplayScene({
+        kind: 'SECURE_STATEMENT_DECISION',
+        encounterId: active.encounterId,
+        decisionId,
+        onDecline:
+          coordinatorSnapshot.pendingSecureDecision?.onDecline ??
+          'START_NEXT_TURN',
+        secure: (): void => {
+          resolveDecisionV2(decisionId, 'SECURE');
+        },
+        continueInterrogation: (): void => {
+          resolveDecisionV2(decisionId, 'CONTINUE');
+        },
+        skipTypewriter: (): void => {
+          controller.finishStatement();
+        },
+        displayStrings: collectAutoplaySceneStrings(screenModel),
+      });
+    } else {
+      setAutoplayScene({
+        kind: 'INTERROGATION',
+        encounterId: active.encounterId,
+        machineState: coordinatorSnapshot.machine.state,
+        turn: coordinatorSnapshot.resources.turn,
+        turnLimit: active.caseDefinition.metadata.estimated_turns,
+        secureStatementEnabled: screenModel.canSecureStatement === true,
+        model: screenModel,
+        caseDefinition: active.caseDefinition,
+        cardPlayability,
+        requiredObjectives: coordinatorSnapshot.objectives.required.map((objective) => ({
+          objectiveId: objective.objectiveId,
+          completed: objective.completed,
+        })),
+        displayStrings: collectAutoplaySceneStrings(screenModel),
+        submit: (submission): void => {
+          interrogationCallbacks.onSubmit?.({
+            cardId: submission.cardId,
+            facet: submission.facet,
+            evidenceIds: submission.evidenceIds,
+          });
+        },
+        // The public endTurn action does not exist in the v2 loop; a policy
+        // that still calls it must fail loudly instead of desyncing the run.
+        endTurn: v2TurnLoop
+          ? (): void => {
+              throw new Error('endTurn is not available in the v2 atomic turn loop.');
+            }
+          : endTurnForAutoplay,
+        secureStatement: (): void => {
+          interrogationCallbacks.onSecureStatement?.();
+        },
+        skipTypewriter: (): void => {
+          controller.finishStatement();
+        },
+      });
+    }
     const suspectTransition = detectSuspectTransition(
       { encounterId: lastSuspectEncounterId, statePart: lastSuspectStatePart },
       { encounterId: active.encounterId, statePart: screenModel.suspectStatePart },
     );
+    const nextResources = {
+      composure: screenModel.dto.resources.composure,
+      coercion: screenModel.dto.resources.coercion,
+    };
+    if (lastSuspectEncounterId === active.encounterId && lastResources !== undefined) {
+      controller.playResourceImpact({
+        composureDelta: nextResources.composure - lastResources.composure,
+        coercionDelta: nextResources.coercion - lastResources.coercion,
+      });
+    }
+    lastResources = nextResources;
     lastSuspectStatePart = screenModel.suspectStatePart;
     lastSuspectEncounterId = active.encounterId;
     if (suspectTransition !== undefined) controller.playSuspectTransition(suspectTransition);
@@ -1716,6 +2026,7 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
       devState.nodeId = node.ref;
       // A new node means a new suspect: the first mount must never shake.
       lastSuspectStatePart = undefined;
+      lastResources = undefined;
       lastSuspectEncounterId = undefined;
       if (node.kind === 'EVENT') {
         const definition = caseForNode(node);
@@ -1755,6 +2066,20 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
         fallbackRepository,
         relicDefinitions: runCatalog.relics.relics,
         enhancementDefinitions: runCatalog.enhancements.enhancements,
+        ...(v2TurnLoop
+          ? {
+              turnLoop: 'V2_ATOMIC' as const,
+              // Attempt identity from the run cursor. The per-retry ordinal
+              // and its persistence arrive with save v4 (P3); until then a
+              // fresh coordinator restarts its serial per mount.
+              identity: {
+                nodeId: node.ref,
+                encounterAttemptId:
+                  `boot:${node.ref}:${runSession.snapshot.nodeIndex}`,
+                initialDrawSerial: 0,
+              },
+            }
+          : {}),
       });
       if (destroyed) return;
       await assets.preloadKeys(
@@ -1882,7 +2207,7 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
       const modeParam = urlParams.get('mode');
       const policyParam = urlParams.get('policy');
       const autoplayModes: readonly AutoplayOptions['mode'][] =
-        ['watch', 'turbo', 'record', 'video', 'submission'];
+        ['watch', 'turbo', 'record', 'video', 'submission', 'slow'];
       const autoplayPolicies: readonly AutoplayOptions['policy'][] =
         ['best', 'partial', 'coerced', 'greedy', 'fuzz'];
       // A typo in a URL parameter must degrade to defaults, never crash boot.

@@ -68,7 +68,7 @@ describe('content repositories', () => {
     const loadedStrings = await new StringsRepository({ fetcher }).load();
 
     expect(loadedCase?.case_id).toBe('case_tutorial');
-    expect(loadedCards?.cards).toHaveLength(14);
+    expect(loadedCards?.cards).toHaveLength(19);
     expect(loadedBalance?.dmg.contradict).toBe(18);
     expect(balanceRepository.current()).toBe(loadedBalance);
     expect(loadedDialogue?.statements.clm_tutorial_who?.fallback).toHaveLength(1);

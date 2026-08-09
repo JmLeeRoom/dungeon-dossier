@@ -54,22 +54,22 @@ async function loadAllowlist(): Promise<Allowlist> {
 }
 
 describe('NHN asset allowlist', () => {
-  it('accounts for every PNG in the delivery: 93 = 72 adopted + 21 excluded', async () => {
+  it('accounts for every PNG in the delivery: 110 = 87 adopted + 23 excluded', async () => {
     const allowlist = await loadAllowlist();
     expect(allowlist.expectedSourcePngCount).toEqual({
-      adopted: 72,
-      excludedInScannedTree: 21,
-      totalInScannedTree: 93,
+      adopted: 87,
+      excludedInScannedTree: 23,
+      totalInScannedTree: 110,
     });
     expect(
       allowlist.expectedSourcePngCount.adopted +
         allowlist.expectedSourcePngCount.excludedInScannedTree,
     ).toBe(allowlist.expectedSourcePngCount.totalInScannedTree);
-    expect(allowlist.entries).toHaveLength(72);
+    expect(allowlist.entries).toHaveLength(87);
     expect(allowlist.expectedCategoryCounts).toEqual({
       characters: 20,
-      background: 13,
-      ui: 39,
+      background: 16,
+      ui: 51,
     });
     expect(validateAllowlist(allowlist)).toEqual([]);
   });
@@ -92,13 +92,13 @@ describe('NHN asset allowlist', () => {
     }, {});
     expect(perDirectory).toEqual({
       'assets/portraits': 20,
-      'assets/bg': 12,
+      'assets/bg': 15,
       // The desk is foreground, not background: it is the one background-folder
       // file that lands somewhere else.
       'assets/fg': 1,
       'assets/cards': 11,
       'assets/evidence': 6,
-      'assets/ui': 22,
+      'assets/ui': 34,
     });
   });
 
@@ -154,16 +154,20 @@ describe('NHN asset allowlist', () => {
       'ui_system_00.png',
     ]);
 
-    const rows = allowlist.entries.map((entry) => ({
+    const rows = allowlist.entries
+      .filter((entry) => entry.workbookRow !== undefined)
+      .map((entry) => ({
       row: entry.workbookRow,
       B: entry.targetPath.split('/').at(-1),
       C: entry.key.split('/')[0],
       D: entry.key.split('/')[1],
       E: entry.key.split('/')[2],
     }));
-    const parity = compareWorkbook(rows, allowlist);
+    // Only the rows the sheet covers are compared; later approvals carry no row.
+    const parity = compareWorkbook(rows.filter((row) => row.row !== undefined), allowlist);
     expect(parity.problems).toEqual([]);
     expect(parity.matched).toBe(72);
+    expect(parity.unrowed).toBe(15);
 
     // An undeclared mismatch is a failure, not a silent normalization.
     const tampered = rows.map((row) => (row.row === 40 ? { ...row, E: 'evidence3' } : row));
@@ -180,7 +184,7 @@ describe('NHN asset importer', () => {
     const result = await importNhnAssets({ mode: 'check' });
     expect(result.problems).toEqual([]);
     expect(result.ok).toBe(true);
-    expect(result.unchanged).toHaveLength(72);
+    expect(result.unchanged).toHaveLength(87);
     expect(result.written).toEqual([]);
     expect(result.stale).toEqual([]);
     expect(result.missing).toEqual([]);

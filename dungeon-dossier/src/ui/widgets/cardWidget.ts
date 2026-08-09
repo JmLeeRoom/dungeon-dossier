@@ -11,9 +11,7 @@ import {
 } from './cardLayers';
 import {
   CARD_COPY_FONT_SIZES,
-  CARD_COPY_LINE_HEIGHTS,
   CARD_COPY_RECTS,
-  CARD_COPY_Z_INDEX,
   CARD_LAYER_RECTS,
   CARD_LOCK_Z_INDEX,
   CARD_SIZE,
@@ -39,6 +37,9 @@ export interface CardFace {
   readonly cpCost: number;
   readonly description?: string;
   readonly ordinal?: number;
+  readonly roleLabel?: string;
+  readonly warningLabels?: readonly string[];
+  readonly affordable?: boolean;
   /** Rendered with the debuff overlay and, upstream, with input suppressed. */
   readonly locked?: boolean;
   readonly lockTurnsRemaining?: number;
@@ -59,8 +60,8 @@ export interface CardWidgetOptions {
 export interface CardWidget {
   readonly view: Container;
   readonly stack: readonly CardLayerSlot[];
-  /** The copy layer, guaranteed to be composited above every raster layer. */
-  readonly copyLayer: Container;
+  /** Named permanent layers make the eight-layer contract inspectable. */
+  readonly permanentLayers: Readonly<Partial<Record<CardLayerId, Container>>>;
 }
 
 function intentColour(intent: string): number {
@@ -86,25 +87,94 @@ function layerSprite(url: string, layer: CardLayerId): Sprite {
   return decorative(view);
 }
 
-/** Top-left cost chip. The badge plate keeps it legible over any base art. */
-function drawCpBadge(cpCost: number): Container {
+/** Approved CP coin and numeric value in the base art's upper COST slot. */
+function drawCpBadge(cpCost: number, iconUrl: string | undefined, affordable = true): Container {
   const rect = CARD_COPY_RECTS.cpBadge;
   const badge = new Container();
-  badge.addChild(
-    new Graphics()
-      .roundRect(rect.x, rect.y, rect.width, rect.height, 12)
-      .fill(UI_PALETTE.deepInk)
-      .roundRect(rect.x, rect.y, rect.width, rect.height, 12)
-      .stroke({ color: UI_PALETTE.parchmentDark, width: 4 }),
-  );
-  const label = createPixelText(`${cpCost} CP`, {
+  if (iconUrl !== undefined) {
+    const icon = Sprite.from(iconUrl);
+    icon.position.set(rect.x + 6, rect.y + 12);
+    icon.width = 56;
+    icon.height = 56;
+    badge.addChild(icon);
+  } else {
+    badge.addChild(
+      new Graphics()
+        .circle(rect.x + 34, rect.y + 40, 27)
+        .fill(affordable ? UI_PALETTE.amber : UI_PALETTE.panelLight)
+        .stroke({ color: UI_PALETTE.deepInk, width: 4 }),
+    );
+  }
+  const label = createPixelText(String(cpCost), {
     fontSize: CARD_COPY_FONT_SIZES.cpBadge,
-    fill: UI_PALETTE.paper,
+    fill: affordable ? UI_PALETTE.ink : UI_PALETTE.panelLight,
   });
   label.anchor.set(0.5);
-  label.position.set(rect.x + rect.width / 2, rect.y + rect.height / 2);
+  label.position.set(rect.x + 78, rect.y + 40);
   badge.addChild(label);
-  return badge;
+  return decorative(badge);
+}
+
+const LEGACY_ROLE_LABELS: Readonly<Record<string, string>> = {
+  QUERY: '질문',
+  CLARIFY: '해명',
+  CONFIRM: '사실 확인',
+  CONTRADICT: '모순 지적',
+  PRESSURE: '압박',
+  RECOVER: '진정',
+  FORENSIC: '과학 수사',
+  SPECIAL: '특수',
+  COMMIT: '확정',
+};
+
+function glyphWidthUnits(character: string): number {
+  if (/\s/u.test(character)) return 0.38;
+  return (character.codePointAt(0) ?? 0) <= 0x7f ? 0.62 : 1;
+}
+
+/** Deterministic pre-fit; the mask below remains the final overflow gate. */
+export function fitCardText(
+  text: string,
+  rect: Readonly<{ width: number; height: number }>,
+  maximumFontSize: number,
+  minimumFontSize: number,
+): Readonly<{ fontSize: number; lineHeight: number; lineCount: number }> {
+  for (let fontSize = maximumFontSize; fontSize >= minimumFontSize; fontSize -= 2) {
+    const capacity = rect.width / fontSize;
+    let used = 0;
+    let lines = 1;
+    for (const character of Array.from(text)) {
+      if (character === '\n') {
+        lines += 1;
+        used = 0;
+        continue;
+      }
+      const width = glyphWidthUnits(character);
+      if (used > 0 && used + width > capacity) {
+        lines += 1;
+        used = width;
+      } else {
+        used += width;
+      }
+    }
+    const lineHeight = fontSize + 6;
+    if (lines * lineHeight <= rect.height) return { fontSize, lineHeight, lineCount: lines };
+  }
+  const fontSize = minimumFontSize;
+  const lineHeight = fontSize + 6;
+  return {
+    fontSize,
+    lineHeight,
+    lineCount: Math.max(1, Math.floor(rect.height / lineHeight)),
+  };
+}
+
+function clippedTextLayer(text: Container, rect: Readonly<{ x: number; y: number; width: number; height: number }>): Container {
+  const holder = new Container();
+  const mask = new Graphics().rect(rect.x, rect.y, rect.width, rect.height).fill(0xffffff);
+  holder.addChild(text, mask);
+  holder.mask = mask;
+  return decorative(holder);
 }
 
 /**
@@ -114,15 +184,16 @@ function drawCpBadge(cpCost: number): Container {
  */
 function drawDescription(description: string): Container {
   const rect = CARD_COPY_RECTS.description;
+  const fit = fitCardText(description, rect, CARD_COPY_FONT_SIZES.description, 24);
   const body = createPixelText(description, {
-    fontSize: CARD_COPY_FONT_SIZES.description,
+    fontSize: fit.fontSize,
     fill: UI_PALETTE.ink,
     wordWrap: true,
     wordWrapWidth: rect.width,
-    lineHeight: CARD_COPY_LINE_HEIGHTS.description,
+    lineHeight: fit.lineHeight,
   });
   body.position.set(rect.x, rect.y);
-  return body;
+  return clippedTextLayer(body, rect);
 }
 
 /**
@@ -131,22 +202,21 @@ function drawDescription(description: string): Container {
  * layer docked afterwards — seals, post-its, evidence polaroids — could cover
  * the text the player needs in order to choose the card.
  */
-export function drawCardCopy(face: CardFace): Container {
+function drawNameLayer(face: CardFace): Container {
   const layer = new Container();
   const titleRect = CARD_COPY_RECTS.title;
+  const fit = fitCardText(face.title, titleRect, CARD_COPY_FONT_SIZES.title, 30);
   const title = createPixelText(face.title, {
-    fontSize: CARD_COPY_FONT_SIZES.title,
+    fontSize: fit.fontSize,
     fill: UI_PALETTE.ink,
     wordWrap: true,
     wordWrapWidth: titleRect.width,
     align: 'center',
-    lineHeight: CARD_COPY_LINE_HEIGHTS.title,
+    lineHeight: fit.lineHeight,
   });
   title.anchor.set(0.5, 0);
   title.position.set(titleRect.x + titleRect.width / 2, titleRect.y);
-  layer.addChild(title);
-
-  layer.addChild(drawCpBadge(face.cpCost));
+  layer.addChild(clippedTextLayer(title, titleRect));
 
   if (face.ordinal !== undefined) {
     // The hand slot number sits opposite the cost badge so both stay readable.
@@ -160,16 +230,36 @@ export function drawCardCopy(face: CardFace): Container {
     layer.addChild(ordinal);
   }
 
+  return decorative(layer);
+}
+
+function drawAbilityLayer(face: CardFace): Container {
+  const layer = new Container();
   const intentRect = CARD_COPY_RECTS.intent;
-  const intent = createPixelText(face.intent, {
+  const roleLabel = face.roleLabel ?? LEGACY_ROLE_LABELS[face.intent] ?? face.intent;
+  const intent = createPixelText(roleLabel, {
     fontSize: CARD_COPY_FONT_SIZES.intent,
     fill: intentColour(face.intent),
   });
   intent.position.set(intentRect.x, intentRect.y);
-  layer.addChild(intent);
+  layer.addChild(clippedTextLayer(intent, intentRect));
 
   if (face.description !== undefined && face.description !== '') {
     layer.addChild(drawDescription(face.description));
+  }
+
+  const warningText = face.warningLabels?.join(' · ');
+  if (warningText !== undefined && warningText !== '') {
+    const rect = CARD_COPY_RECTS.warning;
+    const warning = createPixelText(warningText, {
+      fontSize: CARD_COPY_FONT_SIZES.warning,
+      fill: UI_PALETTE.red,
+      wordWrap: true,
+      wordWrapWidth: rect.width,
+      lineHeight: rect.height,
+    });
+    warning.position.set(rect.x, rect.y);
+    layer.addChild(clippedTextLayer(warning, rect));
   }
 
   return decorative(layer);
@@ -307,6 +397,7 @@ export function createCardWidget(face: CardFace, options: CardWidgetOptions = {}
 
   const evidencePlacements = layoutCardEvidence(attachments.evidenceIds.length);
   let evidenceOrdinal = 0;
+  const permanentLayers: Partial<Record<CardLayerId, Container>> = {};
 
   for (const slot of stack) {
     const url = options.resolveLayerUrl?.(slot.layer, slot.attachmentId);
@@ -320,6 +411,12 @@ export function createCardWidget(face: CardFace, options: CardWidgetOptions = {}
       child = drawEvidence(url, placement);
     } else if (slot.layer === 'base') {
       child = drawBaseLayer(face, url);
+    } else if (slot.layer === 'cost') {
+      child = drawCpBadge(face.cpCost, url, face.affordable !== false);
+    } else if (slot.layer === 'name') {
+      child = drawNameLayer(face);
+    } else if (slot.layer === 'ability') {
+      child = drawAbilityLayer(face);
     } else if (url !== undefined) {
       child = layerSprite(url, slot.layer);
     } else if (slot.layer === 'illust') {
@@ -330,12 +427,11 @@ export function createCardWidget(face: CardFace, options: CardWidgetOptions = {}
       child = drawPostPlaceholder();
     }
     child.zIndex = slot.zIndex;
+    if (slot.attachmentId === undefined && slot.layer !== 'evidence') {
+      permanentLayers[slot.layer] = child;
+    }
     view.addChild(child);
   }
-
-  const copyLayer = drawCardCopy(face);
-  copyLayer.zIndex = CARD_COPY_Z_INDEX;
-  view.addChild(copyLayer);
 
   if (face.locked === true) {
     const lock = drawLockOverlay(face, options.lockOverlayUrl);
@@ -343,5 +439,5 @@ export function createCardWidget(face: CardFace, options: CardWidgetOptions = {}
     view.addChild(lock);
   }
 
-  return { view, stack, copyLayer };
+  return { view, stack, permanentLayers };
 }

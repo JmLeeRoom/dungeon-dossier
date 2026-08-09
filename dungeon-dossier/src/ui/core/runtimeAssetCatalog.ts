@@ -13,9 +13,9 @@ export const RUNTIME_ASSET_CATALOG: readonly RuntimeAssetCatalogEntry[] = RUNTIM
 
 /** The transitional population: the generated set plus the NHN deliverables. */
 export const EXPECTED_CATALOG_COUNTS = {
-  total: 127,
+  total: 142,
   legacyPlaceholder: 55,
-  nhn2026: 72,
+  nhn2026: 87,
 } as const;
 
 function indexBy(

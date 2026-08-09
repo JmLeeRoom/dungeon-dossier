@@ -337,7 +337,7 @@
       "resistance": 3,
       "is_required": false,
       "truth": {
-        "relation": "UNVERIFIABLE",
+        "relation": "CONSISTENT_WITH_WORLD",
         "contradicting_events": []
       }
     },
@@ -415,7 +415,7 @@
       "resistance": 3,
       "is_required": false,
       "truth": {
-        "relation": "UNVERIFIABLE",
+        "relation": "CONSISTENT_WITH_WORLD",
         "contradicting_events": []
       }
     },
@@ -453,7 +453,7 @@
       "resistance": 1,
       "is_required": true,
       "truth": {
-        "relation": "PARTIALLY_TRUE",
+        "relation": "CONSISTENT_WITH_WORLD",
         "contradicting_events": []
       }
     },
@@ -492,7 +492,7 @@
       "resistance": 3,
       "is_required": false,
       "truth": {
-        "relation": "UNVERIFIABLE",
+        "relation": "CONSISTENT_WITH_WORLD",
         "contradicting_events": []
       }
     }
@@ -706,6 +706,9 @@
           "confidence": 1,
           "contradicts_claim_ids": [
             "clm_ep004_when"
+          ],
+          "supports_claim_ids": [
+            "clm_ep004_dwarf_why"
           ]
         }
       ],
@@ -799,6 +802,9 @@
           "confidence": 1,
           "contradicts_claim_ids": [
             "clm_ep004_what"
+          ],
+          "supports_claim_ids": [
+            "clm_ep004_cyclops_why"
           ]
         }
       ],
@@ -939,6 +945,9 @@
           "confidence": 0.9,
           "contradicts_claim_ids": [
             "clm_ep004_fallen_hero_where"
+          ],
+          "supports_claim_ids": [
+            "clm_ep004_fallen_hero_what"
           ]
         }
       ],
@@ -1176,6 +1185,63 @@
           "ev_ep004_signal_switch_log"
         ]
       ]
+    },
+    {
+      "rule_id": "rule_ep004_dwarf_why_support",
+      "target_claim_id": "clm_ep004_dwarf_why",
+      "direction": "SUPPORT",
+      "requirements": {
+        "required_scopes": [
+          "TIME",
+          "SEQUENCE"
+        ],
+        "minimum_confidence": 0.8,
+        "minimum_independent_sources": 1,
+        "require_integrity": true
+      },
+      "guaranteed_evidence_sets": [
+        [
+          "ev_ep004_heat_clock"
+        ]
+      ]
+    },
+    {
+      "rule_id": "rule_ep004_cyclops_why_support",
+      "target_claim_id": "clm_ep004_cyclops_why",
+      "direction": "SUPPORT",
+      "requirements": {
+        "required_scopes": [
+          "ACTION",
+          "INTEGRITY"
+        ],
+        "minimum_confidence": 0.8,
+        "minimum_independent_sources": 1,
+        "require_integrity": true
+      },
+      "guaranteed_evidence_sets": [
+        [
+          "ev_ep004_audio_cache"
+        ]
+      ]
+    },
+    {
+      "rule_id": "rule_ep004_fallen_hero_what_support",
+      "target_claim_id": "clm_ep004_fallen_hero_what",
+      "direction": "SUPPORT",
+      "requirements": {
+        "required_scopes": [
+          "LOCATION",
+          "PRESENCE"
+        ],
+        "minimum_confidence": 0.8,
+        "minimum_independent_sources": 1,
+        "require_integrity": true
+      },
+      "guaranteed_evidence_sets": [
+        [
+          "ev_ep004_platform_manifest"
+        ]
+      ]
     }
   ],
   "encounters": [
@@ -1187,7 +1253,7 @@
         "cp_per_turn": 3,
         "cp_max": 3,
         "coercion_limit": 100,
-        "shields_per_round": 1
+        "shields_per_round": 2
       },
       "rounds": [
         {
@@ -1203,7 +1269,11 @@
           "shields": [
             {
               "claim_id": "clm_ep004_who",
-              "durability": 2
+              "durability": 1
+            },
+            {
+              "claim_id": "clm_ep004_dwarf_why",
+              "durability": 1
             }
           ]
         }
@@ -1362,7 +1432,7 @@
         "cp_per_turn": 2,
         "cp_max": 3,
         "coercion_limit": 100,
-        "shields_per_round": 1
+        "shields_per_round": 2
       },
       "rounds": [
         {
@@ -1378,7 +1448,11 @@
           "shields": [
             {
               "claim_id": "clm_ep004_where",
-              "durability": 2
+              "durability": 1
+            },
+            {
+              "claim_id": "clm_ep004_cyclops_why",
+              "durability": 1
             }
           ]
         }
@@ -1496,25 +1570,39 @@
             "clm_ep004_fallen_hero_who",
             "clm_ep004_fallen_hero_when",
             "clm_ep004_fallen_hero_where",
-            "clm_ep004_how"
+            "clm_ep004_how",
+            "clm_ep004_fallen_hero_what",
+            "clm_ep004_why"
           ],
           "shields": [
             {
               "claim_id": "clm_ep004_how",
-              "durability": 3
+              "durability": 1
+            },
+            {
+              "claim_id": "clm_ep004_fallen_hero_what",
+              "durability": 1
             }
           ]
         },
         {
           "round_id": "round_ep004_fallen_hero_02",
           "statement_claims": [
+            "clm_ep004_fallen_hero_who",
+            "clm_ep004_fallen_hero_when",
+            "clm_ep004_fallen_hero_where",
+            "clm_ep004_how",
             "clm_ep004_fallen_hero_what",
             "clm_ep004_why"
           ],
           "shields": [
             {
               "claim_id": "clm_ep004_why",
-              "durability": 2
+              "durability": 1
+            },
+            {
+              "claim_id": "clm_ep004_fallen_hero_when",
+              "durability": 1
             }
           ]
         }
@@ -1573,7 +1661,7 @@
       "modifiers": [
         {
           "modifier_id": "mod_ep004_fallen_hero_evidence_seal",
-          "trigger": "ON_TURN_START",
+          "trigger": "ON_TURN_START_PRE_DRAW",
           "condition": null,
           "effect": {
             "type": "SEAL_EVIDENCE",

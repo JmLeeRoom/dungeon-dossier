@@ -168,8 +168,11 @@ describe('FlowRunner', () => {
 });
 
 describe('ModifierSystem', () => {
-  it('publishes the fixed 11-trigger and 21-effect catalogues', () => {
-    expect(MODIFIER_TRIGGERS).toHaveLength(11);
+  it('publishes the fixed 13-trigger and 21-effect catalogues', () => {
+    expect(MODIFIER_TRIGGERS).toHaveLength(13);
+    expect(MODIFIER_TRIGGERS).toEqual(
+      expect.arrayContaining(['ON_TURN_START_PRE_DRAW', 'ON_HAND_READY']),
+    );
     expect(MODIFIER_EFFECT_TYPES).toEqual(
       expect.arrayContaining(['LOCK_CARD', 'SEAL_EVIDENCE', 'TRIGGER_QTE']),
     );

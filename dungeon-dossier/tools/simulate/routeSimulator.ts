@@ -322,6 +322,7 @@ function proofPathForObjective(
     const minimum = candidate.target.min_evidence ?? 0;
     const maximum = candidate.target.max_evidence ?? Number.POSITIVE_INFINITY;
     return (
+      candidate.legacy === true &&
       candidate.intent === intent &&
       candidate.target.kind === 'CLAIM' &&
       evidenceIds.length >= minimum &&

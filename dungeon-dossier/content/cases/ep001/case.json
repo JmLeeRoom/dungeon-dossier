@@ -337,7 +337,7 @@
       "resistance": 3,
       "is_required": false,
       "truth": {
-        "relation": "UNVERIFIABLE",
+        "relation": "CONSISTENT_WITH_WORLD",
         "contradicting_events": []
       }
     },
@@ -395,7 +395,7 @@
       "resistance": 2,
       "is_required": false,
       "truth": {
-        "relation": "UNVERIFIABLE",
+        "relation": "CONSISTENT_WITH_WORLD",
         "contradicting_events": []
       }
     },
@@ -493,10 +493,8 @@
       "resistance": 3,
       "is_required": false,
       "truth": {
-        "relation": "CONTRADICTED_BY_WORLD",
-        "contradicting_events": [
-          "evt_ep001_seal_payment"
-        ]
+        "relation": "CONSISTENT_WITH_WORLD",
+        "contradicting_events": []
       }
     }
   ],
@@ -806,6 +804,9 @@
           "confidence": 1,
           "contradicts_claim_ids": [
             "clm_ep001_what"
+          ],
+          "supports_claim_ids": [
+            "clm_ep001_orc_how"
           ]
         },
         {
@@ -927,6 +928,9 @@
           "confidence": 1,
           "contradicts_claim_ids": [
             "clm_ep001_why"
+          ],
+          "supports_claim_ids": [
+            "clm_ep001_goblin_why"
           ]
         }
       ],
@@ -1137,6 +1141,9 @@
           "confidence": 1,
           "contradicts_claim_ids": [
             "clm_ep001_succubus_where"
+          ],
+          "supports_claim_ids": [
+            "clm_ep001_succubus_what"
           ]
         }
       ],
@@ -1306,6 +1313,63 @@
           "ev_ep001_seal_residue"
         ]
       ]
+    },
+    {
+      "rule_id": "rule_ep001_goblin_why_support",
+      "target_claim_id": "clm_ep001_goblin_why",
+      "direction": "SUPPORT",
+      "requirements": {
+        "required_scopes": [
+          "MOTIVE",
+          "OWNERSHIP"
+        ],
+        "minimum_confidence": 0.8,
+        "minimum_independent_sources": 1,
+        "require_integrity": true
+      },
+      "guaranteed_evidence_sets": [
+        [
+          "ev_ep001_commission_note"
+        ]
+      ]
+    },
+    {
+      "rule_id": "rule_ep001_orc_how_support",
+      "target_claim_id": "clm_ep001_orc_how",
+      "direction": "SUPPORT",
+      "requirements": {
+        "required_scopes": [
+          "ACTION",
+          "OWNERSHIP"
+        ],
+        "minimum_confidence": 0.8,
+        "minimum_independent_sources": 1,
+        "require_integrity": true
+      },
+      "guaranteed_evidence_sets": [
+        [
+          "ev_ep001_cargo_manifest"
+        ]
+      ]
+    },
+    {
+      "rule_id": "rule_ep001_succubus_what_support",
+      "target_claim_id": "clm_ep001_succubus_what",
+      "direction": "SUPPORT",
+      "requirements": {
+        "required_scopes": [
+          "LOCATION",
+          "PRESENCE"
+        ],
+        "minimum_confidence": 0.8,
+        "minimum_independent_sources": 1,
+        "require_integrity": true
+      },
+      "guaranteed_evidence_sets": [
+        [
+          "ev_ep001_reception_register"
+        ]
+      ]
     }
   ],
   "encounters": [
@@ -1317,7 +1381,7 @@
         "cp_per_turn": 3,
         "cp_max": 3,
         "coercion_limit": 100,
-        "shields_per_round": 1
+        "shields_per_round": 2
       },
       "rounds": [
         {
@@ -1333,6 +1397,10 @@
           "shields": [
             {
               "claim_id": "clm_ep001_who",
+              "durability": 1
+            },
+            {
+              "claim_id": "clm_ep001_goblin_why",
               "durability": 1
             }
           ]
@@ -1442,7 +1510,7 @@
         "cp_per_turn": 3,
         "cp_max": 3,
         "coercion_limit": 100,
-        "shields_per_round": 1
+        "shields_per_round": 2
       },
       "rounds": [
         {
@@ -1458,7 +1526,11 @@
           "shields": [
             {
               "claim_id": "clm_ep001_where",
-              "durability": 2
+              "durability": 1
+            },
+            {
+              "claim_id": "clm_ep001_orc_how",
+              "durability": 1
             }
           ]
         }
@@ -1494,7 +1566,7 @@
       "modifiers": [
         {
           "modifier_id": "mod_ep001_orc_countdown",
-          "trigger": "ON_TURN_START",
+          "trigger": "ON_TURN_START_PRE_DRAW",
           "condition": null,
           "effect": {
             "type": "ADD_TIMER",
@@ -1512,7 +1584,7 @@
         },
         {
           "modifier_id": "mod_ep001_orc_evidence_damage",
-          "trigger": "ON_TURN_START",
+          "trigger": "ON_TURN_START_PRE_DRAW",
           "condition": null,
           "effect": {
             "type": "DAMAGE_EVIDENCE",
@@ -1600,24 +1672,38 @@
             "clm_ep001_succubus_who",
             "clm_ep001_succubus_when",
             "clm_ep001_succubus_where",
-            "clm_ep001_how"
+            "clm_ep001_how",
+            "clm_ep001_succubus_what",
+            "clm_ep001_why"
           ],
           "shields": [
             {
               "claim_id": "clm_ep001_how",
-              "durability": 2
+              "durability": 1
+            },
+            {
+              "claim_id": "clm_ep001_succubus_what",
+              "durability": 1
             }
           ]
         },
         {
           "round_id": "round_ep001_succubus_02",
           "statement_claims": [
+            "clm_ep001_succubus_who",
+            "clm_ep001_succubus_when",
+            "clm_ep001_succubus_where",
+            "clm_ep001_how",
             "clm_ep001_succubus_what",
             "clm_ep001_why"
           ],
           "shields": [
             {
               "claim_id": "clm_ep001_why",
+              "durability": 1
+            },
+            {
+              "claim_id": "clm_ep001_succubus_what",
               "durability": 1
             }
           ]
@@ -1675,7 +1761,7 @@
       "modifiers": [
         {
           "modifier_id": "mod_ep001_succubus_card_lock",
-          "trigger": "ON_ENCOUNTER_START",
+          "trigger": "ON_HAND_READY",
           "condition": null,
           "effect": {
             "type": "LOCK_CARD",

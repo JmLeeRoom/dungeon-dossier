@@ -60,11 +60,19 @@ function evidenceEntry(spec: EvidenceSpec): unknown {
   };
 }
 
-function claimEntry(claimId: string): unknown {
+const ROUND_FACETS = ['WHO', 'WHEN', 'WHERE', 'WHAT', 'HOW', 'WHY'] as const;
+
+function roundClaimIds(claimId: string): readonly string[] {
+  return ROUND_FACETS.map((facet) =>
+    facet === 'WHO' ? claimId : `${claimId}_${facet.toLowerCase()}`,
+  );
+}
+
+function claimEntry(claimId: string, facet: (typeof ROUND_FACETS)[number]): unknown {
   return {
     claim_id: claimId,
     speaker: SUSPECT_ID,
-    facet: 'WHO',
+    facet,
     canonical_meaning: 'the suspect denies being present',
     predicate: 'denies',
     initial: { commitment: 'ASSERTED', presentation: 'NORMAL' },
@@ -96,9 +104,16 @@ function encounterEntry(encounterId: string, nodeId: string, claimId: string): u
       cp_per_turn: 3,
       cp_max: 9,
       coercion_limit: 5,
-      shields_per_round: 0,
+      shields_per_round: 2,
     },
-    rounds: [{ round_id: `round_${encounterId}`, statement_claims: [claimId], shields: [] }],
+    rounds: [{
+      round_id: `round_${encounterId}`,
+      statement_claims: roundClaimIds(claimId),
+      shields: [
+        { claim_id: claimId, durability: 1 },
+        { claim_id: `${claimId}_why`, durability: 1 },
+      ],
+    }],
     flow_nodes: [
       {
         node_id: nodeId,
@@ -198,7 +213,14 @@ function buildCase(spec: CaseSpec): CaseDefinition {
       reactions: {},
       confession: { full: ['내가 했다.'], coerced: ['그렇다고 해두자.'] },
     },
-    claims: spec.claims.map(claimEntry),
+    claims: spec.claims.flatMap((claimId) =>
+      ROUND_FACETS.map((facet) =>
+        claimEntry(
+          facet === 'WHO' ? claimId : `${claimId}_${facet.toLowerCase()}`,
+          facet,
+        ),
+      ),
+    ),
   });
 }
 

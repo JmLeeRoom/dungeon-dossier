@@ -24,6 +24,7 @@ import {
   CARD_LAYER_RECTS,
   CARD_MODAL_BOX,
   CARD_REST_REVEAL_RATIO,
+  CARD_SELECTED_REVEAL_RATIO,
   CARD_SIZE,
   cardLayerZIndex,
   cardRevealHeight,
@@ -39,22 +40,29 @@ import {
   TAG_ROW_Y,
 } from '../../src/ui/screens/interrogation/createInterrogationScreen';
 
-describe('five-layer card stack', () => {
-  it('orders the layers base, illust, stamp, post, evidence', () => {
-    expect(CARD_LAYER_IDS).toEqual(['base', 'illust', 'stamp', 'post', 'evidence']);
-    expect(CARD_LAYER_Z_INDEX).toEqual({ base: 0, illust: 1, stamp: 2, post: 3, evidence: 4 });
-    expect(CARD_PERMANENT_LAYER_IDS).toEqual(['base', 'illust']);
+describe('eight-layer card stack', () => {
+  it('orders the authored base, cost, name, ability, art, and attachment layers', () => {
+    expect(CARD_LAYER_IDS).toEqual([
+      'base', 'cost', 'name', 'ability', 'illust', 'stamp', 'post', 'evidence',
+    ]);
+    expect(CARD_LAYER_Z_INDEX).toEqual({
+      base: 0, cost: 1, name: 2, ability: 3, illust: 4, stamp: 5, post: 6, evidence: 7,
+    });
+    expect(CARD_PERMANENT_LAYER_IDS).toEqual(['base', 'cost', 'name', 'ability', 'illust']);
     expect(CARD_ATTACHABLE_LAYER_IDS).toEqual(['stamp', 'post', 'evidence']);
-    expect(CARD_LAYER_IDS.map(cardLayerZIndex)).toEqual([0, 1, 2, 3, 4]);
+    expect(CARD_LAYER_IDS.map(cardLayerZIndex)).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
     expect(isCardLayerId('post')).toBe(true);
     expect(isCardLayerId('shadow')).toBe(false);
   });
 
-  it('renders only base and illust before anything is docked', () => {
+  it('renders all five permanent layers before anything is docked', () => {
     const stack = buildCardLayerStack();
     expect(stack).toEqual([
       { layer: 'base', zIndex: 0, attachmentId: undefined },
-      { layer: 'illust', zIndex: 1, attachmentId: undefined },
+      { layer: 'cost', zIndex: 1, attachmentId: undefined },
+      { layer: 'name', zIndex: 2, attachmentId: undefined },
+      { layer: 'ability', zIndex: 3, attachmentId: undefined },
+      { layer: 'illust', zIndex: 4, attachmentId: undefined },
     ]);
   });
 
@@ -67,14 +75,17 @@ describe('five-layer card stack', () => {
     const stack = buildCardLayerStack(attachments);
     expect(stack.map((slot) => slot.layer)).toEqual([
       'base',
+      'cost',
+      'name',
+      'ability',
       'illust',
       'stamp',
       'post',
       'evidence',
       'evidence',
     ]);
-    expect(stack.map((slot) => slot.zIndex)).toEqual([0, 1, 2, 3, 4, 4]);
-    expect(stack.at(-1)).toEqual({ layer: 'evidence', zIndex: 4, attachmentId: 'evidence-photo' });
+    expect(stack.map((slot) => slot.zIndex)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 7]);
+    expect(stack.at(-1)).toEqual({ layer: 'evidence', zIndex: 7, attachmentId: 'evidence-photo' });
     expect([...stack].sort((left, right) => left.zIndex - right.zIndex)).toEqual(stack);
   });
 
@@ -131,9 +142,10 @@ describe('five-layer card stack', () => {
 });
 
 describe('card hand reveal and focus modal', () => {
-  it('shows the top 20% at rest and lifts to 40% on hover', () => {
+  it('shows 20% at rest, 40% on hover, and the whole selected card', () => {
     expect(CARD_REST_REVEAL_RATIO).toBe(0.2);
     expect(CARD_HOVER_REVEAL_RATIO).toBe(0.4);
+    expect(CARD_SELECTED_REVEAL_RATIO).toBe(1);
     // 3/16 of 768x1024. Both dimensions stay whole, so the reveal heights and
     // the hit rectangle land on integers too.
     expect({ width: CARD_FAN_WIDTH, height: CARD_FAN_HEIGHT }).toEqual({ width: 144, height: 192 });
@@ -141,6 +153,7 @@ describe('card hand reveal and focus modal', () => {
 
     expect(cardRevealHeight(CARD_REST_REVEAL_RATIO)).toBe(38);
     expect(cardRevealHeight(CARD_HOVER_REVEAL_RATIO)).toBe(77);
+    expect(cardRevealHeight(CARD_SELECTED_REVEAL_RATIO)).toBe(192);
     expect(cardRevealHeight(2)).toBe(CARD_FAN_HEIGHT);
     expect(cardRevealHeight(-1)).toBe(0);
     expect(cardRevealHeight(Number.NaN)).toBe(0);
@@ -152,6 +165,7 @@ describe('card hand reveal and focus modal', () => {
     expect(slots.map((slot) => slot.x)).toEqual([96, 172, 248, 324, 400]);
     expect(new Set(slots.map((slot) => slot.restY))).toEqual(new Set([362]));
     expect(new Set(slots.map((slot) => slot.hoverY))).toEqual(new Set([323]));
+    expect(new Set(slots.map((slot) => slot.selectedY))).toEqual(new Set([208]));
     expect(slots[2]?.rotation).toBe(0);
     expect(slots[0]?.rotation).toBe(-0.04);
     expect(layoutCardHand(0)).toEqual([]);

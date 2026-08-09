@@ -99,7 +99,7 @@ describe('domain content schemas', () => {
     ).toBe(true);
   });
 
-  it('requires exactly 14 uniquely identified card definitions', () => {
+  it('allows an extensible catalogue with at least five unique card definitions', () => {
     const cards = Array.from({ length: 14 }, (_, index) => createCard(index));
     expect(
       CardsSchema.safeParse({
@@ -109,7 +109,7 @@ describe('domain content schemas', () => {
       }).success,
     ).toBe(true);
     expect(
-      CardsSchema.safeParse({ schema_version: '1.0', cards: cards.slice(0, 13) }).success,
+      CardsSchema.safeParse({ schema_version: '1.0', cards: cards.slice(0, 4) }).success,
     ).toBe(false);
     expect(
       CardsSchema.safeParse({

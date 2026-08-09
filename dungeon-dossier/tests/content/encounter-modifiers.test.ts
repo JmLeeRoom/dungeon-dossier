@@ -30,7 +30,7 @@ const CANONICAL_MODIFIERS = [
   },
   {
     encounterId: 'enc_tutorial_harpy',
-    trigger: 'ON_TURN_START',
+    trigger: 'ON_TURN_START_PRE_DRAW',
     effects: ['TRIGGER_QTE'],
   },
   {
@@ -45,13 +45,18 @@ const CANONICAL_MODIFIERS = [
   },
   {
     encounterId: 'enc_ep001_orc',
-    trigger: 'ON_TURN_START',
+    trigger: 'ON_TURN_START_PRE_DRAW',
     effects: ['ADD_TIMER', 'DAMAGE_EVIDENCE'],
   },
   {
     encounterId: 'enc_ep001_succubus',
     trigger: 'ON_ENCOUNTER_START',
-    effects: ['LOCK_CARD', 'ADD_TIMER'],
+    effects: ['ADD_TIMER'],
+  },
+  {
+    encounterId: 'enc_ep001_succubus',
+    trigger: 'ON_HAND_READY',
+    effects: ['LOCK_CARD'],
   },
   {
     encounterId: 'enc_ep004_dwarf',
@@ -65,7 +70,7 @@ const CANONICAL_MODIFIERS = [
   },
   {
     encounterId: 'enc_ep004_fallen_hero',
-    trigger: 'ON_TURN_START',
+    trigger: 'ON_TURN_START_PRE_DRAW',
     effects: ['SEAL_EVIDENCE'],
   },
 ] as const;
@@ -284,7 +289,7 @@ describe('authored encounter modifiers', () => {
         coercion: 0,
       }),
       encounter.modifiers,
-      'ON_TURN_START',
+      'ON_TURN_START_PRE_DRAW',
     );
 
     expect(result.appliedModifierIds).toEqual([

@@ -235,6 +235,14 @@ export function validateAllowlist(allowlist) {
  * each is declared in `workbookKeyNormalizations` rather than silently
  * accepted, so an undeclared future mismatch still fails.
  */
+/**
+ * Checks the entries the naming workbook actually covers.
+ *
+ * The workbook is a snapshot of one delivery. Later deliveries add files before
+ * the sheet is revised, so an entry without a `workbookRow` is approved by the
+ * allowlist alone and is not a parity failure — only a row that disagrees with
+ * its filename is.
+ */
 export function compareWorkbook(rows, allowlist) {
   const problems = [];
   const [firstRow, lastRow] = allowlist.workbook.runtimeRows;
@@ -242,14 +250,15 @@ export function compareWorkbook(rows, allowlist) {
   const normalizations = new Map(
     allowlist.workbookKeyNormalizations.map((item) => [item.workbookRow, item]),
   );
+  const workbookEntries = allowlist.entries.filter((entry) => entry.workbookRow !== undefined);
 
-  if (runtimeRows.length !== allowlist.entries.length) {
+  if (runtimeRows.length !== workbookEntries.length) {
     problems.push(
-      `workbook rows ${firstRow}-${lastRow} hold ${runtimeRows.length} entries, allowlist has ${allowlist.entries.length}`,
+      `workbook rows ${firstRow}-${lastRow} hold ${runtimeRows.length} entries, allowlist has ${workbookEntries.length} rowed entries`,
     );
   }
 
-  const entriesByRow = new Map(allowlist.entries.map((entry) => [entry.workbookRow, entry]));
+  const entriesByRow = new Map(workbookEntries.map((entry) => [entry.workbookRow, entry]));
   let matched = 0;
 
   for (const row of runtimeRows) {
@@ -294,7 +303,13 @@ export function compareWorkbook(rows, allowlist) {
     problems.push(`workbook reference row ${leakedReference.row} (${leakedReference.B}) was adopted for runtime`);
   }
 
-  return { matched, total: allowlist.entries.length, referenceRows: referenceRows.length, problems };
+  return {
+    matched,
+    total: workbookEntries.length,
+    unrowed: allowlist.entries.length - workbookEntries.length,
+    referenceRows: referenceRows.length,
+    problems,
+  };
 }
 
 async function readTarget(projectRoot, entry) {
@@ -479,7 +494,9 @@ function report(result) {
   }
   if (result.workbook !== undefined) {
     lines.push(
-      `  workbook parity  ${result.workbook.matched}/${result.workbook.total} runtime rows, ${result.workbook.referenceRows} reference rows excluded`,
+      `  workbook parity  ${result.workbook.matched}/${result.workbook.total} runtime rows` +
+        `, ${result.workbook.unrowed} approved after the sheet` +
+        `, ${result.workbook.referenceRows} reference rows excluded`,
     );
   }
   lines.push(

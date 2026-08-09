@@ -31,9 +31,11 @@ describe('integer stage geometry', () => {
     [1280, 800, 2, 1280, 800, 0, 0, true],
     [2560, 1600, 2, 1280, 800, 640, 400, true],
     [1280, 900, 2, 1280, 800, 0, 50, true],
+    [1280, 720, 1.8, 1152, 720, 64, 0, true],
+    [1366, 768, 1.92, 1228.8, 768, 68, 0, true],
     [639, 399, 1, 640, 400, -1, -1, false],
   ])(
-    'letterboxes %ix%i without fractional scaling',
+    'letterboxes %ix%i with a 2x ceiling and a fractional sub-800px fallback',
     (containerWidth, containerHeight, scale, width, height, offsetX, offsetY, fits) => {
       expect(calculateIntegerViewport(containerWidth, containerHeight)).toEqual({
         scale,

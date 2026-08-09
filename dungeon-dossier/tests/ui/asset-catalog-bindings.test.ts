@@ -9,7 +9,9 @@ import {
   CARD_ILLUSTRATION_ASSET_KEYS,
   CARD_LOCKED_ILLUSTRATION_ASSET_KEY,
   CARD_LOCK_OVERLAY_ASSET_KEY,
+  CP_PIP_ASSET_KEYS,
   DETECTIVE_PHOTO_ASSET_KEY,
+  HP_ICON_ASSET_KEY,
   EVIDENCE_ASSET_KEYS,
   HUD_ICON_ASSET_KEYS,
   INTERROGATION_BACKGROUND_ASSET_KEY,
@@ -20,6 +22,7 @@ import {
   RESULT_ASSET_KEYS,
   SUSPECTS_AWAITING_ART,
   SUSPECT_ASSET_SETS,
+  TITLE_MENU_ASSET_KEYS,
   allBoundAssetKeys,
   interrogationBackgroundAssetKey,
   legacySuspectAssetSet,
@@ -38,7 +41,7 @@ import {
 import { TAG_CHIP_ASSET_KEYS, TAG_CHIP_STATES } from '../../src/ui/widgets/tagChip';
 
 describe('runtime asset catalog', () => {
-  it('accounts for the whole transitional set: 127 = 55 legacy + 72 approved', () => {
+  it('accounts for the whole transitional set: 142 = 55 legacy + 87 approved', () => {
     expect(validateRuntimeAssetCatalog()).toEqual([]);
     expect(RUNTIME_ASSET_CATALOG).toHaveLength(EXPECTED_CATALOG_COUNTS.total);
     expect(catalogCountsByProvenance()).toEqual({
@@ -72,7 +75,11 @@ describe('runtime asset catalog', () => {
         expect(entry.palettePolicy, entry.key).toBe('approved-production');
         expect(entry.sha256, entry.key).toMatch(/^[0-9a-f]{64}$/u);
         expect(entry.sourcePath, entry.key).toBeDefined();
-        expect(entry.sourceWorkbookRow, entry.key).toBeGreaterThan(0);
+        // The workbook row is only present for files the naming sheet covered
+        // when it was written; a later delivery is approved by the allowlist.
+        if (entry.sourceWorkbookRow !== undefined) {
+          expect(entry.sourceWorkbookRow, entry.key).toBeGreaterThan(0);
+        }
       } else {
         expect(entry.palettePolicy, entry.key).toBe('strict16');
         expect(entry.sourcePath, entry.key).toBeUndefined();
@@ -176,7 +183,7 @@ describe('app-layer asset bindings', () => {
     for (const cardId of CARDS_AWAITING_ART) {
       expect(CARD_ILLUSTRATION_ASSET_KEYS[cardId], cardId).toBeUndefined();
     }
-    expect(Object.keys(CARD_ILLUSTRATION_ASSET_KEYS).length + CARDS_AWAITING_ART.length).toBe(14);
+    expect(Object.keys(CARD_ILLUSTRATION_ASSET_KEYS).length + CARDS_AWAITING_ART.length).toBe(19);
 
     expect(catalogEntry(CARD_BASE_ASSET_KEY)).toMatchObject({ width: 768, height: 1024 });
     expect(catalogEntry(CARD_LOCKED_ILLUSTRATION_ASSET_KEY)).toBeDefined();
@@ -216,8 +223,20 @@ describe('app-layer asset bindings', () => {
     }
 
     expect(catalogEntry(DETECTIVE_PHOTO_ASSET_KEY)).toMatchObject({ width: 256, height: 256 });
-    // The intern is the paper-cup slime, so one photograph serves both roles.
-    expect(PARTNER_PHOTO_ASSET_KEY).toBe(BOARD_NODE_PHOTO_ASSET_KEYS.enc_tutorial_slime);
+    // The intern now has his own photograph. Sharing the slime suspect's used to
+    // put the same face on the partner card and on a board node.
+    expect(PARTNER_PHOTO_ASSET_KEY).toBe('ui/photo/coffee');
+    expect(PARTNER_PHOTO_ASSET_KEY).not.toBe(BOARD_NODE_PHOTO_ASSET_KEYS.enc_tutorial_slime);
+    expect(catalogEntry(PARTNER_PHOTO_ASSET_KEY)).toMatchObject({ width: 256, height: 256 });
+
+    // The command point is a coin with a spent state, and HP is a heart.
+    expect(catalogEntry(CP_PIP_ASSET_KEYS.active)).toMatchObject({ width: 32, height: 32 });
+    expect(catalogEntry(CP_PIP_ASSET_KEYS.deactive)).toMatchObject({ width: 32, height: 32 });
+    expect(catalogEntry(HP_ICON_ASSET_KEY)).toMatchObject({ width: 32, height: 32 });
+    for (const states of Object.values(TITLE_MENU_ASSET_KEYS)) {
+      expect(catalogEntry(states.active), states.active).toBeDefined();
+      expect(catalogEntry(states.deactive), states.deactive).toBeDefined();
+    }
     expect(PARTNER_ASSET_SET.base).toBe('idle/coffee/base');
     expect(PARTNER_USED_ASSET_KEY).toBe('idle/coffee/used');
 

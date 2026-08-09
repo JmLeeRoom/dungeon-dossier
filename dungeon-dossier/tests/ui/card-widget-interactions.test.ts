@@ -109,7 +109,7 @@ describe('card fan pointer interactions', () => {
     expect(onDropOnTarget).toHaveBeenCalledWith(CARDS[0], 'WHO');
     expect(onTargetHighlight).toHaveBeenLastCalledWith(undefined);
     expect(fan.linkView.visible).toBe(false);
-    expect(first.position.y).toBe(362);
+    expect(first.position.y).toBe(208);
 
     // A bubbled/global release after the card release must not duplicate docking.
     emit(fan.view, 'globalpointerup', { global: { x: 60, y: 260 } });
@@ -118,7 +118,7 @@ describe('card fan pointer interactions', () => {
     fan.destroy();
   });
 
-  it('distinguishes a click from a drag and opens focus after release dispatch', () => {
+  it('selects on the first click and opens focus only on the second click', () => {
     vi.useFakeTimers();
     const onFocus = vi.fn();
     const fan = createCardFan(CARDS, { onFocus });
@@ -129,6 +129,11 @@ describe('card fan pointer interactions', () => {
     emit(first, 'pointerup', { global: { x: 110, y: 380 } });
     expect(onFocus).not.toHaveBeenCalled();
 
+    vi.runAllTimers();
+    expect(onFocus).not.toHaveBeenCalled();
+
+    emit(first, 'pointerdown', { global: { x: 110, y: 240 } });
+    emit(first, 'pointerup', { global: { x: 110, y: 240 } });
     vi.runAllTimers();
     expect(onFocus).toHaveBeenCalledOnce();
     expect(onFocus).toHaveBeenCalledWith(CARDS[0], 0);
