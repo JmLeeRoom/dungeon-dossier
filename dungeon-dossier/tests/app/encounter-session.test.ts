@@ -233,6 +233,11 @@ describe('encounter app session', () => {
     expect(model.cards.map((card) => card.cardId)).toEqual(
       instances.map((instance) => instance.blueprintId),
     );
+    const duplicateGroup = model.cards.filter(
+      (card) => model.cards.filter((candidate) => candidate.cardId === card.cardId).length > 1,
+    );
+    expect(duplicateGroup).toHaveLength(2);
+    expect(new Set(duplicateGroup.map((card) => card.instanceId)).size).toBe(2);
     expect(model.pendingDecision).toBeUndefined();
     expect(model.canSecureStatement).toBe(false);
 

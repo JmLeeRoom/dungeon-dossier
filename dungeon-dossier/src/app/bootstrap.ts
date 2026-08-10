@@ -9,6 +9,7 @@ import {
 import type { CutsceneSelection } from '../ui/screens/cutscene';
 import {
   createEndingDirection,
+  createInterrogationIntroModal,
   createInterrogationScreen,
   createJudgmentDirection,
   directionForOutcome,
@@ -153,6 +154,9 @@ import {
 } from './uiAssetBindings';
 import { TAG_CHIP_ASSET_KEYS } from '../ui/widgets';
 import type { RunStripScreenModel } from '../ui/screens/strip';
+import { isRunResetRequested } from './runReset';
+
+const AUTOPLAY_INTRO_DELAY_MS = 300;
 
 function stableDialogueSeed(parts: readonly string[]): number {
   let seed = 2_166_136_261;
@@ -363,6 +367,7 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
     autoplayParameter,
     import.meta.env.DEV,
   );
+  const resetRequested = isRunResetRequested(urlParams.get('reset'));
   const devSeedParam = import.meta.env.DEV ? urlParams.get('seed') : null;
   const runSeedOverride = parseAutoplaySeedParameter(devSeedParam);
 
@@ -370,7 +375,7 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
   // locks, and other same-origin preferences must survive in localStorage.
   const saveRepository = createRunSaveRepository(
     window.localStorage,
-    autoplayRequested,
+    autoplayRequested || resetRequested,
   );
   // A resumed run must walk the exact route it was saved on, so the saved seed
   // wins over the URL seed whenever a save exists.
@@ -463,6 +468,10 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
   let encounterSession: EncounterSession | undefined;
   let dialogueService: Phase4DialogueService | undefined;
   let interrogation: InterrogationScreenController | undefined;
+  // One briefing per encounter-node session. Turn remounts retain this flag;
+  // a new node session or explicit run reset clears it before opening.
+  let hasShownIntroModal = false;
+  let introModalNodeId: string | undefined;
   let openingNode = false;
   let destroyed = false;
   let audioActivated = false;
@@ -706,6 +715,18 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
     });
   };
 
+  /**
+   * Keep the board as the translucent briefing backdrop, but do not require a
+   * second Continue click after an explicit reset or an ending-screen restart.
+   */
+  async function openResetRun(): Promise<void> {
+    hasShownIntroModal = false;
+    introModalNodeId = undefined;
+    await mountStrip();
+    if (destroyed) return;
+    await openCurrentNode();
+  }
+
   const mountEnding = async (): Promise<void> => {
     encounterSession = undefined;
     dialogueService = undefined;
@@ -723,7 +744,7 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
         runSession = newRunSession(freshState());
         syncDevFlags();
         devState.nodeId = strip[0]?.ref ?? 'run-complete';
-        void mountStrip().catch((error: unknown) => {
+        void openResetRun().catch((error: unknown) => {
           handleFlowError(error, restartRun);
         });
       } catch (error) {
@@ -1989,6 +2010,53 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
     }
   };
 
+  const mountInterrogationIntro = (
+    node: NodeDefinition,
+    active: EncounterSession,
+  ): void => {
+    if (hasShownIntroModal && introModalNodeId === node.ref) {
+      mountInterrogation(true);
+      return;
+    }
+    hasShownIntroModal = true;
+    introModalNodeId = node.ref;
+
+    let transitionQueued = false;
+    let autoplayTimer: number | undefined;
+    const intro = createInterrogationIntroModal({
+      onStart(): void {
+        if (transitionQueued) return;
+        transitionQueued = true;
+        // reset=1 can reach this screen without an earlier pointer gesture.
+        // Activating here keeps browser audio policy aligned with the click or
+        // key that actually begins the interrogation.
+        activateAudio(node.kind === 'BOSS' ? 'BOSS' : 'INTERROGATION');
+        queueMicrotask(() => {
+          if (destroyed || encounterSession !== active) return;
+          audio.play('shuffle_bubble');
+          mountInterrogation(true);
+        });
+      },
+    });
+    setAutoplayScene(undefined);
+    mounted.scenes.showOverlay({
+      view: intro.view,
+      onDestroy(): void {
+        if (autoplayTimer !== undefined) {
+          window.clearTimeout(autoplayTimer);
+          autoplayTimer = undefined;
+        }
+        intro.destroy();
+      },
+    });
+
+    // Autoplay has no user to dismiss a presentation-only gate. The short
+    // delay guarantees at least one mounted frame and avoids same-tick races.
+    if (autoplayRequested) {
+      autoplayTimer = window.setTimeout(() => intro.start(), AUTOPLAY_INTRO_DELAY_MS);
+    }
+  };
+
   const prepareDialogue = async (active: EncounterSession): Promise<Phase4DialogueService> => {
     const allowedTimeHours = active.caseDefinition.claims.flatMap((claim) => {
       const hour = Number(String(claim.time_ref?.from ?? '').split(':')[0]);
@@ -2082,6 +2150,8 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
           : {}),
       });
       if (destroyed) return;
+      hasShownIntroModal = false;
+      introModalNodeId = node.ref;
       await assets.preloadKeys(
         interrogationPresentationAssetKeys(
           active.currentModel(),
@@ -2094,8 +2164,8 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
       dialogueService = await prepareDialogue(active);
       if (destroyed || encounterSession !== active) return;
       audio.play('door_knock');
-      audio.play('shuffle_bubble');
-      mountInterrogation(true);
+      audio.play('paper_flip');
+      mountInterrogationIntro(node, active);
     } finally {
       openingNode = false;
     }
@@ -2108,6 +2178,8 @@ export async function bootstrap(mount: HTMLElement): Promise<MountedGameApplicat
     runSession.snapshot.nodeIndex >= strip.length
   ) {
     await mountEnding();
+  } else if (resetRequested) {
+    await openResetRun();
   } else {
     await mountStrip();
   }

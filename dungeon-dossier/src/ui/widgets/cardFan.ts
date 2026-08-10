@@ -1,5 +1,8 @@
 import { Container, Graphics, type FederatedPointerEvent } from 'pixi.js';
-import type { InterrogationCardView } from '../screens/interrogation/model';
+import {
+  interrogationCardKey,
+  type InterrogationCardView,
+} from '../screens/interrogation/model';
 import { createCardWidget, type CardLayerUrlResolver } from './cardWidget';
 import type { CardAttachments, CardLayerId } from './cardLayers';
 import {
@@ -49,8 +52,8 @@ export interface CardFanController {
   /** Dotted drag link; the screen adds this above the tag row. */
   readonly linkView: Container;
   selectByIndex(index: number): void;
-  setSelected(cardId: string | undefined): void;
-  setAttachments(cardId: string, attachments: CardAttachments): void;
+  setSelected(cardKey: string | undefined): void;
+  setAttachments(cardKey: string, attachments: CardAttachments): void;
   registerDropTarget(target: CardDropTarget): void;
   clearDropTargets(): void;
   destroy(): void;
@@ -60,7 +63,11 @@ export interface CardFanOptions {
   readonly onSelect?: (card: InterrogationCardView, index: number) => void;
   /** Raised by a click that was not a drag: open the full-size focus modal. */
   readonly onFocus?: (card: InterrogationCardView, index: number) => void;
-  readonly onDropOnTarget?: (card: InterrogationCardView, targetId: string) => void;
+  readonly onDropOnTarget?: (
+    card: InterrogationCardView,
+    targetId: string,
+    index: number,
+  ) => void;
   readonly onTargetHighlight?: (targetId: string | undefined) => void;
   readonly resolveLayerUrl?: (
     card: InterrogationCardView,
@@ -79,6 +86,7 @@ const DRAG_THRESHOLD = 4;
 const DRAG_POINTER_GAP = 8;
 
 interface CardEntry {
+  readonly key: string;
   readonly card: InterrogationCardView;
   readonly index: number;
   readonly view: Container;
@@ -113,7 +121,7 @@ export function createCardFan(
   const attachmentsByCard = new Map<string, CardAttachments>(
     Object.entries(options.attachments ?? {}),
   );
-  let selectedId: string | undefined;
+  let selectedKey: string | undefined;
   let hoveredIndex: number | undefined;
   let dragIndex: number | undefined;
   let dragging = false;
@@ -125,7 +133,7 @@ export function createCardFan(
 
   const applyLayout = (): void => {
     entries.forEach((entry, index) => {
-      const selected = entry.card.cardId === selectedId;
+      const selected = entry.key === selectedKey;
       const transientLift = index === hoveredIndex || index === dragIndex;
       const lifted = selected || transientLift;
       const y = selected
@@ -177,7 +185,9 @@ export function createCardFan(
       return;
     }
     const target = findCardDropTarget(point, dropTargets);
-    if (target !== undefined) options.onDropOnTarget?.(activeEntry.card, target.id);
+    if (target !== undefined) {
+      options.onDropOnTarget?.(activeEntry.card, target.id, activeEntry.index);
+    }
   };
 
   const cancelDrag = (): void => {
@@ -186,7 +196,8 @@ export function createCardFan(
   };
 
   const buildArtwork = (card: InterrogationCardView, index: number): Container => {
-    const attachments = attachmentsByCard.get(card.cardId);
+    const key = interrogationCardKey(card, index);
+    const attachments = attachmentsByCard.get(key);
     const lockOverlayUrl = options.resolveLockOverlayUrl?.(card);
     const artwork = createCardWidget(
       {
@@ -222,6 +233,7 @@ export function createCardFan(
   const buildCard = (card: InterrogationCardView, index: number): void => {
     const slot = slots[index];
     if (slot === undefined) return;
+    const key = interrogationCardKey(card, index);
     const cardView = new Container();
     const artwork = buildArtwork(card, index);
     const outline = new Graphics();
@@ -243,8 +255,8 @@ export function createCardFan(
       applyLayout();
     });
     cardView.on('pointerdown', (event: FederatedPointerEvent) => {
-      pressWasSelected = selectedId === card.cardId;
-      selectedId = card.cardId;
+      pressWasSelected = selectedKey === key;
+      selectedKey = key;
       dragIndex = index;
       dragging = false;
       dragOrigin = { x: event.global.x, y: event.global.y };
@@ -283,7 +295,7 @@ export function createCardFan(
     cardView.on('pointerupoutside', endDrag);
     cardView.on('pointercancel', cancelDrag);
 
-    entries.push({ card, index, view: cardView, outline, slot, artwork });
+    entries.push({ key, card, index, view: cardView, outline, slot, artwork });
     view.addChild(cardView);
   };
 
@@ -305,17 +317,17 @@ export function createCardFan(
       // honour the same lock. Without this, Digit1-9 could select a card the
       // engine will refuse to play and leave the selection visibly wrong.
       if (card.locked === true) return;
-      selectedId = card.cardId;
+      selectedKey = interrogationCardKey(card, index);
       applyLayout();
       options.onSelect?.(card, index);
     },
-    setSelected(cardId): void {
-      selectedId = cardId;
+    setSelected(cardKey): void {
+      selectedKey = cardKey;
       applyLayout();
     },
-    setAttachments(cardId, attachments): void {
-      attachmentsByCard.set(cardId, attachments);
-      const entry = entries.find((candidate) => candidate.card.cardId === cardId);
+    setAttachments(cardKey, attachments): void {
+      attachmentsByCard.set(cardKey, attachments);
+      const entry = entries.find((candidate) => candidate.key === cardKey);
       if (entry === undefined) return;
       entry.view.removeChild(entry.artwork);
       entry.artwork.destroy({ children: true });

@@ -452,6 +452,7 @@ export function startAutoplay(port: AutoplayPort, options: AutoplayOptions): voi
   const submissionContext = (scene: InterrogationScene): LegalSubmissionContext => ({
     handCards: scene.model.cards.map((card) => ({
       cardId: card.cardId,
+      ...(card.instanceId === undefined ? {} : { instanceId: card.instanceId }),
       cpCost:
         scene.cardPlayability[card.cardId]?.effectiveCpCost ?? card.cpCost,
       requiresEvidence: card.requiresEvidence,

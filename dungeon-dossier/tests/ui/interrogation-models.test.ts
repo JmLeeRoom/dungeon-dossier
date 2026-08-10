@@ -9,7 +9,9 @@ import {
 import {
   canSubmitInterrogationSelection,
   cardNeedsEvidence,
+  interrogationCardKey,
   interrogationCardAllowsFacet,
+  selectedInterrogationCard,
   type InterrogationCardView,
 } from '../../src/ui/screens/interrogation/model';
 import {
@@ -445,5 +447,36 @@ describe('card, evidence, and submit selection models', () => {
     expect(submit('finisher', [], 'BROKEN')).toBe(false);
     expect(submit('proof', ['ev'], 'SHIELDED')).toBe(true);
     expect(submit('broke', [], 'GAP')).toBe(false);
+  });
+
+  it('resolves duplicate blueprints by instance instead of the first card id match', () => {
+    const duplicates: readonly InterrogationCardView[] = [
+      { ...CARDS[0]!, instanceId: 'copy-1', affordable: false },
+      { ...CARDS[0]!, instanceId: 'copy-2', affordable: true },
+    ];
+    expect(interrogationCardKey(duplicates[0]!, 0)).toBe('copy-1');
+    expect(interrogationCardKey(duplicates[1]!, 1)).toBe('copy-2');
+    expect(selectedInterrogationCard(duplicates, {
+      cardId: 'query',
+      instanceId: 'copy-2',
+    })).toBe(duplicates[1]);
+    expect(canSubmitInterrogationSelection(duplicates, {
+      cardId: 'query',
+      instanceId: 'copy-2',
+      facet: 'WHO',
+      evidenceIds: [],
+    })).toBe(true);
+    expect(canSubmitInterrogationSelection(duplicates, {
+      cardId: 'query',
+      instanceId: 'copy-1',
+      facet: 'WHO',
+      evidenceIds: [],
+    })).toBe(false);
+    expect(canSubmitInterrogationSelection(duplicates, {
+      cardId: 'query',
+      instanceId: 'missing-copy',
+      facet: 'WHO',
+      evidenceIds: [],
+    })).toBe(false);
   });
 });

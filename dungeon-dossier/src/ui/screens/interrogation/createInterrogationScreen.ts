@@ -42,7 +42,9 @@ import { createJudgmentBanner, type JudgmentBannerController } from './judgmentB
 import { createPulseRings, createPunishJuice, PUNISH_TIMELINE } from './punishJuice';
 import {
   canSubmitInterrogationSelection,
+  interrogationCardKey,
   interrogationCardAllowsFacet,
+  selectedInterrogationCard,
   type InterrogationAssetLookup,
   type InterrogationCallbacks,
   type InterrogationCardView,
@@ -597,7 +599,9 @@ export function createInterrogationScreen(
   typewriter.useFallback(firstStatementText(model));
   content.addChild(typewriter.view);
 
+  let selectedCardKey: string | undefined;
   let selectedCardId: string | undefined;
+  let selectedInstanceId: string | undefined;
   let selectedFacet: PublicFacet | undefined;
   let selectedEvidenceIds = [...(model.selectedEvidenceIds ?? [])];
   let dossierView: Container | undefined;
@@ -611,8 +615,14 @@ export function createInterrogationScreen(
   const visibleCards = model.cards.slice(0, 5);
   const renderedAttachmentSignatures = new Map<string, string>();
 
-  const attachmentsForCard = (card: InterrogationCardView): CardAttachments =>
-    interrogationCardAttachments(card, selectedEvidenceIds, card.cardId === selectedCardId);
+  const attachmentsForCard = (
+    card: InterrogationCardView,
+    index: number,
+  ): CardAttachments => interrogationCardAttachments(
+    card,
+    selectedEvidenceIds,
+    interrogationCardKey(card, index) === selectedCardKey,
+  );
 
   const resolveCardLayerUrl = (
     card: InterrogationCardView,
@@ -630,12 +640,14 @@ export function createInterrogationScreen(
 
   const selectionSnapshot = (): InterrogationSelection => ({
     ...(selectedCardId === undefined ? {} : { cardId: selectedCardId }),
+    ...(selectedInstanceId === undefined ? {} : { instanceId: selectedInstanceId }),
     ...(selectedFacet === undefined ? {} : { facet: selectedFacet }),
     evidenceIds: [...selectedEvidenceIds],
   });
 
   const refreshSelection = (notify = true): void => {
-    const selectedCard = visibleCards.find((card) => card.cardId === selectedCardId);
+    const selection = selectionSnapshot();
+    const selectedCard = selectedInterrogationCard(visibleCards, selection);
     if (
       selectedFacet !== undefined &&
       !interrogationCardAllowsFacet(
@@ -646,14 +658,15 @@ export function createInterrogationScreen(
     ) {
       selectedFacet = undefined;
     }
-    cardFan.setSelected(selectedCardId);
-    for (const card of visibleCards) {
-      const attachments = attachmentsForCard(card);
+    cardFan.setSelected(selectedCardKey);
+    visibleCards.forEach((card, index) => {
+      const cardKey = interrogationCardKey(card, index);
+      const attachments = attachmentsForCard(card, index);
       const signature = attachmentSignature(attachments);
-      if (renderedAttachmentSignatures.get(card.cardId) === signature) continue;
-      renderedAttachmentSignatures.set(card.cardId, signature);
-      cardFan.setAttachments(card.cardId, attachments);
-    }
+      if (renderedAttachmentSignatures.get(cardKey) === signature) return;
+      renderedAttachmentSignatures.set(cardKey, signature);
+      cardFan.setAttachments(cardKey, attachments);
+    });
     tagControllers.forEach((controller, facet) => {
       const publicState = deriveFacetTagChipState(facet, model.dto.statement);
       controller.setState(
@@ -680,15 +693,17 @@ export function createInterrogationScreen(
     if (notify) callbacks.onSelectionChange?.(selectionSnapshot());
   };
 
-  function selectCard(cardId: string): void {
+  function selectCard(card: InterrogationCardView, index: number): void {
     if (decisionActive) return;
-    selectedCardId = cardId;
+    selectedCardKey = interrogationCardKey(card, index);
+    selectedCardId = card.cardId;
+    selectedInstanceId = card.instanceId;
     refreshSelection();
   }
 
   function selectFacet(facet: PublicFacet): void {
     if (decisionActive) return;
-    const selectedCard = visibleCards.find((card) => card.cardId === selectedCardId);
+    const selectedCard = selectedInterrogationCard(visibleCards, selectionSnapshot());
     if (
       !interrogationCardAllowsFacet(
         selectedCard,
@@ -731,11 +746,9 @@ export function createInterrogationScreen(
     cardModal = undefined;
   };
 
-  const openCardModal = (cardId: string): void => {
+  const openCardModal = (card: InterrogationCardView, index: number): void => {
     if (decisionActive) return;
     closeCardModal();
-    const card = model.cards.find((candidate) => candidate.cardId === cardId);
-    if (card === undefined) return;
     const lockOverlayUrl = card.locked === true ? resolveCardLockOverlayUrl(card) : undefined;
     cardModal = createCardDetailModal(
       {
@@ -754,7 +767,7 @@ export function createInterrogationScreen(
       {
         stageWidth: STAGE_WIDTH,
         stageHeight: STAGE_HEIGHT,
-        attachments: attachmentsForCard(card),
+        attachments: attachmentsForCard(card, index),
         ...(lockOverlayUrl === undefined ? {} : { lockOverlayUrl }),
         resolveLayerUrl: (layer, attachmentId) =>
           resolveCardLayerUrl(card, layer, attachmentId),
@@ -786,10 +799,11 @@ export function createInterrogationScreen(
   content.addChild(judgmentBanner.view);
 
   const initialAttachments = Object.fromEntries(
-    visibleCards.map((card) => {
+    visibleCards.map((card, index) => {
+      const cardKey = interrogationCardKey(card, index);
       const attachments = interrogationCardAttachments(card, [], false);
-      renderedAttachmentSignatures.set(card.cardId, attachmentSignature(attachments));
-      return [card.cardId, attachments] as const;
+      renderedAttachmentSignatures.set(cardKey, attachmentSignature(attachments));
+      return [cardKey, attachments] as const;
     }),
   );
   const cardFan: CardFanController = createCardFan(visibleCards, {
@@ -799,29 +813,31 @@ export function createInterrogationScreen(
     attachments: initialAttachments,
     resolveLayerUrl: resolveCardLayerUrl,
     resolveLockOverlayUrl: resolveCardLockOverlayUrl,
-    onSelect(card): void {
-      selectCard(card.cardId);
+    onSelect(card, index): void {
+      selectCard(card, index);
     },
-    onFocus(card): void {
-      openCardModal(card.cardId);
+    onFocus(card, index): void {
+      openCardModal(card, index);
     },
     onTargetHighlight(targetId): void {
       highlightedFacet = FACETS.find((facet) => facet === targetId);
       // Drag hover is presentation-only; it must not emit a gameplay selection.
       refreshSelection(false);
     },
-    onDropOnTarget(card, targetId): void {
+    onDropOnTarget(card, targetId, index): void {
       if (decisionActive) return;
       const facet = FACETS.find((candidate) => candidate === targetId);
       if (
         facet === undefined ||
         !interrogationCardAllowsFacet(card, facet, model.claimExposureByFacet?.[facet])
       ) return;
+      selectedCardKey = interrogationCardKey(card, index);
       selectedCardId = card.cardId;
+      selectedInstanceId = card.instanceId;
       selectedFacet = facet;
       highlightedFacet = undefined;
       refreshSelection();
-      callbacks.onCardDock?.(card.cardId, facet);
+      callbacks.onCardDock?.(card.cardId, facet, card.instanceId);
     },
   });
   for (const [facet, bounds] of tagBounds) {

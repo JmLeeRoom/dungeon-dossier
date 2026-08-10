@@ -162,6 +162,36 @@ describe('interrogation screen impact juice', () => {
     screen.view.destroy({ children: true });
   });
 
+  it('echoes the exact selected instance when duplicate blueprints share a card id', () => {
+    const inputTarget = new EventTarget();
+    const baseCard = { ...screenModel().cards[0]!, requiresEvidence: false };
+    const model = screenModel({
+      cards: [
+        { ...baseCard, instanceId: 'physical-copy-1' },
+        { ...baseCard, instanceId: 'physical-copy-2' },
+      ],
+    });
+    const onSelectionChange = vi.fn();
+    const screen = createInterrogationScreen(
+      model,
+      { onSelectionChange },
+      { inputTarget },
+    );
+
+    inputTarget.dispatchEvent(keyboardEvent('Digit2'));
+    expect(screen.selection).toMatchObject({
+      cardId: 'card_contradict_basic',
+      instanceId: 'physical-copy-2',
+    });
+    expect(onSelectionChange).toHaveBeenLastCalledWith(expect.objectContaining({
+      cardId: 'card_contradict_basic',
+      instanceId: 'physical-copy-2',
+    }));
+
+    screen.destroy();
+    screen.view.destroy({ children: true });
+  });
+
   it('builds with the juice overlay above the scene and below nothing else', () => {
     const screen = createInterrogationScreen(screenModel());
 

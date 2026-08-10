@@ -56,6 +56,7 @@ export type AutoplayFacet = 'WHO' | 'WHEN' | 'WHERE' | 'WHAT' | 'HOW' | 'WHY';
 
 export interface AutoplaySubmission {
   readonly cardId: string;
+  readonly instanceId?: string;
   readonly facet: AutoplayFacet;
   readonly evidenceIds: readonly string[];
 }

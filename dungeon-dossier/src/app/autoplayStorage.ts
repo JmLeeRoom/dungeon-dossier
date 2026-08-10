@@ -4,15 +4,15 @@ import {
 } from './save';
 
 /**
- * Creates the run-save boundary used by bootstrap. Autoplay resets only the
- * run slot; the deliberately narrow SaveStorage interface cannot erase
- * workbench transforms, locks, or any other same-origin localStorage data.
+ * Creates the run-save boundary used by bootstrap. Autoplay and an explicit
+ * player reset remove only the run slot; the deliberately narrow SaveStorage
+ * interface cannot erase workbench transforms, locks, or other preferences.
  */
 export function createRunSaveRepository(
   storage: SaveStorage,
-  resetForAutoplay: boolean,
+  resetRun: boolean,
 ): SaveRepository {
   const repository = new SaveRepository(storage);
-  if (resetForAutoplay) repository.clear();
+  if (resetRun) repository.clear();
   return repository;
 }

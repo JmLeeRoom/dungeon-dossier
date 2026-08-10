@@ -295,7 +295,13 @@ describe('autoplay best plan', () => {
       handCards: [
         { cardId: 'card_confirm_basic', cpCost: 1, requiresEvidence: true, intent: 'CONFIRM' },
         { cardId: 'card_pressure', cpCost: 2, requiresEvidence: false, intent: 'PRESSURE' },
-        { cardId: 'card_recover_breathe', cpCost: 1, requiresEvidence: false, intent: 'RECOVER' },
+        {
+          cardId: 'card_recover_breathe',
+          instanceId: 'recover-copy-2',
+          cpCost: 1,
+          requiresEvidence: false,
+          intent: 'RECOVER',
+        },
       ],
       commandPoints: 3,
       facets: ['WHO'],
@@ -304,6 +310,7 @@ describe('autoplay best plan', () => {
 
     expect(bestFillerSubmission(context)).toEqual({
       cardId: 'card_recover_breathe',
+      instanceId: 'recover-copy-2',
       facet: 'WHO',
       evidenceIds: [],
     });

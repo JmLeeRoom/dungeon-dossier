@@ -106,7 +106,7 @@ describe('card fan pointer interactions', () => {
 
     emit(first, 'pointerup', { global: { x: 60, y: 260 } });
     expect(onDropOnTarget).toHaveBeenCalledOnce();
-    expect(onDropOnTarget).toHaveBeenCalledWith(CARDS[0], 'WHO');
+    expect(onDropOnTarget).toHaveBeenCalledWith(CARDS[0], 'WHO', 0);
     expect(onTargetHighlight).toHaveBeenLastCalledWith(undefined);
     expect(fan.linkView.visible).toBe(false);
     expect(first.position.y).toBe(208);
@@ -137,6 +137,40 @@ describe('card fan pointer interactions', () => {
     vi.runAllTimers();
     expect(onFocus).toHaveBeenCalledOnce();
     expect(onFocus).toHaveBeenCalledWith(CARDS[0], 0);
+
+    fan.destroy();
+  });
+
+  it('keeps duplicate blueprints independent by physical instance id', () => {
+    const duplicates: readonly InterrogationCardView[] = [
+      { ...CARDS[0]!, instanceId: 'instance-1' },
+      { ...CARDS[0]!, instanceId: 'instance-2' },
+    ];
+    const onSelect = vi.fn();
+    const fan = createCardFan(duplicates, { spacing: 76, onSelect });
+    const first = fan.view.children[0];
+    const second = fan.view.children[1];
+    if (!(first instanceof Container) || !(second instanceof Container)) {
+      throw new Error('Expected duplicate card containers.');
+    }
+
+    emit(first, 'pointerdown', { global: { x: 100, y: 380 } });
+    emit(first, 'pointerup', { global: { x: 100, y: 380 } });
+    expect(first.position.y).toBe(208);
+    expect(second.position.y).toBe(362);
+    expect(onSelect).toHaveBeenLastCalledWith(duplicates[0], 0);
+
+    emit(second, 'pointerdown', { global: { x: 180, y: 380 } });
+    emit(second, 'pointerup', { global: { x: 180, y: 380 } });
+    expect(first.position.y).toBe(362);
+    expect(second.position.y).toBe(208);
+    expect(onSelect).toHaveBeenLastCalledWith(duplicates[1], 1);
+
+    const firstArtwork = first.children[0];
+    const secondArtwork = second.children[0];
+    fan.setAttachments('instance-2', { evidenceIds: ['ev-2'] });
+    expect(first.children[0]).toBe(firstArtwork);
+    expect(second.children[0]).not.toBe(secondArtwork);
 
     fan.destroy();
   });

@@ -141,6 +141,8 @@ export interface InterrogationDecisionView {
 
 export interface InterrogationSelection {
   readonly cardId?: string;
+  /** V2 physical copy identity. Duplicate blueprints must never collapse. */
+  readonly instanceId?: string;
   readonly facet?: PublicDTO['statement'][number]['facet'];
   readonly evidenceIds: readonly string[];
 }
@@ -153,7 +155,11 @@ export interface InterrogationCallbacks {
   readonly onUsePartner?: () => void;
   readonly onKeystroke?: () => void;
   /** Raised when a card is dragged onto a tag chip and docked there. */
-  readonly onCardDock?: (cardId: string, facet: InterrogationSelection['facet']) => void;
+  readonly onCardDock?: (
+    cardId: string,
+    facet: InterrogationSelection['facet'],
+    instanceId?: string,
+  ) => void;
   /** v2 decision rail: the player chose Secure or Continue for this decision. */
   readonly onResolveDecision?: (
     decisionId: string,
@@ -192,6 +198,29 @@ export function interrogationCardAllowsFacet(
   return exposure === 'BROKEN';
 }
 
+/** Stable per-slot UI key; V2 uses the canonical physical instance id. */
+export function interrogationCardKey(
+  card: InterrogationCardView,
+  index: number,
+): string {
+  return card.instanceId ?? `legacy:${index}:${card.cardId}`;
+}
+
+export function selectedInterrogationCard(
+  cards: readonly InterrogationCardView[],
+  selection: Pick<InterrogationSelection, 'cardId' | 'instanceId'>,
+): InterrogationCardView | undefined {
+  if (selection.cardId === undefined) return undefined;
+  if (selection.instanceId === undefined) {
+    return cards.find((candidate) => candidate.cardId === selection.cardId);
+  }
+  return cards.find(
+    (candidate) =>
+      candidate.cardId === selection.cardId &&
+      candidate.instanceId === selection.instanceId,
+  );
+}
+
 export function cardEvidenceRange(
   card: InterrogationCardView,
   exposure?: ClaimExposure,
@@ -211,7 +240,7 @@ export function canSubmitInterrogationSelection(
   claimExposureByFacet: InterrogationScreenModel['claimExposureByFacet'] = {},
 ): boolean {
   if (selection.cardId === undefined || selection.facet === undefined) return false;
-  const card = cards.find((candidate) => candidate.cardId === selection.cardId);
+  const card = selectedInterrogationCard(cards, selection);
   if (card === undefined) return false;
   if (card.locked === true) return false;
   if (card.affordable === false) return false;

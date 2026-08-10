@@ -261,6 +261,7 @@ export function chooseReward(
 
 export interface LegalHandCard {
   readonly cardId: string;
+  readonly instanceId?: string;
   readonly cpCost: number;
   readonly requiresEvidence: boolean;
   readonly intent: string;
@@ -298,6 +299,7 @@ function submissionFor(
   if (card === undefined || facet === undefined) return undefined;
   return {
     cardId: card.cardId,
+    ...(card.instanceId === undefined ? {} : { instanceId: card.instanceId }),
     facet,
     evidenceIds: card.requiresEvidence ? context.evidenceIds.slice(0, 1) : [],
   };
@@ -395,6 +397,7 @@ function compatibleProofSubmission(
   if (card === undefined) return undefined;
   return {
     cardId: card.cardId,
+    ...(card.instanceId === undefined ? {} : { instanceId: card.instanceId }),
     facet: path.facet,
     evidenceIds: [...path.evidenceIds],
   };
@@ -506,5 +509,10 @@ export function fuzzSubmission(
   while (evidenceIds.length < wanted && pool.length > 0) {
     evidenceIds.push(...pool.splice(pickIndex(rng, pool.length), 1));
   }
-  return { cardId: card.cardId, facet, evidenceIds };
+  return {
+    cardId: card.cardId,
+    ...(card.instanceId === undefined ? {} : { instanceId: card.instanceId }),
+    facet,
+    evidenceIds,
+  };
 }
